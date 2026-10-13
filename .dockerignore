@@ -1,0 +1,10 @@
+**/.git
+**/.vs
+**/bin
+**/obj
+**/*.md
+**/appsettings.Development.json
+.history
+**/.history
+**/wwwroot/uploads
+**/TestResults

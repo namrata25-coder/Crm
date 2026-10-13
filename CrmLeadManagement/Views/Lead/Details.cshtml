@@ -1,0 +1,1850 @@
+@model CrmLeadManagement.Models.Lead
+@{
+    var lead = Model!;
+    var activeTab = ViewData["ActiveTab"] as string ?? "call";
+    var activeFinanceSubTab = ViewData["ActiveFinanceSubTab"] as string ?? "estimation";
+    var requirementError = TempData["RequirementError"] as string;
+    var estimationError = TempData["EstimationError"] as string;
+    var quotationError = TempData["QuotationError"] as string;
+    var proposalError = TempData["ProposalError"] as string;
+    var latestCall = lead.CallHistory.Count > 0 ? lead.CallHistory[^1] : null;
+    var latestFollowUp = lead.FollowUps.Count > 0 ? lead.FollowUps[^1] : null;
+    var latestVisit = lead.Visits.Count > 0 ? lead.Visits[^1] : null;
+}
+
+<div class="breadcrumb-row">
+    <a asp-controller="Home" asp-action="Index">Home</a><span class="sep">/</span>
+    <a asp-controller="Lead" asp-action="List">Lead List</a><span class="sep">/</span>
+    <span class="current">@lead.LeadName</span>
+</div>
+
+<!-- ============ LEAD DETAILS HEADER ============ -->
+<div class="page-head">
+    <div class="detail-hero">
+        <div class="avatar-lg">@Initials(lead.LeadName)</div>
+        <div>
+            <h1>@lead.LeadName</h1>
+            <div class="meta">
+                <span>@lead.LeadId</span><span class="sep">•</span>
+                <span>@lead.CompanyName</span><span class="sep">•</span>
+                @Html.Raw(StatusBadge(lead.LeadStatus))
+                <span class="badge-priority pr-@(lead.Priority?.ToLower() ?? "medium")">@(lead.Priority ?? "Medium") priority</span>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary btn-sm" onclick="switchLeadTab('followup'); openAddFollowUpModal();">
+            <i class="bi bi-calendar-plus"></i> Add Follow-up
+        </button>
+        <a asp-controller="Lead" asp-action="List" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left"></i> Back to Lead List</a>
+    </div>
+</div>
+
+<!-- ============ TABS: Call | Follow-up | Requirement | Assign/Re-assign | Finance | Visit ============ -->
+<div class="tabs-bar" role="tablist">
+    <button type="button" class="tab-btn" data-tab="call" onclick="switchLeadTab('call')">
+        <i class="bi bi-telephone-fill"></i> Call
+    </button>
+    <button type="button" class="tab-btn" data-tab="followup" onclick="switchLeadTab('followup')">
+        <i class="bi bi-calendar-check-fill"></i> Follow-up
+    </button>
+    <button type="button" class="tab-btn" data-tab="requirement" onclick="switchLeadTab('requirement')">
+        <i class="bi bi-clipboard-check"></i> Requirement
+    </button>
+    <button type="button" class="tab-btn" data-tab="assign" onclick="switchLeadTab('assign')">
+        <i class="bi bi-person-gear"></i> Assign / Re-assign
+    </button>
+    <button type="button" class="tab-btn" data-tab="finance" onclick="switchLeadTab('finance')">
+        <i class="bi bi-cash-coin"></i> Finance
+    </button>
+    <button type="button" class="tab-btn" data-tab="visit" onclick="switchLeadTab('visit')">
+        <i class="bi bi-geo-alt-fill"></i> Visit
+    </button>
+</div>
+
+<!-- ============ TAB CONTENT (only one panel visible at a time) ============ -->
+<div class="panel" style="margin-bottom:22px;">
+    <div class="panel-body">
+
+        <!-- ============ CALL TAB — detail + history + Add Call Detail ============ -->
+        <div class="tab-panel" id="tab-call">
+            <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <span>Call History Detail</span>
+                <button type="button" class="btn btn-primary btn-sm" id="btnAddCallDetail" onclick="openAddCallModal()">
+                    <i class="bi bi-plus-lg"></i> + Add Call Detail
+                </button>
+            </div>
+
+            <div id="callSuccessAlert" class="alert-success-banner" style="display:none;margin-bottom:16px;">
+                <i class="bi bi-check-circle-fill"></i>
+                <span id="callSuccessMsg">Call detail saved successfully!</span>
+            </div>
+
+            <div class="empty-state" id="callEmptyState" style="@(latestCall is null ? "" : "display:none;")">
+                <i class="bi bi-telephone-x"></i>
+                <p>No calls logged yet for this lead.</p>
+            </div>
+
+            <div id="callLatestSummaryBox" style="@(latestCall is null ? "display:none;" : "")">
+                <div class="info-grid">
+                    <div class="info-item"><div class="lbl">CALL DATE</div><div class="val" id="latestCallDate">@(latestCall?.CallDate ?? "—")</div></div>
+                    <div class="info-item"><div class="lbl">CALL TIME</div><div class="val" id="latestCallTime">@(latestCall?.CallTime ?? "—")</div></div>
+                    <div class="info-item"><div class="lbl">CALL STATUS</div><div class="val" id="latestCallStatus">@Html.Raw(CallStatusBadge(latestCall?.CallStatus))</div></div>
+                    <div class="info-item"><div class="lbl">DURATION</div><div class="val muted" id="latestCallDuration">@(string.IsNullOrWhiteSpace(latestCall?.Duration) ? "—" : latestCall?.Duration)</div></div>
+                    <div class="info-item full"><div class="lbl">REMARKS</div><div class="val muted" id="latestCallRemarks">@(string.IsNullOrWhiteSpace(latestCall?.Notes) ? "—" : latestCall?.Notes)</div></div>
+                </div>
+            </div>
+
+            <div id="callHistorySection" style="@(latestCall is null ? "display:none;" : "")">
+                <div class="divider-line"></div>
+
+                <div class="section-title">Call History</div>
+                <div class="table-wrap" id="callHistoryTableWrap">
+                    <table class="data-table" id="callHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Call Date</th><th>Call Time</th><th>Call Status</th>
+                                <th>Duration</th><th>Employee</th><th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="callHistoryTbody">
+                            @if (lead.CallHistory.Count > 0)
+                            {
+                                @foreach (var c in lead.CallHistory.AsEnumerable().Reverse())
+                                {
+                                    <tr>
+                                        <td>@c.CallDate</td>
+                                        <td>@c.CallTime</td>
+                                        <td>@Html.Raw(CallStatusBadge(c.CallStatus))</td>
+                                        <td>@(string.IsNullOrWhiteSpace(c.Duration) ? "—" : c.Duration)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(c.Employee) ? (string.IsNullOrWhiteSpace(lead.AssignedTo) ? "—" : lead.AssignedTo) : c.Employee)</td>
+                                        <td style="max-width:260px;">@(string.IsNullOrWhiteSpace(c.Notes) ? "—" : c.Notes)</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ FOLLOW-UP TAB — detail + history + Add Follow-up ============ -->
+        <div class="tab-panel" id="tab-followup">
+            <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <span>Follow-up Detail</span>
+                <button type="button" class="btn btn-primary btn-sm" id="btnAddFollowUp" onclick="openAddFollowUpModal()">
+                    <i class="bi bi-plus-lg"></i> + Add Follow-up
+                </button>
+            </div>
+
+            <div id="followUpSuccessAlert" class="alert-success-banner" style="display:none;margin-bottom:16px;">
+                <i class="bi bi-check-circle-fill"></i>
+                <span id="followUpSuccessMsg">Follow-up saved successfully!</span>
+            </div>
+
+            <div class="empty-state" id="followUpEmptyState" style="@(latestFollowUp is null ? "" : "display:none;")">
+                <i class="bi bi-calendar-x"></i>
+                <p>No follow-ups recorded for this lead.</p>
+            </div>
+
+            <div id="followUpLatestSummaryBox" style="@(latestFollowUp is null ? "display:none;" : "")">
+                <div class="info-grid">
+                    <div class="info-item"><div class="lbl">FOLLOW-UP DATE</div><div class="val" id="latestFollowUpDate">@(latestFollowUp?.FollowUpDate ?? "—")</div></div>
+                    <div class="info-item"><div class="lbl">FOLLOW-UP TIME</div><div class="val" id="latestFollowUpTime">@(latestFollowUp?.FollowUpTime ?? "—")</div></div>
+                    <div class="info-item"><div class="lbl">FOLLOW-UP TYPE</div><div class="val" id="latestFollowUpType">@(string.IsNullOrWhiteSpace(latestFollowUp?.FollowUpType) ? "Call" : latestFollowUp.FollowUpType)</div></div>
+                    <div class="info-item"><div class="lbl">STATUS</div><div class="val" id="latestFollowUpStatus">@Html.Raw(FollowUpStatusBadge(latestFollowUp?.Status))</div></div>
+                    <div class="info-item full"><div class="lbl">REMARKS</div><div class="val muted" id="latestFollowUpRemarks">@(string.IsNullOrWhiteSpace(latestFollowUp?.Remarks) ? "—" : latestFollowUp.Remarks)</div></div>
+                </div>
+            </div>
+
+            <div id="followUpHistorySection" style="@(latestFollowUp is null ? "display:none;" : "")">
+                <div class="divider-line"></div>
+
+                <div class="section-title">Follow-up History</div>
+                <div class="table-wrap" id="followUpHistoryTableWrap">
+                    <table class="data-table" id="followUpHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Follow-up Date</th>
+                                <th>Follow-up Time</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="followUpHistoryTbody">
+                            @if (lead.FollowUps.Count > 0)
+                            {
+                                @foreach (var f in lead.FollowUps.AsEnumerable().Reverse())
+                                {
+                                    <tr>
+                                        <td>@f.FollowUpDate</td>
+                                        <td>@f.FollowUpTime</td>
+                                        <td>@(string.IsNullOrWhiteSpace(f.FollowUpType) ? "Call" : f.FollowUpType)</td>
+                                        <td>@Html.Raw(FollowUpStatusBadge(f.Status))</td>
+                                        <td style="max-width:320px;">@(string.IsNullOrWhiteSpace(f.Remarks) ? "—" : f.Remarks)</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ REQUIREMENT TAB — Add Requirement (with image) + saved list ============ -->
+        <div class="tab-panel" id="tab-requirement">
+            <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>Requirements</span>
+                <button type="button" class="btn btn-primary btn-sm" onclick="toggleRequirementForm()">
+                    <i class="bi bi-plus-lg"></i> Add Requirement
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(requirementError))
+            {
+                <div class="form-error-banner"><i class="bi bi-exclamation-triangle-fill"></i> @requirementError</div>
+            }
+
+            <div id="addRequirementForm" class="req-add-form" style="display:none;">
+                <form method="post" asp-controller="Lead" asp-action="AddRequirement" enctype="multipart/form-data">
+                    <input type="hidden" name="leadId" value="@lead.LeadId" />
+                    
+                    <div style="font-weight:700;font-size:15px;color:var(--ink-800);margin-bottom:12px;">Basic Requirement Details</div>
+                    <div class="form-grid">
+                        <div class="form-field full">
+                            <label>Requirement Title / Subject</label>
+                            <input type="text" name="title" placeholder="e.g., UPVC Windows & Doors Project" />
+                        </div>
+                        <div class="form-field">
+                            <label>Priority</label>
+                            <select name="priority">
+                                @foreach (var p in LookupData.Priorities)
+                                {
+                                    if (p == "Medium")
+                                    {
+                                        <option value="@p" selected>@p</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@p">@p</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label>Status</label>
+                            <select name="status">
+                                @foreach (var s in LookupData.RequirementStatuses)
+                                {
+                                    if (s == "New")
+                                    {
+                                        <option value="@s" selected>@s</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@s">@s</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label>Expected Date</label>
+                            <input type="date" name="expectedDate" />
+                        </div>
+                        <div class="form-field">
+                            <label>Budget</label>
+                            <input type="text" name="budget" placeholder="e.g., ₹1,50,000" />
+                        </div>
+                        <div class="form-field full">
+                            <label>Description / Remarks</label>
+                            <textarea name="description" rows="2" placeholder="General requirement overview or notes..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="divider-line" style="margin:16px 0;"></div>
+
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                        <div>
+                            <span style="font-weight:700;font-size:14px;color:var(--ink-800);">Item Specifications</span>
+                            <span style="font-size:12px;color:var(--ink-500);margin-left:8px;">(Add individual items in table format)</span>
+                        </div>
+                        <button type="button" id="addRequirementItemBtn" class="btn btn-primary btn-sm" onclick="addRequirementItem()">
+                            <i class="bi bi-plus-lg"></i> Add Item
+                        </button>
+                    </div>
+
+                    <div class="table-wrap req-table-wrap" style="overflow-x:auto;margin-bottom:18px;border:1px solid var(--line);border-radius:10px;background:#fff;">
+                        <table class="data-table req-items-table" style="width:100%;min-width:1250px;border-collapse:collapse;margin:0;">
+                            <thead>
+                                <tr style="background:var(--ink-50,#f8fafc);border-bottom:1px solid var(--line);">
+                                    <th style="width:55px;text-align:center;font-size:12px;font-weight:700;padding:10px 6px;">S.No.</th>
+                                    <th style="min-width:130px;font-size:12px;font-weight:700;padding:10px 8px;">Category</th>
+                                    <th style="min-width:140px;font-size:12px;font-weight:700;padding:10px 8px;">Item</th>
+                                    <th style="min-width:120px;font-size:12px;font-weight:700;padding:10px 8px;">Location</th>
+                                    <th style="width:80px;min-width:75px;font-size:12px;font-weight:700;padding:10px 4px;text-align:center;">H1</th>
+                                    <th style="width:80px;min-width:75px;font-size:12px;font-weight:700;padding:10px 4px;text-align:center;">H2</th>
+                                    <th style="width:80px;min-width:75px;font-size:12px;font-weight:700;padding:10px 4px;text-align:center;">H3</th>
+                                    <th style="width:80px;min-width:75px;font-size:12px;font-weight:700;padding:10px 4px;text-align:center;">W1</th>
+                                    <th style="width:80px;min-width:75px;font-size:12px;font-weight:700;padding:10px 4px;text-align:center;">W2</th>
+                                    <th style="width:80px;min-width:75px;font-size:12px;font-weight:700;padding:10px 4px;text-align:center;">W3</th>
+                                    <th style="min-width:125px;font-size:12px;font-weight:700;padding:10px 8px;">Types</th>
+                                    <th style="min-width:115px;font-size:12px;font-weight:700;padding:10px 8px;">Topology</th>
+                                    <th style="min-width:130px;font-size:12px;font-weight:700;padding:10px 8px;">Glass</th>
+                                    <th style="min-width:180px;font-size:12px;font-weight:700;padding:10px 8px;text-align:center;">Photo / Image</th>
+                                    <th style="width:45px;text-align:center;padding:10px 4px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="requirementItemsTbody">
+                            </tbody>
+                        </table>
+                        <div id="reqItemsEmptyHint" style="padding:22px;text-align:center;color:var(--ink-400);font-size:13px;">
+                            <i class="bi bi-table" style="font-size:20px;display:block;margin-bottom:6px;color:var(--ink-300);"></i>
+                            No items added yet. Click <strong>"Add Item"</strong> to add item rows in table format.
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+                        <button type="button" class="btn btn-outline" onclick="toggleRequirementForm()">Cancel</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Requirement</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="divider-line"></div>
+
+            <div class="section-title">Saved Requirements</div>
+            @if (lead.Requirements.Count == 0)
+            {
+                <div class="empty-state"><i class="bi bi-inbox"></i><p>No requirements added yet.</p></div>
+            }
+            else
+            {
+                @foreach (var r in lead.Requirements.AsEnumerable().Reverse())
+                {
+                    <div class="req-card">
+                        <div class="row1">
+                            <span class="badge-priority pr-@(r.Priority?.ToLower() ?? "medium")">@(r.Priority ?? "Medium") priority</span>
+                            <span class="badge-status st-new">@(r.Status ?? "New")</span>
+                        </div>
+                        <div style="font-weight:700;font-size:14px;margin:6px 0 4px;">@(string.IsNullOrWhiteSpace(r.Title) ? r.ItemName : r.Title)</div>
+                        @if (!string.IsNullOrWhiteSpace(r.Description))
+                        {
+                            <div style="font-size:13px;color:var(--ink-700);margin-bottom:6px;">@r.Description</div>
+                        }
+                        <div style="font-size:12px;color:var(--ink-500);">
+                            @if (!string.IsNullOrWhiteSpace(r.ExpectedDate)) { <span>Expected by @r.ExpectedDate</span> }
+                            @if (!string.IsNullOrWhiteSpace(r.Budget)) { <span>&nbsp;•&nbsp;Budget: @r.Budget</span> }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(r.ImagePath))
+                        {
+                            <div style="margin-top:10px;">
+                                <img src="@r.ImagePath" alt="Requirement attachment" style="max-width:220px;max-height:160px;border-radius:10px;border:1px solid var(--line);object-fit:cover;" />
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- ============ ASSIGN / RE-ASSIGN TAB ============ -->
+        <div class="tab-panel" id="tab-assign">
+            <div class="section-title">Current Assignment</div>
+            <div class="assign-current">
+                <div class="avatar-chip">
+                    <div class="initials">@Initials(lead.AssignedTo)</div>
+                </div>
+                <div>
+                    <div class="lbl">CURRENTLY ASSIGNED TO</div>
+                    <div class="name">@(string.IsNullOrWhiteSpace(lead.AssignedTo) ? "Not assigned yet" : lead.AssignedTo)</div>
+                </div>
+            </div>
+
+            <div class="divider-line"></div>
+
+            <div class="section-title">Assign / Re-assign</div>
+            <form method="post" asp-controller="Lead" asp-action="AssignLead">
+                <input type="hidden" name="leadId" value="@lead.LeadId" />
+                <div class="form-grid">
+                    <div class="form-field full">
+                        <label>Assigned Employee <span class="req">*</span></label>
+                        <select name="assignedEmployee" required>
+                            <option value="">Select employee</option>
+                            @foreach (var e in LookupData.Employees)
+                            {
+                                @if (e == lead.AssignedTo)
+                                {
+                                    <option value="@e" selected>@e</option>
+                                }
+                                else
+                                {
+                                    <option value="@e">@e</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Assignment Date <span class="req">*</span></label>
+                        <input type="date" name="assignmentDate" required value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="form-field"></div>
+                    <div class="form-field full">
+                        <label>Remarks</label>
+                        <textarea name="remarks" placeholder="Reason for assignment / handover notes..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save / Assign</button>
+                </div>
+            </form>
+
+            @if (lead.AssignmentHistory.Count > 0)
+            {
+                <div class="divider-line"></div>
+                <div class="section-title">Assignment History</div>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr><th>Assigned Employee</th><th>Assignment Date</th><th>Remarks</th></tr></thead>
+                        <tbody>
+                            @foreach (var a in lead.AssignmentHistory.AsEnumerable().Reverse())
+                            {
+                                <tr>
+                                    <td>@a.AssignedEmployee</td>
+                                    <td>@a.AssignmentDate</td>
+                                    <td style="max-width:320px;">@a.Remarks</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <!-- ============ FINANCE TAB — Estimation | Quotation | Proposal sub-tabs ============ -->
+        <div class="tab-panel" id="tab-finance">
+            <div class="fin-subtabs" role="tablist">
+                <button type="button" class="fin-subtab-btn" data-subtab="estimation" onclick="switchFinanceSubTab('estimation')">
+                    <i class="bi bi-calculator"></i> Estimation
+                </button>
+                <button type="button" class="fin-subtab-btn" data-subtab="quotation" onclick="switchFinanceSubTab('quotation')">
+                    <i class="bi bi-file-earmark-text"></i> Quotation
+                </button>
+                <button type="button" class="fin-subtab-btn" data-subtab="proposal" onclick="switchFinanceSubTab('proposal')">
+                    <i class="bi bi-file-earmark-richtext"></i> Proposal
+                </button>
+            </div>
+
+            <!-- ===== ESTIMATION SUB-TAB ===== -->
+            <div class="fin-subpanel" id="finsub-estimation">
+                <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                    <span>Estimations</span>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="newFinanceForm('estimation')">
+                        <i class="bi bi-plus-lg"></i> New Estimation
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(estimationError))
+                {
+                    <div class="form-error-banner"><i class="bi bi-exclamation-triangle-fill"></i> @estimationError</div>
+                }
+
+                <div id="estimationForm" class="fin-add-form" style="display:none;">
+                    <div class="fin-form-title" style="display:flex;align-items:center;justify-content:space-between;">
+                        <span id="estimationFormTitle">New Estimation</span>
+                        <span class="fin-number-chip" id="estimationNumberDisplay">Auto-generated on save</span>
+                    </div>
+                    <form method="post" asp-controller="Lead" asp-action="SaveEstimation" enctype="multipart/form-data">
+                        <input type="hidden" name="leadId" value="@lead.LeadId" />
+                        <input type="hidden" name="number" id="estimationEditingNumber" value="" />
+                        <div class="form-grid">
+                            <div class="form-field full">
+                                <label>Choose File</label>
+                                <div class="fin-attach-row">
+                                    <label class="btn btn-outline btn-sm fin-attach-btn" for="estimationAttachment">
+                                        <i class="bi bi-paperclip"></i> Choose File
+                                    </label>
+                                    <input type="file" name="attachment" id="estimationAttachment"
+                                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                           style="display:none;" onchange="previewFinanceAttachment(this,'estimation')" />
+                                    <span id="estimationAttachmentFileName" class="fin-attach-filename">No file chosen</span>
+                                </div>
+                                <div id="estimationCurrentAttachment" class="fin-attach-current" style="display:none;">
+                                    <i class="bi bi-paperclip"></i> Current: <a href="#" id="estimationCurrentAttachmentLink" target="_blank" rel="noopener"></a>
+                                    <span class="hint">(uploading a new file will replace this)</span>
+                                </div>
+                                <div class="hint" style="margin-top:4px;">PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG — up to 10 MB.</div>
+                            </div>
+                            <div class="form-field full">
+                                <label>Description / Note</label>
+                                <textarea name="notes" id="estimationNotes" placeholder="Enter description or note..."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-outline" onclick="cancelFinanceForm('estimation')">Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Estimation</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="divider-line"></div>
+                <div class="section-title">Saved Estimations</div>
+                @if (lead.Estimations.Count == 0)
+                {
+                    <div class="empty-state"><i class="bi bi-calculator"></i><p>No estimations created yet.</p></div>
+                }
+                else
+                {
+                    @foreach (var e in lead.Estimations.AsEnumerable().Reverse())
+                    {
+                        <div class="fin-record-card">
+                            <div class="fin-record-head">
+                                <div class="fin-record-main">
+                                    <span class="fin-record-num">@e.Number</span>
+                                    <span class="fin-record-sub">@e.Date</span>
+                                    <span class="badge-status st-new">@e.Status</span>
+                                    <span class="fin-record-amt">₹@e.Total</span>
+                                </div>
+                                <div class="fin-record-actions">
+                                    <button type="button" class="fin-icon-btn" title="View" onclick="toggleFinanceDetail('est-detail-@e.Number')"><i class="bi bi-eye"></i></button>
+                                    <button type="button" class="fin-icon-btn" title="Edit" onclick="editFinanceRecord('estimation','@e.Number')"><i class="bi bi-pencil"></i></button>
+                                    <form method="post" asp-controller="Lead" asp-action="DeleteEstimation" onsubmit="return confirm('Delete estimation @e.Number?')" style="display:inline;">
+                                        <input type="hidden" name="leadId" value="@lead.LeadId" />
+                                        <input type="hidden" name="number" value="@e.Number" />
+                                        <button type="submit" class="fin-icon-btn danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="fin-record-detail" id="est-detail-@e.Number">
+                                <div class="info-grid">
+                                    <div class="info-item"><div class="lbl">PROJECT / REQUIREMENT</div><div class="val muted">@e.ProjectRequirement</div></div>
+                                    <div class="info-item"><div class="lbl">VALID UNTIL</div><div class="val muted">@e.ValidUntil</div></div>
+                                    <div class="info-item"><div class="lbl">DISCOUNT / TAX</div><div class="val muted">@e.Discount / @e.Tax</div></div>
+                                </div>
+                                @if (e.Items.Count > 0)
+                                {
+                                    <div class="table-wrap" style="margin-top:12px;">
+                                        <table class="data-table">
+                                            <thead><tr><th>Item / Service</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead>
+                                            <tbody>
+                                                @foreach (var it in e.Items)
+                                                {
+                                                    <tr><td>@it.ItemName</td><td>@it.Quantity</td><td>@it.Rate</td><td>@it.Amount</td></tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(e.TermsConditions))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">TERMS &amp; CONDITIONS</div><div style="font-size:13px;color:var(--ink-700);">@e.TermsConditions</div></div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(e.Notes))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">NOTES</div><div style="font-size:13px;color:var(--ink-700);">@e.Notes</div></div>
+                                }
+                                <div style="margin-top:10px;">
+                                    <div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">ATTACHMENTS</div>
+                                    @if (!string.IsNullOrWhiteSpace(e.AttachmentPath))
+                                    {
+                                        <div class="fin-attach-current" style="margin-top:4px;">
+                                            <i class="bi bi-paperclip"></i>
+                                            <a href="@e.AttachmentPath" target="_blank" rel="noopener">@e.AttachmentFileName</a>
+                                            <a href="@e.AttachmentPath" download class="btn btn-soft btn-sm" style="margin-left:8px;"><i class="bi bi-download"></i> Download</a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div style="font-size:13px;color:var(--ink-500);margin-top:4px;">No attachment</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <script type="application/json" id="estimation-json-@e.Number">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(e))</script>
+                    }
+                }
+            </div>
+
+            <!-- ===== QUOTATION SUB-TAB ===== -->
+            <div class="fin-subpanel" id="finsub-quotation">
+                <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                    <span>Quotations</span>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="newFinanceForm('quotation')">
+                        <i class="bi bi-plus-lg"></i> New Quotation
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(quotationError))
+                {
+                    <div class="form-error-banner"><i class="bi bi-exclamation-triangle-fill"></i> @quotationError</div>
+                }
+
+                <div id="quotationForm" class="fin-add-form" style="display:none;">
+                    <div class="fin-form-title" style="display:flex;align-items:center;justify-content:space-between;">
+                        <span id="quotationFormTitle">New Quotation</span>
+                        <span class="fin-number-chip" id="quotationNumberDisplay">Auto-generated on save</span>
+                    </div>
+                    <form method="post" asp-controller="Lead" asp-action="SaveQuotation" enctype="multipart/form-data">
+                        <input type="hidden" name="leadId" value="@lead.LeadId" />
+                        <input type="hidden" name="number" id="quotationEditingNumber" value="" />
+                        <div class="form-grid">
+                            <div class="form-field full">
+                                <label>Choose File</label>
+                                <div class="fin-attach-row">
+                                    <label class="btn btn-outline btn-sm fin-attach-btn" for="quotationAttachment">
+                                        <i class="bi bi-paperclip"></i> Choose File
+                                    </label>
+                                    <input type="file" name="attachment" id="quotationAttachment"
+                                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                           style="display:none;" onchange="previewFinanceAttachment(this,'quotation')" />
+                                    <span id="quotationAttachmentFileName" class="fin-attach-filename">No file chosen</span>
+                                </div>
+                                <div id="quotationCurrentAttachment" class="fin-attach-current" style="display:none;">
+                                    <i class="bi bi-paperclip"></i> Current: <a href="#" id="quotationCurrentAttachmentLink" target="_blank" rel="noopener"></a>
+                                    <span class="hint">(uploading a new file will replace this)</span>
+                                </div>
+                                <div class="hint" style="margin-top:4px;">PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG — up to 10 MB.</div>
+                            </div>
+                            <div class="form-field full">
+                                <label>Description / Note</label>
+                                <textarea name="notes" id="quotationNotes" placeholder="Enter description or note..."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-outline" onclick="cancelFinanceForm('quotation')">Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Quotation</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="divider-line"></div>
+                <div class="section-title">Saved Quotations</div>
+                @if (lead.Quotations.Count == 0)
+                {
+                    <div class="empty-state"><i class="bi bi-file-earmark-text"></i><p>No quotations created yet.</p></div>
+                }
+                else
+                {
+                    @foreach (var q in lead.Quotations.AsEnumerable().Reverse())
+                    {
+                        <div class="fin-record-card">
+                            <div class="fin-record-head">
+                                <div class="fin-record-main">
+                                    <span class="fin-record-num">@q.Number</span>
+                                    <span class="fin-record-sub">@q.Date</span>
+                                    <span class="badge-status st-new">@q.Status</span>
+                                    <span class="fin-record-amt">₹@q.GrandTotal</span>
+                                </div>
+                                <div class="fin-record-actions">
+                                    <button type="button" class="fin-icon-btn" title="View" onclick="toggleFinanceDetail('quo-detail-@q.Number')"><i class="bi bi-eye"></i></button>
+                                    <button type="button" class="fin-icon-btn" title="Edit" onclick="editFinanceRecord('quotation','@q.Number')"><i class="bi bi-pencil"></i></button>
+                                    <form method="post" asp-controller="Lead" asp-action="DeleteQuotation" onsubmit="return confirm('Delete quotation @q.Number?')" style="display:inline;">
+                                        <input type="hidden" name="leadId" value="@lead.LeadId" />
+                                        <input type="hidden" name="number" value="@q.Number" />
+                                        <button type="submit" class="fin-icon-btn danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="fin-record-detail" id="quo-detail-@q.Number">
+                                <div class="info-grid">
+                                    <div class="info-item"><div class="lbl">PROJECT / REQUIREMENT</div><div class="val muted">@q.ProjectRequirement</div></div>
+                                    <div class="info-item"><div class="lbl">VALID UNTIL</div><div class="val muted">@q.ValidUntil</div></div>
+                                    <div class="info-item"><div class="lbl">DISCOUNT / TAX</div><div class="val muted">@q.Discount / @q.Tax</div></div>
+                                </div>
+                                @if (q.Items.Count > 0)
+                                {
+                                    <div class="table-wrap" style="margin-top:12px;">
+                                        <table class="data-table">
+                                            <thead><tr><th>Item / Service</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead>
+                                            <tbody>
+                                                @foreach (var it in q.Items)
+                                                {
+                                                    <tr><td>@it.ItemName</td><td>@it.Quantity</td><td>@it.Rate</td><td>@it.Amount</td></tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(q.TermsConditions))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">TERMS &amp; CONDITIONS</div><div style="font-size:13px;color:var(--ink-700);">@q.TermsConditions</div></div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(q.Notes))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">NOTES</div><div style="font-size:13px;color:var(--ink-700);">@q.Notes</div></div>
+                                }
+                                <div style="margin-top:10px;">
+                                    <div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">ATTACHMENTS</div>
+                                    @if (!string.IsNullOrWhiteSpace(q.AttachmentPath))
+                                    {
+                                        <div class="fin-attach-current" style="margin-top:4px;">
+                                            <i class="bi bi-paperclip"></i>
+                                            <a href="@q.AttachmentPath" target="_blank" rel="noopener">@q.AttachmentFileName</a>
+                                            <a href="@q.AttachmentPath" download class="btn btn-soft btn-sm" style="margin-left:8px;"><i class="bi bi-download"></i> Download</a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div style="font-size:13px;color:var(--ink-500);margin-top:4px;">No attachment</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <script type="application/json" id="quotation-json-@q.Number">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(q))</script>
+                    }
+                }
+            </div>
+
+            <!-- ===== PROPOSAL SUB-TAB ===== -->
+            <div class="fin-subpanel" id="finsub-proposal">
+                <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                    <span>Proposals</span>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="newFinanceForm('proposal')">
+                        <i class="bi bi-plus-lg"></i> New Proposal
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(proposalError))
+                {
+                    <div class="form-error-banner"><i class="bi bi-exclamation-triangle-fill"></i> @proposalError</div>
+                }
+
+                <div id="proposalForm" class="fin-add-form" style="display:none;">
+                    <div class="fin-form-title" style="display:flex;align-items:center;justify-content:space-between;">
+                        <span id="proposalFormTitle">New Proposal</span>
+                        <span class="fin-number-chip" id="proposalNumberDisplay">Auto-generated on save</span>
+                    </div>
+                    <form method="post" asp-controller="Lead" asp-action="SaveProposal" enctype="multipart/form-data">
+                        <input type="hidden" name="leadId" value="@lead.LeadId" />
+                        <input type="hidden" name="number" id="proposalEditingNumber" value="" />
+                        <div class="form-grid">
+                            <div class="form-field full">
+                                <label>Choose File</label>
+                                <div class="fin-attach-row">
+                                    <label class="btn btn-outline btn-sm fin-attach-btn" for="proposalAttachment">
+                                        <i class="bi bi-paperclip"></i> Choose File
+                                    </label>
+                                    <input type="file" name="attachment" id="proposalAttachment"
+                                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                           style="display:none;" onchange="previewFinanceAttachment(this,'proposal')" />
+                                    <span id="proposalAttachmentFileName" class="fin-attach-filename">No file chosen</span>
+                                </div>
+                                <div id="proposalCurrentAttachment" class="fin-attach-current" style="display:none;">
+                                    <i class="bi bi-paperclip"></i> Current: <a href="#" id="proposalCurrentAttachmentLink" target="_blank" rel="noopener"></a>
+                                    <span class="hint">(uploading a new file will replace this)</span>
+                                </div>
+                                <div class="hint" style="margin-top:4px;">PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG — up to 10 MB.</div>
+                            </div>
+                            <div class="form-field full">
+                                <label>Description / Note</label>
+                                <textarea name="notes" id="proposalNotes" placeholder="Enter description or note..."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-outline" onclick="cancelFinanceForm('proposal')">Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Proposal</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="divider-line"></div>
+                <div class="section-title">Saved Proposals</div>
+                @if (lead.Proposals.Count == 0)
+                {
+                    <div class="empty-state"><i class="bi bi-file-earmark-richtext"></i><p>No proposals created yet.</p></div>
+                }
+                else
+                {
+                    @foreach (var p in lead.Proposals.AsEnumerable().Reverse())
+                    {
+                        <div class="fin-record-card">
+                            <div class="fin-record-head">
+                                <div class="fin-record-main">
+                                    <span class="fin-record-num">@p.Number</span>
+                                    <span class="fin-record-sub">@p.Date</span>
+                                    <span class="badge-status st-new">@p.Status</span>
+                                    <span style="font-weight:700;font-size:13.5px;">@p.Title</span>
+                                </div>
+                                <div class="fin-record-actions">
+                                    <button type="button" class="fin-icon-btn" title="View" onclick="toggleFinanceDetail('pro-detail-@p.Number')"><i class="bi bi-eye"></i></button>
+                                    <button type="button" class="fin-icon-btn" title="Edit" onclick="editFinanceRecord('proposal','@p.Number')"><i class="bi bi-pencil"></i></button>
+                                    <form method="post" asp-controller="Lead" asp-action="DeleteProposal" onsubmit="return confirm('Delete proposal @p.Number?')" style="display:inline;">
+                                        <input type="hidden" name="leadId" value="@lead.LeadId" />
+                                        <input type="hidden" name="number" value="@p.Number" />
+                                        <button type="submit" class="fin-icon-btn danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="fin-record-detail" id="pro-detail-@p.Number">
+                                <div class="info-grid">
+                                    <div class="info-item"><div class="lbl">PROJECT / REQUIREMENT</div><div class="val muted">@p.ProjectRequirement</div></div>
+                                    <div class="info-item"><div class="lbl">TIMELINE</div><div class="val muted">@p.Timeline</div></div>
+                                    <div class="info-item"><div class="lbl">BUDGET</div><div class="val muted">@p.Budget</div></div>
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(p.ScopeOfWork))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">SCOPE OF WORK</div><div style="font-size:13px;color:var(--ink-700);">@p.ScopeOfWork</div></div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(p.Description))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">DESCRIPTION</div><div style="font-size:13px;color:var(--ink-700);">@p.Description</div></div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(p.Deliverables))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">DELIVERABLES</div><div style="font-size:13px;color:var(--ink-700);">@p.Deliverables</div></div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(p.TermsConditions))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">TERMS &amp; CONDITIONS</div><div style="font-size:13px;color:var(--ink-700);">@p.TermsConditions</div></div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(p.Notes))
+                                {
+                                    <div style="margin-top:10px;"><div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">NOTES</div><div style="font-size:13px;color:var(--ink-700);">@p.Notes</div></div>
+                                }
+                                <div style="margin-top:10px;">
+                                    <div class="lbl" style="font-size:11.5px;color:var(--ink-500);font-weight:600;">ATTACHMENTS</div>
+                                    @if (!string.IsNullOrWhiteSpace(p.AttachmentPath))
+                                    {
+                                        <div class="fin-attach-current" style="margin-top:4px;">
+                                            <i class="bi bi-paperclip"></i>
+                                            <a href="@p.AttachmentPath" target="_blank" rel="noopener">@p.AttachmentFileName</a>
+                                            <a href="@p.AttachmentPath" download class="btn btn-soft btn-sm" style="margin-left:8px;"><i class="bi bi-download"></i> Download</a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div style="font-size:13px;color:var(--ink-500);margin-top:4px;">No attachment</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <script type="application/json" id="proposal-json-@p.Number">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(p))</script>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- ============ VISIT TAB — Add Visit button + Visit History ============ -->
+        <div class="tab-panel" id="tab-visit">
+            <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <span>Visit Details</span>
+                <button type="button" class="btn btn-primary btn-sm" id="btnAddVisit" onclick="openAddVisitModal()">
+                    <i class="bi bi-plus-lg"></i> Add Visit
+                </button>
+            </div>
+
+            <div id="visitSuccessAlert" class="alert-success-banner" style="display:none;margin-bottom:16px;">
+                <i class="bi bi-check-circle-fill"></i>
+                <span id="visitSuccessMsg">Visit detail saved successfully!</span>
+            </div>
+
+            <div class="empty-state" id="visitEmptyState" style="@(latestVisit is null ? "" : "display:none;")">
+                <i class="bi bi-geo-alt"></i>
+                <p>No visits recorded yet for this lead.</p>
+            </div>
+
+            <div id="visitLatestSummaryBox" style="@(latestVisit is null ? "display:none;" : "")">
+                <div class="info-grid">
+                    <div class="info-item"><div class="lbl">VISIT DATE</div><div class="val" id="latestVisitDate">@(latestVisit?.VisitDate ?? "—")</div></div>
+                    <div class="info-item"><div class="lbl">VISIT TIME</div><div class="val" id="latestVisitTime">@(latestVisit?.VisitTime ?? "—")</div></div>
+                    <div class="info-item"><div class="lbl">VISIT LOCATION</div><div class="val" id="latestVisitLocation">@(latestVisit?.VisitLocation ?? "—")</div></div>
+                    <div class="info-item"><div class="lbl">SALESPERSON</div><div class="val" id="latestVisitSalesperson">@(string.IsNullOrWhiteSpace(latestVisit?.Employee) ? (string.IsNullOrWhiteSpace(lead.AssignedTo) ? "—" : lead.AssignedTo) : latestVisit.Employee)</div></div>
+                    <div class="info-item"><div class="lbl">RESULT / OUTCOME</div><div class="val" id="latestVisitOutcome">@Html.Raw(VisitOutcomeBadge(latestVisit?.Outcome))</div></div>
+                    <div class="info-item full"><div class="lbl">CONVERSATION / DISCUSSION</div><div class="val muted" id="latestVisitConversation">@(string.IsNullOrWhiteSpace(latestVisit?.Conversation) ? "—" : latestVisit?.Conversation)</div></div>
+                    <div class="info-item full"><div class="lbl">REMARKS</div><div class="val muted" id="latestVisitRemarks">@(string.IsNullOrWhiteSpace(latestVisit?.Remarks) ? "—" : latestVisit?.Remarks)</div></div>
+                </div>
+            </div>
+
+            <div id="visitHistorySection" style="@(latestVisit is null ? "display:none;" : "")">
+                <div class="divider-line"></div>
+
+                <div class="section-title">Visit History</div>
+                <div class="table-wrap" id="visitHistoryTableWrap">
+                    <table class="data-table" id="visitHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Visit Date</th>
+                                <th>Visit Time</th>
+                                <th>Visit Location</th>
+                                <th>Salesperson</th>
+                                <th>Conversation</th>
+                                <th>Result / Outcome</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="visitHistoryTbody">
+                            @if (lead.Visits.Count > 0)
+                            {
+                                @foreach (var v in lead.Visits.AsEnumerable().Reverse())
+                                {
+                                    <tr>
+                                        <td>@v.VisitDate</td>
+                                        <td>@v.VisitTime</td>
+                                        <td style="max-width:220px;">@v.VisitLocation</td>
+                                        <td>@(string.IsNullOrWhiteSpace(v.Employee) ? (string.IsNullOrWhiteSpace(lead.AssignedTo) ? "—" : lead.AssignedTo) : v.Employee)</td>
+                                        <td style="max-width:260px;">@(string.IsNullOrWhiteSpace(v.Conversation) ? "—" : v.Conversation)</td>
+                                        <td>@Html.Raw(VisitOutcomeBadge(v.Outcome))</td>
+                                        <td style="max-width:220px;">@(string.IsNullOrWhiteSpace(v.Remarks) ? "—" : v.Remarks)</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<datalist id="requirementList">
+    @foreach (var r in lead.Requirements)
+    {
+        <option value="@r.Title"></option>
+    }
+</datalist>
+
+<!-- ============ LEAD INFORMATION — immediately below the tab content ============ -->
+<div class="panel" style="margin-bottom:22px;">
+    <div class="panel-header">
+        <div>
+            <h2>Lead Information</h2>
+            <div class="hint">Complete profile and contact details</div>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="info-grid">
+            <div class="info-item"><div class="lbl">LEAD NAME</div><div class="val">@lead.LeadName</div></div>
+            <div class="info-item"><div class="lbl">COMPANY NAME</div><div class="val">@lead.CompanyName</div></div>
+            <div class="info-item"><div class="lbl">MOBILE NUMBER</div><div class="val">@lead.MobileNumber</div></div>
+            <div class="info-item"><div class="lbl">EMAIL</div><div class="val">@lead.Email</div></div>
+            <div class="info-item"><div class="lbl">DESIGNATION</div><div class="val muted">@lead.Designation</div></div>
+            <div class="info-item"><div class="lbl">LOCATION</div><div class="val muted">@lead.Location</div></div>
+            <div class="info-item"><div class="lbl">LEAD SOURCE</div><div class="val muted">@lead.Source</div></div>
+            <div class="info-item"><div class="lbl">LEAD STATUS</div><div class="val">@Html.Raw(StatusBadge(lead.LeadStatus))</div></div>
+            <div class="info-item"><div class="lbl">ASSIGNED EMPLOYEE</div>
+                <div class="val">
+                    <div class="avatar-chip"><div class="initials">@Initials(lead.AssignedTo)</div><span>@lead.AssignedTo</span></div>
+                </div>
+            </div>
+            <div class="info-item"><div class="lbl">CREATED DATE</div><div class="val muted">@lead.CreatedDate</div></div>
+            <div class="info-item"><div class="lbl">FOLLOW-UP DATE</div><div class="val muted">@lead.FollowUpDate</div></div>
+            <div class="info-item"><div class="lbl">REMARKS</div><div class="val muted">@lead.Remarks</div></div>
+        </div>
+    </div>
+</div>
+
+@if (lead.Visits.Count > 0)
+{
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Visit History</h2>
+                <div class="hint">Complete record of in-person visits for this lead</div>
+            </div>
+        </div>
+        <div class="panel-body">
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Visit Date</th><th>Visit Time</th><th>Visit Location</th><th>Salesperson</th>
+                            <th>Conversation</th><th>Result / Outcome</th><th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var v in lead.Visits)
+                        {
+                            <tr>
+                                <td>@v.VisitDate</td>
+                                <td>@v.VisitTime</td>
+                                <td style="max-width:220px;">@v.VisitLocation</td>
+                                <td>@v.Employee</td>
+                                <td style="max-width:260px;">@v.Conversation</td>
+                                <td>
+                                    @{
+                                        var outCls = v.Outcome switch
+                                        {
+                                            "Interested" => "st-qualified",
+                                            "Deal Closed" => "st-won",
+                                            "Not Interested" => "st-lost",
+                                            _ => "st-proposalsent"
+                                        };
+                                    }
+                                    <span class="badge-status @outCls">@v.Outcome</span>
+                                </td>
+                                <td style="max-width:220px;">@v.Remarks</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ============ ADD CALL DETAIL MODAL ============ -->
+<div class="modal-backdrop-custom" id="addCallModal" role="dialog" aria-modal="true" aria-labelledby="addCallModalTitle">
+    <div class="modal-box" style="max-width:540px;">
+        <div class="modal-box-head">
+            <div>
+                <h3 id="addCallModalTitle"><i class="bi bi-telephone-plus-fill" style="color:var(--brand-600);margin-right:6px;"></i>Add Call Detail</h3>
+                <p id="addCallModalSubtitle">Record call conversation and status for @lead.LeadName (@lead.LeadId)</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('addCallModal')" aria-label="Close modal">&times;</button>
+        </div>
+        <div class="modal-box-body">
+            <div id="addCallErrorBanner" class="form-error-banner" style="display:none;margin-bottom:14px;"></div>
+            
+            <form id="addCallDetailForm" onsubmit="handleSaveCallDetail(event)">
+                <input type="hidden" id="addCallLeadId" value="@lead.LeadId" />
+                <input type="hidden" id="addCallEmployee" value="@(lead.AssignedTo ?? "")" />
+
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="addCallDate">Date <span class="req">*</span></label>
+                        <input type="date" id="addCallDate" name="callDate" required />
+                    </div>
+                    <div class="form-field">
+                        <label for="addCallTime">Time <span class="req">*</span></label>
+                        <input type="text" id="addCallTime" name="callTime" placeholder="e.g. 10:30 AM" required />
+                    </div>
+                    <div class="form-field">
+                        <label for="addCallDuration">Duration</label>
+                        <input type="text" id="addCallDuration" name="duration" placeholder="e.g. 5m 20s" />
+                    </div>
+                    <div class="form-field">
+                        <label for="addCallStatus">Status <span class="req">*</span></label>
+                        <select id="addCallStatus" name="callStatus" required>
+                            <option value="Connected">Connected</option>
+                            <option value="Not Connected">Not Connected</option>
+                        </select>
+                    </div>
+                    <div class="form-field full">
+                        <label for="addCallRemark">Remark</label>
+                        <textarea id="addCallRemark" name="remark" rows="3" placeholder="Enter conversation notes, client feedback, or next steps..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('addCallModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveCallDetail">
+                        <i class="bi bi-check-lg"></i> <span id="saveCallBtnLabel">Save Call Detail</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============ ADD FOLLOW-UP MODAL ============ -->
+<div class="modal-backdrop-custom" id="addFollowUpModal" role="dialog" aria-modal="true" aria-labelledby="addFollowUpModalTitle">
+    <div class="modal-box" style="max-width:540px;">
+        <div class="modal-box-head">
+            <div>
+                <h3 id="addFollowUpModalTitle"><i class="bi bi-calendar-plus-fill" style="color:var(--brand-600);margin-right:6px;"></i>Add Follow-up</h3>
+                <p id="addFollowUpModalSubtitle">Schedule or log follow-up for @lead.LeadName (@lead.LeadId)</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('addFollowUpModal')" aria-label="Close modal">&times;</button>
+        </div>
+        <div class="modal-box-body">
+            <div id="addFollowUpErrorBanner" class="form-error-banner" style="display:none;margin-bottom:14px;"></div>
+            
+            <form id="addFollowUpForm" onsubmit="handleSaveFollowUp(event)">
+                <input type="hidden" id="addFollowUpLeadId" value="@lead.LeadId" />
+
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="addFollowUpDate">Follow-up Date <span class="req">*</span></label>
+                        <input type="date" id="addFollowUpDate" name="followUpDate" required />
+                    </div>
+                    <div class="form-field">
+                        <label for="addFollowUpTime">Follow-up Time <span class="req">*</span></label>
+                        <input type="text" id="addFollowUpTime" name="followUpTime" placeholder="e.g. 10:30 AM" required />
+                    </div>
+                    <div class="form-field">
+                        <label for="addFollowUpType">Follow-up Type</label>
+                        <select id="addFollowUpType" name="followUpType">
+                            @foreach (var t in LookupData.FollowUpTypes)
+                            {
+                                <option value="@t">@t</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="addFollowUpStatus">Status <span class="req">*</span></label>
+                        <select id="addFollowUpStatus" name="status" required>
+                            @foreach (var s in LookupData.FollowUpStatuses)
+                            {
+                                <option value="@s">@s</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-field full">
+                        <label for="addFollowUpRemarks">Remarks</label>
+                        <textarea id="addFollowUpRemarks" name="remarks" rows="3" placeholder="Enter follow-up agenda, discussion notes, or next steps..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('addFollowUpModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveFollowUp">
+                        <i class="bi bi-check-lg"></i> <span id="saveFollowUpBtnLabel">Save Follow-up</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============ ADD VISIT MODAL ============ -->
+<div class="modal-backdrop-custom" id="addVisitModal" role="dialog" aria-modal="true" aria-labelledby="addVisitModalTitle">
+    <div class="modal-box" style="max-width:600px;">
+        <div class="modal-box-head">
+            <div>
+                <h3 id="addVisitModalTitle"><i class="bi bi-geo-alt-fill" style="color:var(--brand-600);margin-right:6px;"></i>Add Visit</h3>
+                <p id="addVisitModalSubtitle">Record in-person visit for @lead.LeadName (@lead.LeadId)</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('addVisitModal')" aria-label="Close modal">&times;</button>
+        </div>
+        <div class="modal-box-body">
+            <div id="addVisitErrorBanner" class="form-error-banner" style="display:none;margin-bottom:14px;"></div>
+            
+            <!-- Auto-generated Lead Details Box -->
+            <div style="background:var(--surface-50,#f8fafc);border:1px solid var(--border-color,#e2e8f0);border-radius:8px;padding:12px 14px;margin-bottom:16px;">
+                <div style="font-size:11px;font-weight:700;letter-spacing:0.5px;color:var(--ink-500,#64748b);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                    <i class="bi bi-person-badge"></i> Auto-Generated Lead Details
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;font-size:12.5px;">
+                    <div><span style="color:var(--ink-500);display:block;font-size:11px;">Lead:</span><strong>@lead.LeadName</strong> <span style="color:var(--ink-500);font-size:11px;">(@lead.LeadId)</span></div>
+                    <div><span style="color:var(--ink-500);display:block;font-size:11px;">Company:</span><strong>@(string.IsNullOrWhiteSpace(lead.CompanyName) ? "—" : lead.CompanyName)</strong></div>
+                    <div><span style="color:var(--ink-500);display:block;font-size:11px;">Contact:</span><strong>@(string.IsNullOrWhiteSpace(lead.MobileNumber) ? "—" : lead.MobileNumber)</strong></div>
+                    <div><span style="color:var(--ink-500);display:block;font-size:11px;">Location:</span><strong>@(string.IsNullOrWhiteSpace(lead.Location) ? "—" : lead.Location)</strong></div>
+                </div>
+            </div>
+
+            <form id="addVisitForm" onsubmit="handleSaveVisit(event)">
+                <input type="hidden" id="addVisitLeadId" value="@lead.LeadId" />
+                <input type="hidden" id="addVisitDefaultLoc" value="@(lead.Location ?? "")" />
+
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="addVisitDate">Visit Date <span class="req">*</span></label>
+                        <input type="date" id="addVisitDate" name="visitDate" required />
+                    </div>
+                    <div class="form-field">
+                        <label for="addVisitTime">Visit Time <span class="req">*</span></label>
+                        <input type="text" id="addVisitTime" name="visitTime" placeholder="e.g. 11:30 AM" required />
+                    </div>
+                    <div class="form-field full">
+                        <label for="addVisitLocation">Visit Location <span class="req">*</span></label>
+                        <input type="text" id="addVisitLocation" name="visitLocation" placeholder="e.g. Client Office, MIDC Bhosari, Pune" required />
+                    </div>
+                    <div class="form-field">
+                        <label for="addVisitEmployee">Salesperson / Employee</label>
+                        <select id="addVisitEmployee" name="employee">
+                            <option value="">— Select Employee —</option>
+                            @foreach (var emp in LookupData.Employees)
+                            {
+                                if (emp == lead.AssignedTo)
+                                {
+                                    <option value="@emp" selected>@emp (Assigned)</option>
+                                }
+                                else
+                                {
+                                    <option value="@emp">@emp</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="addVisitOutcome">Result / Outcome <span class="req">*</span></label>
+                        <select id="addVisitOutcome" name="outcome" required>
+                            @foreach (var oc in LookupData.VisitOutcomes)
+                            {
+                                <option value="@oc">@oc</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-field full">
+                        <label for="addVisitConversation">Conversation / Discussion</label>
+                        <textarea id="addVisitConversation" name="conversation" rows="3" placeholder="Key points discussed during the in-person meeting..."></textarea>
+                    </div>
+                    <div class="form-field full">
+                        <label for="addVisitRemarks">Remarks</label>
+                        <textarea id="addVisitRemarks" name="remarks" rows="2" placeholder="Enter follow-up requirements, client requests or observations..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('addVisitModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveVisit">
+                        <i class="bi bi-check-lg"></i> <span id="saveVisitBtnLabel">Save Visit</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- REQUIREMENT ITEM: CAMERA CAPTURE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="reqCameraModal" role="dialog" aria-modal="true" style="display:none;align-items:center;justify-content:center;">
+    <div class="modal-box" style="max-width:540px;width:95%;">
+        <div class="modal-box-head">
+            <div>
+                <h3><i class="bi bi-camera-fill" style="color:var(--brand-600);margin-right:6px;"></i>Capture Photo</h3>
+                <p>Take a real-time photo of the requirement item using device camera</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeReqCameraModal()" aria-label="Close modal">&times;</button>
+        </div>
+        <div class="modal-box-body" style="padding:16px;">
+            <div id="reqCameraErrorBox" class="form-error-banner" style="display:none;margin-bottom:12px;"></div>
+            
+            <div style="position:relative;background:#0f172a;border-radius:10px;overflow:hidden;min-height:280px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 20px rgba(0,0,0,0.5);">
+                <!-- Live Video Feed -->
+                <video id="reqCameraVideo" autoplay playsinline style="width:100%;max-height:340px;object-fit:cover;display:block;border-radius:10px;"></video>
+                
+                <!-- Captured Photo Static Preview -->
+                <img id="reqCameraPhotoPreview" alt="Captured preview" style="display:none;width:100%;max-height:340px;object-fit:contain;border-radius:10px;" />
+                
+                <!-- Hidden Canvas for frame snapshot -->
+                <canvas id="reqCameraCanvas" style="display:none;"></canvas>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;gap:10px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline" onclick="closeReqCameraModal()">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </button>
+                
+                <div style="display:flex;gap:8px;">
+                    <button type="button" id="reqCameraCaptureBtn" class="btn btn-primary" onclick="captureReqPhoto()" style="display:inline-flex;align-items:center;gap:6px;">
+                        <i class="bi bi-camera"></i> Capture Photo
+                    </button>
+                    
+                    <button type="button" id="reqCameraRetakeBtn" class="btn btn-outline" onclick="retakeReqPhoto()" style="display:none;align-items:center;gap:6px;">
+                        <i class="bi bi-arrow-counterclockwise"></i> Retake
+                    </button>
+                    
+                    <button type="button" id="reqCameraUseBtn" class="btn btn-primary" onclick="useCapturedReqPhoto()" style="display:none;align-items:center;gap:6px;background:var(--brand-600);">
+                        <i class="bi bi-check2-circle"></i> Use Photo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- REQUIREMENT ITEM: FULL IMAGE PREVIEW MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="reqImageZoomModal" role="dialog" aria-modal="true" style="display:none;align-items:center;justify-content:center;">
+    <div class="modal-box" style="max-width:680px;width:95%;">
+        <div class="modal-box-head">
+            <div>
+                <h3><i class="bi bi-image" style="color:var(--brand-600);margin-right:6px;"></i>Item Photo Preview</h3>
+                <p>Full preview of captured or uploaded requirement photo</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeReqZoomModal()" aria-label="Close modal">&times;</button>
+        </div>
+        <div class="modal-box-body" style="padding:16px;text-align:center;background:#0f172a;border-radius:0 0 12px 12px;">
+            <img id="reqZoomImg" src="" alt="Requirement Item Photo" style="max-width:100%;max-height:75vh;border-radius:8px;object-fit:contain;" />
+            <div style="margin-top:12px;text-align:right;">
+                <button type="button" class="btn btn-outline" style="color:#fff;border-color:#475569;" onclick="closeReqZoomModal()">Close Preview</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var initialTab = '@activeTab';
+            var initialFinanceSubTab = '@activeFinanceSubTab';
+            var hasRequirementError = @(string.IsNullOrEmpty(requirementError) ? "false" : "true");
+
+            function activate() {
+                switchLeadTab(initialTab);
+                switchFinanceSubTab(initialFinanceSubTab);
+                if (hasRequirementError) {
+                    switchLeadTab('requirement');
+                    toggleRequirementForm();
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', activate);
+            } else {
+                // DOM already parsed (script executing after content) — run immediately.
+                activate();
+            }
+        })();
+
+        function formatCurrentTime() {
+            var now = new Date();
+            var hours = now.getHours();
+            var minutes = now.getMinutes();
+            var ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            var strMinutes = minutes < 10 ? '0' + minutes : minutes;
+            var strHours = hours < 10 ? '0' + hours : hours;
+            return strHours + ':' + strMinutes + ' ' + ampm;
+        }
+
+        function formatCurrentDate() {
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = String(now.getMonth() + 1).padStart(2, '0');
+            var day = String(now.getDate()).padStart(2, '0');
+            return year + '-' + month + '-' + day;
+        }
+
+        function openAddCallModal() {
+            var form = document.getElementById('addCallDetailForm');
+            if (form) form.reset();
+
+            var dateInput = document.getElementById('addCallDate');
+            if (dateInput) dateInput.value = formatCurrentDate();
+
+            var timeInput = document.getElementById('addCallTime');
+            if (timeInput) timeInput.value = formatCurrentTime();
+
+            var statusSelect = document.getElementById('addCallStatus');
+            if (statusSelect) statusSelect.value = 'Connected';
+
+            var errBanner = document.getElementById('addCallErrorBanner');
+            if (errBanner) {
+                errBanner.style.display = 'none';
+                errBanner.textContent = '';
+            }
+
+            var btn = document.getElementById('btnSaveCallDetail');
+            var btnLabel = document.getElementById('saveCallBtnLabel');
+            if (btn) btn.disabled = false;
+            if (btnLabel) btnLabel.textContent = 'Save Call Detail';
+
+            openModal('addCallModal');
+        }
+
+        async function handleSaveCallDetail(e) {
+            e.preventDefault();
+
+            var leadId = document.getElementById('addCallLeadId').value;
+            var callDate = document.getElementById('addCallDate').value.trim();
+            var callTime = document.getElementById('addCallTime').value.trim();
+            var duration = document.getElementById('addCallDuration').value.trim();
+            var callStatus = document.getElementById('addCallStatus').value;
+            var remark = document.getElementById('addCallRemark').value.trim();
+            var assignedEmp = document.getElementById('addCallEmployee').value.trim();
+
+            var errBanner = document.getElementById('addCallErrorBanner');
+            if (!callDate || !callTime || !callStatus) {
+                if (errBanner) {
+                    errBanner.textContent = 'Please fill in all required fields (Date, Time, Status).';
+                    errBanner.style.display = 'flex';
+                }
+                return;
+            }
+
+            var btn = document.getElementById('btnSaveCallDetail');
+            var btnLabel = document.getElementById('saveCallBtnLabel');
+            if (btn) btn.disabled = true;
+            if (btnLabel) btnLabel.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+            var payload = {
+                CallDate: callDate,
+                CallTime: callTime,
+                Duration: duration,
+                CallStatus: callStatus,
+                Remark: remark,
+                Notes: remark
+            };
+
+            try {
+                var response = await fetch('/api/leads/' + encodeURIComponent(leadId) + '/calls', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    var errData = {};
+                    try { errData = await response.json(); } catch (_) { }
+                    var msg = errData.Message || errData.message || ('Server returned error: ' + response.status);
+                    if (errBanner) {
+                        errBanner.textContent = msg;
+                        errBanner.style.display = 'flex';
+                    }
+                    if (btn) btn.disabled = false;
+                    if (btnLabel) btnLabel.textContent = 'Save Call Detail';
+                    return;
+                }
+
+                var data = await response.json();
+
+                // Close modal
+                closeModal('addCallModal');
+
+                // Render status badge HTML
+                var isConnected = callStatus.toLowerCase() === 'connected';
+                var badgeCls = isConnected ? 'st-won' : 'st-lost';
+                var badgeHtml = '<span class="badge-status ' + badgeCls + '">' + escapeHtml(callStatus) + '</span>';
+
+                // Update latest summary box
+                var latestDateEl = document.getElementById('latestCallDate');
+                var latestTimeEl = document.getElementById('latestCallTime');
+                var latestStatusEl = document.getElementById('latestCallStatus');
+                var latestDurationEl = document.getElementById('latestCallDuration');
+                var latestRemarksEl = document.getElementById('latestCallRemarks');
+
+                if (latestDateEl) latestDateEl.textContent = callDate;
+                if (latestTimeEl) latestTimeEl.textContent = callTime;
+                if (latestStatusEl) latestStatusEl.innerHTML = badgeHtml;
+                if (latestDurationEl) latestDurationEl.textContent = duration || '—';
+                if (latestRemarksEl) latestRemarksEl.textContent = remark || '—';
+
+                // Ensure summary and table are visible, empty state hidden
+                var emptyState = document.getElementById('callEmptyState');
+                if (emptyState) emptyState.style.display = 'none';
+
+                var summaryBox = document.getElementById('callLatestSummaryBox');
+                if (summaryBox) summaryBox.style.display = 'block';
+
+                var historySection = document.getElementById('callHistorySection');
+                if (historySection) historySection.style.display = 'block';
+
+                // Prepend new row to call history table
+                var tbody = document.getElementById('callHistoryTbody');
+                if (tbody) {
+                    var tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td>' + escapeHtml(callDate) + '</td>' +
+                        '<td>' + escapeHtml(callTime) + '</td>' +
+                        '<td>' + badgeHtml + '</td>' +
+                        '<td>' + escapeHtml(duration || '—') + '</td>' +
+                        '<td>' + escapeHtml(assignedEmp || '—') + '</td>' +
+                        '<td style="max-width:260px;">' + escapeHtml(remark || '—') + '</td>';
+                    tbody.insertBefore(tr, tbody.firstChild);
+                }
+
+                // Show success alert
+                var successAlert = document.getElementById('callSuccessAlert');
+                var successMsg = document.getElementById('callSuccessMsg');
+                if (successAlert) {
+                    if (successMsg) successMsg.textContent = 'Call detail saved successfully!';
+                    successAlert.style.display = 'flex';
+                    setTimeout(function () {
+                        successAlert.style.display = 'none';
+                    }, 4000);
+                }
+            } catch (err) {
+                console.error('Save call detail error:', err);
+                if (errBanner) {
+                    errBanner.textContent = 'Network error: ' + (err.message || 'Could not connect to server.');
+                    errBanner.style.display = 'flex';
+                }
+            } finally {
+                if (btn) btn.disabled = false;
+                if (btnLabel) btnLabel.textContent = 'Save Call Detail';
+            }
+        }
+
+        window.openAddCallModal = openAddCallModal;
+        window.handleSaveCallDetail = handleSaveCallDetail;
+
+        function openAddFollowUpModal() {
+            var form = document.getElementById('addFollowUpForm');
+            if (form) form.reset();
+
+            var dateInput = document.getElementById('addFollowUpDate');
+            if (dateInput) dateInput.value = formatCurrentDate();
+
+            var timeInput = document.getElementById('addFollowUpTime');
+            if (timeInput) timeInput.value = formatCurrentTime();
+
+            var typeSelect = document.getElementById('addFollowUpType');
+            if (typeSelect) typeSelect.value = 'Call';
+
+            var statusSelect = document.getElementById('addFollowUpStatus');
+            if (statusSelect) statusSelect.value = 'Pending';
+
+            var errBanner = document.getElementById('addFollowUpErrorBanner');
+            if (errBanner) {
+                errBanner.style.display = 'none';
+                errBanner.textContent = '';
+            }
+
+            var btn = document.getElementById('btnSaveFollowUp');
+            var btnLabel = document.getElementById('saveFollowUpBtnLabel');
+            if (btn) btn.disabled = false;
+            if (btnLabel) btnLabel.textContent = 'Save Follow-up';
+
+            openModal('addFollowUpModal');
+        }
+
+        function getFollowUpBadgeHtml(status) {
+            var s = status || 'Pending';
+            var lower = s.toLowerCase().replace(/\s+/g, '');
+            var badgeCls = 'st-new';
+            if (lower === 'completed') badgeCls = 'st-won';
+            else if (lower === 'rescheduled') badgeCls = 'st-proposalsent';
+            return '<span class="badge-status ' + badgeCls + '">' + escapeHtml(s) + '</span>';
+        }
+
+        async function handleSaveFollowUp(e) {
+            e.preventDefault();
+
+            var leadId = document.getElementById('addFollowUpLeadId').value;
+            var followUpDate = document.getElementById('addFollowUpDate').value.trim();
+            var followUpTime = document.getElementById('addFollowUpTime').value.trim();
+            var followUpType = document.getElementById('addFollowUpType').value;
+            var status = document.getElementById('addFollowUpStatus').value;
+            var remarks = document.getElementById('addFollowUpRemarks').value.trim();
+
+            var errBanner = document.getElementById('addFollowUpErrorBanner');
+            if (!followUpDate || !followUpTime || !status) {
+                if (errBanner) {
+                    errBanner.textContent = 'Please fill in all required fields (Date, Time, Status).';
+                    errBanner.style.display = 'flex';
+                }
+                return;
+            }
+
+            var btn = document.getElementById('btnSaveFollowUp');
+            var btnLabel = document.getElementById('saveFollowUpBtnLabel');
+            if (btn) btn.disabled = true;
+            if (btnLabel) btnLabel.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+            var payload = {
+                FollowUpDate: followUpDate,
+                FollowUpTime: followUpTime,
+                FollowUpType: followUpType || 'Call',
+                Status: status,
+                Remarks: remarks
+            };
+
+            try {
+                var response = await fetch('/api/leads/' + encodeURIComponent(leadId) + '/followups', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    var errData = {};
+                    try { errData = await response.json(); } catch (_) { }
+                    var msg = errData.Message || errData.message || ('Server returned error: ' + response.status);
+                    if (errBanner) {
+                        errBanner.textContent = msg;
+                        errBanner.style.display = 'flex';
+                    }
+                    if (btn) btn.disabled = false;
+                    if (btnLabel) btnLabel.textContent = 'Save Follow-up';
+                    return;
+                }
+
+                var data = await response.json();
+
+                // Close modal
+                closeModal('addFollowUpModal');
+
+                var badgeHtml = getFollowUpBadgeHtml(status);
+
+                // Update latest summary box
+                var latestDateEl = document.getElementById('latestFollowUpDate');
+                var latestTimeEl = document.getElementById('latestFollowUpTime');
+                var latestTypeEl = document.getElementById('latestFollowUpType');
+                var latestStatusEl = document.getElementById('latestFollowUpStatus');
+                var latestRemarksEl = document.getElementById('latestFollowUpRemarks');
+
+                if (latestDateEl) latestDateEl.textContent = followUpDate;
+                if (latestTimeEl) latestTimeEl.textContent = followUpTime;
+                if (latestTypeEl) latestTypeEl.textContent = followUpType || 'Call';
+                if (latestStatusEl) latestStatusEl.innerHTML = badgeHtml;
+                if (latestRemarksEl) latestRemarksEl.textContent = remarks || '—';
+
+                // Hide empty state and show summary / history sections
+                var emptyState = document.getElementById('followUpEmptyState');
+                if (emptyState) emptyState.style.display = 'none';
+
+                var summaryBox = document.getElementById('followUpLatestSummaryBox');
+                if (summaryBox) summaryBox.style.display = 'block';
+
+                var historySection = document.getElementById('followUpHistorySection');
+                if (historySection) historySection.style.display = 'block';
+
+                // Prepend new row to follow-up history table
+                var tbody = document.getElementById('followUpHistoryTbody');
+                if (tbody) {
+                    var tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td>' + escapeHtml(followUpDate) + '</td>' +
+                        '<td>' + escapeHtml(followUpTime) + '</td>' +
+                        '<td>' + escapeHtml(followUpType || 'Call') + '</td>' +
+                        '<td>' + badgeHtml + '</td>' +
+                        '<td style="max-width:320px;">' + escapeHtml(remarks || '—') + '</td>';
+                    tbody.insertBefore(tr, tbody.firstChild);
+                }
+
+                // Show success alert
+                var successAlert = document.getElementById('followUpSuccessAlert');
+                var successMsg = document.getElementById('followUpSuccessMsg');
+                if (successAlert) {
+                    if (successMsg) successMsg.textContent = 'Follow-up saved successfully!';
+                    successAlert.style.display = 'flex';
+                    setTimeout(function () {
+                        successAlert.style.display = 'none';
+                    }, 4000);
+                }
+            } catch (err) {
+                console.error('Save follow-up error:', err);
+                if (errBanner) {
+                    errBanner.textContent = 'Network error: ' + (err.message || 'Could not connect to server.');
+                    errBanner.style.display = 'flex';
+                }
+            } finally {
+                if (btn) btn.disabled = false;
+                if (btnLabel) btnLabel.textContent = 'Save Follow-up';
+            }
+        }
+
+        window.openAddFollowUpModal = openAddFollowUpModal;
+        window.handleSaveFollowUp = handleSaveFollowUp;
+
+        function openAddVisitModal() {
+            var form = document.getElementById('addVisitForm');
+            if (form) form.reset();
+
+            var dateInput = document.getElementById('addVisitDate');
+            if (dateInput) dateInput.value = formatCurrentDate();
+
+            var timeInput = document.getElementById('addVisitTime');
+            if (timeInput) timeInput.value = formatCurrentTime();
+
+            var defaultLoc = document.getElementById('addVisitDefaultLoc');
+            var locInput = document.getElementById('addVisitLocation');
+            if (locInput && defaultLoc) {
+                locInput.value = defaultLoc.value || '';
+            }
+
+            var outcomeSelect = document.getElementById('addVisitOutcome');
+            if (outcomeSelect) outcomeSelect.value = 'Interested';
+
+            var errBanner = document.getElementById('addVisitErrorBanner');
+            if (errBanner) {
+                errBanner.style.display = 'none';
+                errBanner.textContent = '';
+            }
+
+            var btn = document.getElementById('btnSaveVisit');
+            var btnLabel = document.getElementById('saveVisitBtnLabel');
+            if (btn) btn.disabled = false;
+            if (btnLabel) btnLabel.textContent = 'Save Visit';
+
+            openModal('addVisitModal');
+        }
+
+        function getVisitOutcomeBadgeHtml(outcome) {
+            var oc = outcome || 'Interested';
+            var cls = 'st-proposalsent';
+            if (oc === 'Interested') cls = 'st-qualified';
+            else if (oc === 'Deal Closed') cls = 'st-won';
+            else if (oc === 'Not Interested') cls = 'st-lost';
+            return '<span class="badge-status ' + cls + '">' + escapeHtml(oc) + '</span>';
+        }
+
+        async function handleSaveVisit(e) {
+            e.preventDefault();
+
+            var leadId = document.getElementById('addVisitLeadId').value;
+            var visitDate = document.getElementById('addVisitDate').value.trim();
+            var visitTime = document.getElementById('addVisitTime').value.trim();
+            var visitLocation = document.getElementById('addVisitLocation').value.trim();
+            var employee = document.getElementById('addVisitEmployee').value.trim();
+            var outcome = document.getElementById('addVisitOutcome').value;
+            var conversation = document.getElementById('addVisitConversation').value.trim();
+            var remarks = document.getElementById('addVisitRemarks').value.trim();
+
+            var errBanner = document.getElementById('addVisitErrorBanner');
+            if (!visitDate || !visitTime || !visitLocation) {
+                if (errBanner) {
+                    errBanner.textContent = 'Please fill in all required fields (Date, Time, Location).';
+                    errBanner.style.display = 'flex';
+                }
+                return;
+            }
+
+            var btn = document.getElementById('btnSaveVisit');
+            var btnLabel = document.getElementById('saveVisitBtnLabel');
+            if (btn) btn.disabled = true;
+            if (btnLabel) btnLabel.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+            var payload = {
+                VisitDate: visitDate,
+                VisitTime: visitTime,
+                VisitLocation: visitLocation,
+                Employee: employee,
+                Outcome: outcome,
+                Conversation: conversation,
+                Remarks: remarks
+            };
+
+            try {
+                var response = await fetch('/api/leads/' + encodeURIComponent(leadId) + '/visits', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    var errData = {};
+                    try { errData = await response.json(); } catch (_) { }
+                    var msg = errData.Message || errData.message || ('Server returned error: ' + response.status);
+                    if (errBanner) {
+                        errBanner.textContent = msg;
+                        errBanner.style.display = 'flex';
+                    }
+                    if (btn) btn.disabled = false;
+                    if (btnLabel) btnLabel.textContent = 'Save Visit';
+                    return;
+                }
+
+                var data = await response.json();
+
+                // Close modal
+                closeModal('addVisitModal');
+
+                var badgeHtml = getVisitOutcomeBadgeHtml(outcome);
+
+                // Update latest summary box in Visit tab
+                var latestDateEl = document.getElementById('latestVisitDate');
+                var latestTimeEl = document.getElementById('latestVisitTime');
+                var latestLocEl = document.getElementById('latestVisitLocation');
+                var latestEmpEl = document.getElementById('latestVisitSalesperson');
+                var latestOutcomeEl = document.getElementById('latestVisitOutcome');
+                var latestConvEl = document.getElementById('latestVisitConversation');
+                var latestRemarksEl = document.getElementById('latestVisitRemarks');
+
+                if (latestDateEl) latestDateEl.textContent = visitDate;
+                if (latestTimeEl) latestTimeEl.textContent = visitTime;
+                if (latestLocEl) latestLocEl.textContent = visitLocation;
+                if (latestEmpEl) latestEmpEl.textContent = employee || '—';
+                if (latestOutcomeEl) latestOutcomeEl.innerHTML = badgeHtml;
+                if (latestConvEl) latestConvEl.textContent = conversation || '—';
+                if (latestRemarksEl) latestRemarksEl.textContent = remarks || '—';
+
+                // Hide empty state and show summary / history sections
+                var emptyState = document.getElementById('visitEmptyState');
+                if (emptyState) emptyState.style.display = 'none';
+
+                var summaryBox = document.getElementById('visitLatestSummaryBox');
+                if (summaryBox) summaryBox.style.display = 'block';
+
+                var historySection = document.getElementById('visitHistorySection');
+                if (historySection) historySection.style.display = 'block';
+
+                // Prepend new row to visit history table in Visit tab
+                var tbody = document.getElementById('visitHistoryTbody');
+                if (tbody) {
+                    var tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td>' + escapeHtml(visitDate) + '</td>' +
+                        '<td>' + escapeHtml(visitTime) + '</td>' +
+                        '<td style="max-width:220px;">' + escapeHtml(visitLocation) + '</td>' +
+                        '<td>' + escapeHtml(employee || '—') + '</td>' +
+                        '<td style="max-width:260px;">' + escapeHtml(conversation || '—') + '</td>' +
+                        '<td>' + badgeHtml + '</td>' +
+                        '<td style="max-width:220px;">' + escapeHtml(remarks || '—') + '</td>';
+                    tbody.insertBefore(tr, tbody.firstChild);
+                }
+
+                // Show success alert
+                var successAlert = document.getElementById('visitSuccessAlert');
+                var successMsg = document.getElementById('visitSuccessMsg');
+                if (successAlert) {
+                    if (successMsg) successMsg.textContent = 'Visit detail saved successfully!';
+                    successAlert.style.display = 'flex';
+                    setTimeout(function () {
+                        successAlert.style.display = 'none';
+                    }, 4000);
+                }
+            } catch (err) {
+                console.error('Save visit error:', err);
+                if (errBanner) {
+                    errBanner.textContent = 'Network error: ' + (err.message || 'Could not connect to server.');
+                    errBanner.style.display = 'flex';
+                }
+            } finally {
+                if (btn) btn.disabled = false;
+                if (btnLabel) btnLabel.textContent = 'Save Visit';
+            }
+        }
+
+        window.openAddVisitModal = openAddVisitModal;
+        window.handleSaveVisit = handleSaveVisit;
+    </script>
+}
+
+@functions {
+    string StatusBadge(string? status)
+    {
+        var s = status ?? "New";
+        var cls = s.ToLower().Replace(" ", "") switch
+        {
+            "new" => "st-new",
+            "contacted" => "st-contacted",
+            "qualified" => "st-qualified",
+            "proposalsent" => "st-proposalsent",
+            "negotiation" => "st-negotiation",
+            "won" => "st-won",
+            "lost" => "st-lost",
+            _ => "st-new"
+        };
+        return $"<span class='badge-status {cls}'>{s}</span>";
+    }
+
+    string CallStatusBadge(string? status)
+    {
+        var s = string.IsNullOrWhiteSpace(status) ? "Connected" : status;
+        var isConnected = s.Equals("Connected", StringComparison.OrdinalIgnoreCase);
+        var cls = isConnected ? "st-won" : "st-lost";
+        return $"<span class='badge-status {cls}'>{s}</span>";
+    }
+
+    string FollowUpStatusBadge(string? status)
+    {
+        var s = status ?? "Pending";
+        var cls = s switch { "Completed" => "st-won", "Rescheduled" => "st-proposalsent", _ => "st-new" };
+        return $"<span class='badge-status {cls}'>{s}</span>";
+    }
+
+    string VisitOutcomeBadge(string? outcome)
+    {
+        var s = string.IsNullOrWhiteSpace(outcome) ? "Interested" : outcome;
+        var cls = s switch
+        {
+            "Interested" => "st-qualified",
+            "Deal Closed" => "st-won",
+            "Not Interested" => "st-lost",
+            _ => "st-proposalsent"
+        };
+        return $"<span class='badge-status {cls}'>{s}</span>";
+    }
+
+    string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "—";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}" : name.Substring(0, Math.Min(2, name.Length));
+    }
+}

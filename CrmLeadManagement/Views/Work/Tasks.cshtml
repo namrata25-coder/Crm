@@ -1,0 +1,1067 @@
+@model List<CrmLeadManagement.Models.WorkTask>
+@using CrmLeadManagement.Models
+@{
+    ViewData["Title"] = "Tasks";
+    var projects   = ViewData["Projects"] as List<WorkProject> ?? new();
+    var milestones = ViewData["Milestones"] as List<WorkMilestone> ?? new();
+    var employees  = ViewData["Employees"] as List<string> ?? new();
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-check2-square" style="color:var(--brand-600);"></i> Tasks</h1>
+        <p class="page-sub">Global task management and history across all projects & milestones</p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateTaskModal()">
+        <i class="bi bi-plus-lg"></i> Add Task
+    </button>
+</div>
+
+<!-- STATS SUMMARY CARDS -->
+<div class="work-stats-grid">
+    <div class="work-stat-card">
+        <div class="stat-icon bg-cyan-subtle text-cyan"><i class="bi bi-check2-square"></i></div>
+        <div>
+            <div class="stat-val" id="statTotalTasks">0</div>
+            <div class="stat-lbl">Total Tasks</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-green-subtle text-success"><i class="bi bi-check2-circle"></i></div>
+        <div>
+            <div class="stat-val" id="statCompletedTasks">0</div>
+            <div class="stat-lbl">Completed</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-blue-subtle text-primary"><i class="bi bi-hourglass-split"></i></div>
+        <div>
+            <div class="stat-val" id="statInProgressTasks">0</div>
+            <div class="stat-lbl">In Progress</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-amber-subtle text-warning"><i class="bi bi-currency-rupee"></i></div>
+        <div>
+            <div class="stat-val" id="statTotalTaskAmount">₹0</div>
+            <div class="stat-lbl">Total Task Value</div>
+        </div>
+    </div>
+</div>
+
+    <!-- TASKS PIPELINE CARD -->
+    <div id="taskPipelineCard" class="card mt-3" style="display:none;padding:1rem 1.25rem;background:linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);border-left:4px solid var(--brand-600);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <i class="bi bi-diagram-2-fill text-cyan" style="font-size:1.15rem;"></i>
+                <h4 style="margin:0;font-size:13.5px;font-weight:700;color:var(--ink-900);">Strict Sequential Task &amp; Milestone Dependency Engine</h4>
+            </div>
+            <span class="badge badge-purple" style="font-size:11px;"><i class="bi bi-shield-lock-fill"></i> Strict Sequence Enforced</span>
+        </div>
+        <p style="margin:0;font-size:12.5px;color:var(--ink-600);line-height:1.5;">
+            <strong>Rule:</strong> Tasks inside milestones and projects follow strict sequential dependency. <strong>Task N cannot move forward until Task N-1 is completed.</strong> In addition, any task nested inside a locked milestone remains strictly locked until the parent milestone's previous invoice dependency is paid.
+        </p>
+    </div>
+
+    <!-- TASKS TABLE -->
+    <div class="card mt-3">
+        <div class="card-header-row">
+            <h3 class="card-title"><i class="bi bi-list-check"></i> Complete Task History &amp; Sequential Dependencies</h3>
+            <div class="table-search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" id="taskSearchInput" placeholder="Filter tasks, projects, members..." onkeyup="filterTasksTable()" />
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <!-- Empty State -->
+            <div class="empty-state" id="tasksEmptyState" style="display:none;">
+                <i class="bi bi-check2-square" style="font-size:3rem;color:var(--ink-300);"></i>
+                <h4 style="margin-top:1rem;font-weight:700;color:var(--ink-700);">No tasks found</h4>
+                <p style="color:var(--ink-500);margin-bottom:1.25rem;">Create dynamic tasks assigned to team members under projects and milestones.</p>
+                <button class="btn btn-primary" onclick="openCreateTaskModal()">
+                    <i class="bi bi-plus-lg"></i> Add First Task
+                </button>
+            </div>
+
+            <!-- Table Container -->
+            <div class="table-responsive" id="tasksTableWrap">
+                <table class="data-table" id="tasksTable">
+                    <thead>
+                        <tr>
+                            <th style="width:65px;">Seq</th>
+                            <th>Task Code</th>
+                            <th>Task Name</th>
+                            <th>Project Name</th>
+                            <th>Milestone</th>
+                            <th>Assigned Member</th>
+                            <th>Timeline</th>
+                            <th>Amount</th>
+                            <th>Progress</th>
+                            <th>Dependency &amp; Lock</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th style="text-align:right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tasksTableBody">
+                        <tr>
+                            <td colspan="13" style="text-align:center;padding:24px;color:var(--ink-500);">
+                                <i class="bi bi-arrow-repeat spin" style="font-size:1.2rem;display:inline-block;margin-right:8px;"></i> Loading tasks from server...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GLOBAL TASK MODAL -->
+<div class="modal-backdrop-custom" id="globalTaskModal">
+    <div class="modal-box modal-lg" style="max-width:820px;max-height:92vh;display:flex;flex-direction:column;">
+        <div class="modal-box-head">
+            <div>
+                <h3><i class="bi bi-check2-square" style="color:var(--brand-600);"></i> <span id="globalTaskTitle">Add Task</span></h3>
+                <p id="globalTaskSub">Auto-populates Project Details and computes sequential Dependency Type</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('globalTaskModal')">&times;</button>
+        </div>
+        <div class="modal-box-body" style="overflow-y:auto;padding:1.25rem 1.5rem;">
+            <form id="taskForm" onsubmit="handleSaveTask(event)">
+                <input type="hidden" name="taskId" id="gtId" value="0"/>
+
+                <!-- 1. PROJECT & MILESTONE SELECTION -->
+                <div class="form-grid mb-2">
+                    <div class="form-field">
+                        <label style="font-weight:700;">Select Project <span class="req">*</span></label>
+                        <select name="projectId" id="gtProjectId" required onchange="handleTaskProjectChange(this.value)" style="font-weight:600;">
+                            <option value="">-- Choose Project --</option>
+                            @foreach (var p in projects)
+                            {
+                                <option value="@p.Id">@p.ProjectCode - @p.ProjectName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label style="font-weight:700;">Select Milestone</label>
+                        <select name="milestoneId" id="gtMilestoneId" onchange="handleTaskMilestoneChange(this.value)">
+                            <option value="0">-- Direct Task (No Milestone) --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 2. TASK DEPENDENCY OPTIONS (MUTUALLY EXCLUSIVE) -->
+                <div class="form-field full mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;">
+                    <label style="font-weight:700;font-size:13px;display:block;margin-bottom:8px;color:var(--ink-800);">
+                        Task Dependency Options <span class="req">*</span>
+                    </label>
+                    
+                    <div style="display:flex;align-items:center;gap:24px;margin-bottom:6px;">
+                        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;color:var(--ink-700);">
+                            <input type="radio" id="gtOptionDependency" name="taskDependencyOption" value="dependency" onchange="handleTaskDependencyOptionToggle('dependency')" style="width:16px;height:16px;cursor:pointer;accent-color:var(--brand-600);" />
+                            <span><i class="bi bi-diagram-2" style="color:var(--brand-600);margin-right:4px;"></i> Dependency</span>
+                        </label>
+                        
+                        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;color:var(--ink-700);">
+                            <input type="radio" id="gtOptionNoDependency" name="taskDependencyOption" value="nodependency" onchange="handleTaskDependencyOptionToggle('nodependency')" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--brand-600);" />
+                            <span><i class="bi bi-slash-circle" style="color:#64748b;margin-right:4px;"></i> No Dependency</span>
+                        </label>
+                    </div>
+
+                    <!-- DEPENDENCY TASK INPUT & DYNAMIC PROJECT TASK LIST -->
+                    <div id="gtDependencyTaskSection" style="display:none;margin-top:10px;border-top:1px dashed #cbd5e1;padding-top:10px;">
+                        <div class="form-field full mb-2">
+                            <label for="gtDependencyTaskId" style="font-weight:700;font-size:12.5px;color:var(--ink-800);display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                <span>Dependency Task <span class="req">*</span></span>
+                                <span id="gtDepTaskCountBadge" class="badge badge-purple" style="font-size:11px;">0 tasks available</span>
+                            </label>
+                            <select name="dependencyTaskId" id="gtDependencyTaskId" onchange="handleDependencyTaskSelectionChange(this.value)" style="font-weight:600;width:100%;padding:8px 10px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;">
+                                <option value="">-- Select Prerequisite Task in Selected Project --</option>
+                            </select>
+                            <div id="gtDependencyTaskHint" style="font-size:11.5px;color:var(--ink-500);margin-top:4px;">
+                                <i class="bi bi-info-circle"></i> The dependent task cannot start until this prerequisite task is 100% completed.
+                            </div>
+                        </div>
+
+                        <!-- List of existing tasks in the selected project below the input -->
+                        <div id="gtExistingTasksListWrap" style="margin-top:8px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;">
+                            <div style="font-size:11.5px;font-weight:700;color:var(--ink-600);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
+                                <span><i class="bi bi-list-check"></i> Existing Tasks in Selected Project:</span>
+                                <span style="font-size:11px;color:var(--ink-400);">(Click any task to select as dependency)</span>
+                            </div>
+                            <div id="gtExistingTasksListContent" style="display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto;padding-right:4px;">
+                                <div style="color:var(--ink-400);font-size:12px;font-style:italic;padding:4px 0;">Select a project first to load its existing tasks.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. AUTO-GENERATED COMPLETE PROJECT & DEPENDENCY PANEL -->
+                <div id="gtProjectDetailsPanel" style="display:none;margin-bottom:1.25rem;">
+                    <!-- Project Details Card -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:10px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
+                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--brand-600);">
+                                <i class="bi bi-folder-check"></i> Project Details (Auto-Generated)
+                            </span>
+                            <span id="gtProjTypeBadge" class="badge badge-secondary" style="font-size:11px;">Direct Project</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;font-size:12.5px;">
+                            <div><span style="color:var(--ink-500);">Project:</span> <strong id="gtProjCodeNameText" style="color:var(--ink-900);">—</strong></div>
+                            <div><span style="color:var(--ink-500);">Client:</span> <strong id="gtProjClientText" style="color:var(--ink-900);">—</strong></div>
+                            <div><span style="color:var(--ink-500);">Budget:</span> <strong id="gtProjBudgetText" style="color:#16a34a;">₹0</strong></div>
+                            <div><span style="color:var(--ink-500);">Timeline:</span> <strong id="gtProjTimelineText" style="color:var(--ink-900);">—</strong></div>
+                            <div><span style="color:var(--ink-500);">Manager:</span> <strong id="gtProjManagerText" style="color:var(--ink-900);">—</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Dependency Type & Strict Sequence Card -->
+                    <div id="gtDependencyCard" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                            <div style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:12.5px;color:#0369a1;">
+                                <i class="bi bi-shield-lock-fill"></i> <span id="gtDepSeqTitle">Sequential Task Dependency</span>
+                            </div>
+                            <span id="gtDepLockStatusBadge" class="badge badge-success"><i class="bi bi-unlock"></i> Unlocked</span>
+                        </div>
+                        <div style="font-size:12px;color:#0284c7;margin-bottom:8px;line-height:1.4;">
+                            <strong>Dependency Type:</strong> <span id="gtDepTypeText">Strict Finish-to-Start Sequential Task Dependency</span>
+                        </div>
+                        <div id="gtDepConditionBox" style="background:#fff;border-radius:8px;padding:10px 12px;border:1px dashed #38bdf8;font-size:12px;color:var(--ink-700);">
+                            <!-- Dynamic task dependency check content -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. TASK FORM FIELDS -->
+                <div class="form-grid">
+                    <div class="form-field full">
+                        <label>Task Name <span class="req">*</span></label>
+                        <input type="text" name="taskName" id="gtName" required placeholder="e.g., Implement Authentication API"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Assigned Member</label>
+                        <select name="assignedMember" id="gtAssigned">
+                            <option value="">-- Select Member --</option>
+                            @foreach (var e in employees)
+                            {
+                                <option value="@e">@e</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Task Amount (₹)</label>
+                        <input type="number" name="taskAmount" id="gtAmount" min="0" step="0.01" value="0" placeholder="0.00"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Completed Amount (₹)</label>
+                        <input type="number" name="completedAmount" id="gtCompleted" min="0" step="0.01" value="0" placeholder="0.00"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Start Date</label>
+                        <input type="date" name="startDate" id="gtStart"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Due Date</label>
+                        <input type="date" name="dueDate" id="gtDue"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Priority</label>
+                        <select name="priority" id="gtPriority">
+                            @foreach (var p in WorkLookup.Priorities)
+                            {
+                                <option value="@p">@p</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Status <span id="gtStatusLockHint" style="display:none;color:#dc2626;font-size:11px;font-weight:700;">(🔒 Locked until prerequisite is completed)</span></label>
+                        <select name="status" id="gtStatus">
+                            @foreach (var s in WorkLookup.TaskStatuses)
+                            {
+                                <option value="@s">@s</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field full">
+                        <label>Description</label>
+                        <textarea name="description" id="gtDesc" rows="2" placeholder="Task requirements, checklist, and notes..."></textarea>
+                    </div>
+
+                    <div class="form-field full">
+                        <label>Notes</label>
+                        <textarea name="notes" id="gtNotes" rows="2" placeholder="Additional notes..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions" style="margin-top:1.25rem;border-top:1px solid #e2e8f0;padding-top:1rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('globalTaskModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveTaskBtn"><i class="bi bi-check-lg"></i> Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="~/js/project/work-api.js"></script>
+<script src="~/js/project/project-api.js"></script>
+<script src="~/js/project/milestone-api.js"></script>
+<script src="~/js/project/task-api.js"></script>
+<script>
+let tasksData = [];
+let projectsList = [];
+let allMilestones = [];
+let currentSelectedTaskProjectDependency = null;
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getTaskBadge(s) {
+    s = s || 'Pending';
+    let cls = 'badge-secondary';
+    if (s === 'Completed') cls = 'badge-success';
+    else if (s === 'In Progress') cls = 'badge-info';
+    else if (s === 'Cancelled') cls = 'badge-danger';
+    else if (s === 'On Hold') cls = 'badge-warning';
+    return `<span class="badge ${cls}">${escapeHtml(s)}</span>`;
+}
+
+function getPriorityBadge(p) {
+    p = p || 'Medium';
+    let cls = 'badge-warning';
+    if (p === 'High') cls = 'badge-danger';
+    else if (p === 'Low') cls = 'badge-success';
+    return `<span class="badge ${cls}">${escapeHtml(p)}</span>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Load Tasks, Projects, Milestones, and Work Summary via separated API modules
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadTasksData() {
+    const tbody = document.getElementById('tasksTableBody');
+
+    try {
+        const [tasksResult, projectsResult, milestonesResult, summaryResult] = await Promise.allSettled([
+            TaskApi.getAll(),
+            ProjectApi.getAll(),
+            MilestoneApi.getAll(),
+            WorkApi.getSummary()
+        ]);
+
+        if (summaryResult.status === 'fulfilled' && summaryResult.value) {
+            updateTaskStatsFromWork(summaryResult.value);
+        }
+
+        if (projectsResult.status === 'fulfilled') {
+            projectsList = Array.isArray(projectsResult.value) ? projectsResult.value : [];
+            populateProjectsSelect(projectsList);
+        }
+
+        if (milestonesResult.status === 'fulfilled') {
+            allMilestones = Array.isArray(milestonesResult.value) ? milestonesResult.value : [];
+        }
+
+        if (tasksResult.status === 'fulfilled') {
+            tasksData = Array.isArray(tasksResult.value) ? tasksResult.value : [];
+            renderTasks(tasksData);
+            if (summaryResult.status !== 'fulfilled') {
+                updateTaskStats(tasksData);
+            }
+            const pipelineCard = document.getElementById('taskPipelineCard');
+            if (pipelineCard && tasksData.length > 0) pipelineCard.style.display = 'block';
+        } else {
+            throw tasksResult.reason || new Error('Failed to load tasks');
+        }
+    } catch (err) {
+        console.error('[Tasks] Load error:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--danger, #dc2626);">
+                <i class="bi bi-exclamation-triangle" style="margin-right:6px;"></i> Error loading tasks: ${escapeHtml(err.message)}
+            </td></tr>`;
+        }
+    }
+}
+
+function populateProjectsSelect(projects) {
+    const sel = document.getElementById('gtProjectId');
+    if (!sel || !Array.isArray(projects)) return;
+    const curVal = sel.value;
+    sel.innerHTML = '<option value="">-- Choose Project --</option>';
+    projects.forEach(p => {
+        const id = p.Id !== undefined ? p.Id : p.id;
+        const code = p.ProjectCode || p.projectCode || '';
+        const name = p.ProjectName || p.projectName || '';
+        sel.innerHTML += `<option value="${id}">${escapeHtml(code)} - ${escapeHtml(name)}</option>`;
+    });
+    if (curVal) sel.value = curVal;
+}
+
+function handleProjectChange(projectId, selectedMilestoneId = 0) {
+    const msSelect = document.getElementById('gtMilestoneId');
+    if (!msSelect) return;
+    msSelect.innerHTML = '<option value="0">-- Direct Task (No Milestone) --</option>';
+
+    if (!projectId || projectId == 0) return;
+
+    const projectMs = allMilestones.filter(m => (m.ProjectId !== undefined ? m.ProjectId : m.projectId) == projectId);
+    projectMs.forEach(m => {
+        const id = m.Id !== undefined ? m.Id : m.id;
+        const code = m.MilestoneCode || m.milestoneCode || '';
+        const name = m.MilestoneName || m.milestoneName || '';
+        msSelect.innerHTML += `<option value="${id}">${escapeHtml(code)} - ${escapeHtml(name)}</option>`;
+    });
+
+    if (selectedMilestoneId > 0) {
+        setSelectValue('gtMilestoneId', selectedMilestoneId.toString());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task Dependency Options & Selection Handlers
+// ─────────────────────────────────────────────────────────────────────────────
+function handleTaskDependencyOptionToggle(option) {
+    const depCheck = document.getElementById('gtOptionDependency');
+    const noDepCheck = document.getElementById('gtOptionNoDependency');
+    const depSection = document.getElementById('gtDependencyTaskSection');
+    const depTaskSelect = document.getElementById('gtDependencyTaskId');
+
+    if (option === 'dependency') {
+        if (depCheck) depCheck.checked = true;
+        if (noDepCheck) noDepCheck.checked = false;
+        if (depSection) depSection.style.display = 'block';
+    } else {
+        if (noDepCheck) noDepCheck.checked = true;
+        if (depCheck) depCheck.checked = false;
+        if (depSection) depSection.style.display = 'none';
+        if (depTaskSelect) depTaskSelect.value = '';
+    }
+
+    const projectId = parseInt(document.getElementById('gtProjectId')?.value, 10) || 0;
+    const milestoneId = parseInt(document.getElementById('gtMilestoneId')?.value, 10) || 0;
+    const currentTaskId = parseInt(document.getElementById('gtId')?.value, 10) || 0;
+    if (projectId > 0) {
+        handleTaskDependencyEvaluation(projectId, milestoneId, currentTaskId > 0, currentTaskId);
+    }
+}
+
+function handleDependencyTaskSelectionChange(taskId) {
+    highlightSelectedDependencyCard(taskId);
+    const projectId = parseInt(document.getElementById('gtProjectId')?.value, 10) || 0;
+    const milestoneId = parseInt(document.getElementById('gtMilestoneId')?.value, 10) || 0;
+    const currentTaskId = parseInt(document.getElementById('gtId')?.value, 10) || 0;
+    if (projectId > 0) {
+        handleTaskDependencyEvaluation(projectId, milestoneId, currentTaskId > 0, currentTaskId);
+    }
+}
+
+function selectDependencyTaskFromList(taskId) {
+    const sel = document.getElementById('gtDependencyTaskId');
+    if (sel) {
+        sel.value = taskId;
+        handleDependencyTaskSelectionChange(taskId);
+    }
+}
+
+function highlightSelectedDependencyCard(selectedTaskId) {
+    const cards = document.querySelectorAll('.gt-dep-task-item');
+    cards.forEach(card => {
+        const id = card.getAttribute('data-task-id');
+        if (String(id) === String(selectedTaskId)) {
+            card.style.borderColor = 'var(--brand-600, #14b8a6)';
+            card.style.background = '#f0fdf4';
+        } else {
+            card.style.borderColor = '#e2e8f0';
+            card.style.background = '#fff';
+        }
+    });
+}
+
+function populateProjectExistingTasks(existingTasks, selectedDepTaskId, currentEditingId) {
+    const sel = document.getElementById('gtDependencyTaskId');
+    const listWrap = document.getElementById('gtExistingTasksListContent');
+    const badge = document.getElementById('gtDepTaskCountBadge');
+
+    if (!sel || !listWrap) return;
+
+    const filtered = (existingTasks || []).filter(t => {
+        const id = t.id !== undefined ? t.id : t.Id;
+        return !currentEditingId || id !== currentEditingId;
+    });
+
+    if (badge) {
+        badge.textContent = `${filtered.length} task${filtered.length === 1 ? '' : 's'} in project`;
+    }
+
+    // Populate Select Options
+    const currentVal = selectedDepTaskId || sel.value;
+    sel.innerHTML = '<option value="">-- Select Prerequisite Task in Selected Project --</option>';
+    filtered.forEach(t => {
+        const id = t.id !== undefined ? t.id : t.Id;
+        const code = t.taskCode || t.TaskCode || '';
+        const name = t.taskName || t.TaskName || '';
+        const status = t.status || t.Status || 'Pending';
+        const progress = t.progressPercent !== undefined ? t.progressPercent : (t.ProgressPercent || 0);
+        sel.innerHTML += `<option value="${id}">${escapeHtml(code)} - ${escapeHtml(name)} (${status} - ${progress}%)</option>`;
+    });
+    if (currentVal) sel.value = currentVal;
+
+    // Populate Visual Task List Below Input
+    if (filtered.length === 0) {
+        listWrap.innerHTML = `
+            <div style="color:var(--ink-400);font-size:12px;font-style:italic;padding:8px;text-align:center;background:#f8fafc;border-radius:6px;">
+                <i class="bi bi-info-circle"></i> No existing tasks in this project yet. You can select "No Dependency" for this initial task.
+            </div>
+        `;
+        return;
+    }
+
+    let listHtml = '';
+    filtered.forEach(t => {
+        const id = t.id !== undefined ? t.id : t.Id;
+        const code = t.taskCode || t.TaskCode || '';
+        const name = t.taskName || t.TaskName || '';
+        const status = t.status || t.Status || 'Pending';
+        const progress = t.progressPercent !== undefined ? t.progressPercent : (t.ProgressPercent || 0);
+        const member = t.assignedMember || t.AssignedMember || 'Unassigned';
+        const msName = t.milestoneName || t.MilestoneName || '';
+        const isSelected = String(id) === String(sel.value);
+        const isCompleted = status === 'Completed' || progress >= 100;
+
+        listHtml += `
+            <div class="gt-dep-task-item" data-task-id="${id}" onclick="selectDependencyTaskFromList(${id})"
+                 style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:6px;border:1px solid ${isSelected ? 'var(--brand-600, #14b8a6)' : '#e2e8f0'};background:${isSelected ? '#f0fdf4' : '#fff'};cursor:pointer;transition:all .15s ease;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="badge badge-code" style="font-size:11px;">${escapeHtml(code)}</span>
+                    <div>
+                        <div style="font-weight:600;font-size:12px;color:var(--ink-900);">${escapeHtml(name)}</div>
+                        <div style="font-size:11px;color:var(--ink-500);display:flex;gap:8px;">
+                            ${msName ? `<span><i class="bi bi-flag"></i> ${escapeHtml(msName)}</span>` : ''}
+                            <span><i class="bi bi-person"></i> ${escapeHtml(member)}</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="badge ${isCompleted ? 'badge-success' : 'badge-secondary'}" style="font-size:10.5px;">
+                        ${isCompleted ? '<i class="bi bi-check-circle-fill"></i> Completed' : escapeHtml(status)}
+                    </span>
+                    <button type="button" class="btn btn-sm ${isSelected ? 'btn-primary' : 'btn-outline'}" style="font-size:11px;padding:2px 8px;">
+                        ${isSelected ? 'Selected' : 'Select'}
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    listWrap.innerHTML = listHtml;
+}
+
+async function handleTaskProjectChange(projectId, isEdit = false, editingTaskId = 0) {
+    handleProjectChange(projectId);
+    await handleTaskDependencyEvaluation(projectId, parseInt(document.getElementById('gtMilestoneId').value, 10) || 0, isEdit, editingTaskId);
+}
+
+async function handleTaskMilestoneChange(milestoneId) {
+    const projectId = parseInt(document.getElementById('gtProjectId').value, 10) || 0;
+    const editingTaskId = parseInt(document.getElementById('gtId').value, 10) || 0;
+    await handleTaskDependencyEvaluation(projectId, parseInt(milestoneId, 10) || 0, editingTaskId > 0, editingTaskId);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-generate Project & Milestone Details and compute strict Sequential Dependency
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleTaskDependencyEvaluation(projectId, milestoneId, isEdit = false, editingTaskId = 0) {
+    const panel = document.getElementById('gtProjectDetailsPanel');
+    if (!panel) return;
+
+    if (!projectId || projectId <= 0) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    try {
+        const isDepChecked = document.getElementById('gtOptionDependency')?.checked || false;
+        const depTaskIdVal = parseInt(document.getElementById('gtDependencyTaskId')?.value, 10) || 0;
+
+        const res = await fetch(`/api/tasks/project-dependency/${projectId}?milestoneId=${milestoneId || 0}&currentTaskId=${editingTaskId || 0}&hasDependency=${isDepChecked}&dependencyTaskId=${depTaskIdVal}`);
+        if (!res.ok) throw new Error('Failed to retrieve task dependency metadata');
+        const data = await res.json();
+        currentSelectedTaskProjectDependency = data;
+
+        const proj = data.project || data.Project;
+        const milestone = data.milestone || data.Milestone;
+        const nextDep = data.nextTaskDependency || data.NextTaskDependency || {};
+        const existingTasks = data.existingTasks || data.ExistingTasks || [];
+
+        // 1. Populate Existing Tasks List in Selected Project
+        populateProjectExistingTasks(existingTasks, depTaskIdVal, editingTaskId);
+
+        // 2. Populate Project Details UI
+        document.getElementById('gtProjCodeNameText').textContent = `${proj.projectCode || proj.ProjectCode || ''} - ${proj.projectName || proj.ProjectName || ''}`;
+        document.getElementById('gtProjClientText').textContent = proj.clientName || proj.ClientName || 'N/A';
+        document.getElementById('gtProjTypeBadge').textContent = proj.projectType || proj.ProjectType || 'Direct Project';
+        document.getElementById('gtProjBudgetText').textContent = '₹' + Number(proj.budget || proj.Budget || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+        const start = proj.startDate || proj.StartDate || 'N/A';
+        const deadline = proj.deadline || proj.Deadline || 'N/A';
+        document.getElementById('gtProjTimelineText').textContent = `${start} → ${deadline}`;
+        document.getElementById('gtProjManagerText').textContent = proj.projectManager || proj.ProjectManager || 'Unassigned';
+
+        // 3. Dependency Evaluation
+        let isLocked = nextDep.isLocked ?? nextDep.IsLocked ?? false;
+        let lockReason = nextDep.lockReason || nextDep.LockReason || '';
+        let seqIndex = nextDep.sequenceIndex || nextDep.SequenceIndex || 1;
+
+        if (isEdit && editingTaskId > 0) {
+            const found = tasksData.find(t => (t.id || t.Id) === Number(editingTaskId));
+            if (found) {
+                seqIndex = found.sequenceIndex || found.SequenceIndex || 1;
+            }
+        }
+
+        const scopeLabel = milestone ? `Milestone: ${milestone.milestoneCode || milestone.MilestoneCode || ''}` : 'Direct Project Tasks';
+        document.getElementById('gtDepSeqTitle').innerHTML = `<i class="bi bi-diagram-2"></i> Task #${seqIndex} (${escapeHtml(scopeLabel)})`;
+        document.getElementById('gtDepTypeText').textContent = nextDep.dependencyType || nextDep.DependencyType || (isDepChecked ? "Prerequisite Task Dependency" : "No Dependency");
+
+        const lockBadge = document.getElementById('gtDepLockStatusBadge');
+        if (isLocked) {
+            lockBadge.className = 'badge badge-danger';
+            lockBadge.innerHTML = '<i class="bi bi-lock-fill"></i> Locked';
+            lockBadge.style.background = '#fee2e2';
+            lockBadge.style.color = '#dc2626';
+            lockBadge.style.border = '1px solid #fca5a5';
+        } else {
+            lockBadge.className = 'badge badge-success';
+            lockBadge.innerHTML = '<i class="bi bi-unlock-fill"></i> Unlocked / Ready';
+            lockBadge.style.background = '#dcfce7';
+            lockBadge.style.color = '#15803d';
+            lockBadge.style.border = '1px solid #86efac';
+        }
+
+        // Render Condition Details
+        const condBox = document.getElementById('gtDepConditionBox');
+        let condHtml = '';
+
+        if (milestone) {
+            const msLocked = milestone.isLocked || milestone.IsLocked || false;
+            const msReason = milestone.lockReason || milestone.LockReason || '';
+            condHtml += `
+                <div style="margin-bottom:8px;padding:6px 10px;border-radius:6px;background:${msLocked ? '#fff1f2' : '#f0fdf4'};border:1px solid ${msLocked ? '#fecdd3' : '#bbf7d0'};font-size:12px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <span><strong>Milestone Gate:</strong> ${escapeHtml(milestone.milestoneCode || '')} - ${escapeHtml(milestone.milestoneName || '')}</span>
+                        <strong style="color:${msLocked ? '#e11d48' : '#16a34a'};">${msLocked ? '🔒 Milestone Locked' : '✓ Milestone Unlocked'}</strong>
+                    </div>
+                    ${msLocked ? `<div style="font-size:11px;color:#b91c1c;margin-top:2px;">${escapeHtml(msReason)}</div>` : ''}
+                </div>
+            `;
+        }
+
+        if (!isDepChecked) {
+            condHtml += `
+                <div style="display:flex;align-items:center;gap:6px;color:#15803d;font-weight:600;">
+                    <i class="bi bi-check-circle-fill"></i> No prerequisite dependency selected. This task is independent.
+                </div>
+            `;
+        } else if (!depTaskIdVal) {
+            condHtml += `
+                <div style="display:flex;align-items:gap:6px;color:#0369a1;font-weight:600;">
+                    <i class="bi bi-info-circle-fill"></i> Please select a prerequisite task above to establish dependency.
+                </div>
+            `;
+        } else {
+            const prereqCode = nextDep.prerequisiteTaskCode || nextDep.PrerequisiteTaskCode || `Task #${depTaskIdVal}`;
+            const prereqName = nextDep.prerequisiteTaskName || nextDep.PrerequisiteTaskName || '';
+            const prereqStatus = nextDep.prerequisiteStatus || nextDep.PrerequisiteStatus || 'Pending';
+            const isCompleted = nextDep.prerequisiteCompleted ?? nextDep.PrerequisiteCompleted ?? false;
+
+            condHtml += `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;background:${isCompleted ? '#f0fdf4' : '#fff1f2'};border:1px solid ${isCompleted ? '#bbf7d0' : '#fecdd3'};font-size:12px;">
+                    <span><strong>Prerequisite Task:</strong> ${escapeHtml(prereqCode)} (${escapeHtml(prereqName)})</span>
+                    <strong style="color:${isCompleted ? '#16a34a' : '#e11d48'};">${isCompleted ? '✓ Completed (100%)' : `✗ Incomplete (${prereqStatus})`}</strong>
+                </div>
+                ${isLocked ? `
+                    <div style="color:#b91c1c;font-weight:600;margin-top:6px;display:flex;align-items:flex-start;gap:5px;">
+                        <i class="bi bi-exclamation-octagon-fill" style="margin-top:1px;"></i>
+                        <span>${escapeHtml(lockReason || `Locked until ${prereqCode} is completed.`)}</span>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        condBox.innerHTML = condHtml;
+
+        // 3. Smart Defaults
+        if (!isEdit) {
+            setSelectValue('gtPriority', proj.priority || proj.Priority || 'Medium');
+        }
+
+        const statusLockHint = document.getElementById('gtStatusLockHint');
+        if (isLocked) {
+            if (statusLockHint) statusLockHint.style.display = 'inline';
+            if (!isEdit) setSelectValue('gtStatus', 'Pending');
+        } else {
+            if (statusLockHint) statusLockHint.style.display = 'none';
+        }
+
+        panel.style.display = 'block';
+    } catch (err) {
+        console.warn('Error fetching task dependency:', err);
+        panel.style.display = 'none';
+    }
+}
+
+function updateTaskStatsFromWork(summary) {
+    if (!summary) return;
+    const elTotal = document.getElementById('statTotalTasks');
+    const elCompleted = document.getElementById('statCompletedTasks');
+    const elInProgress = document.getElementById('statInProgressTasks');
+    const elTotalAmount = document.getElementById('statTotalTaskAmount');
+
+    if (elTotal) elTotal.textContent = summary.TotalTasks || summary.totalTasks || 0;
+    if (elCompleted) elCompleted.textContent = summary.CompletedTasks || summary.completedTasks || 0;
+    if (elInProgress) elInProgress.textContent = summary.InProgressTasks || summary.inProgressTasks || 0;
+    if (elTotalAmount) {
+        const total = tasksData.reduce((sum, t) => sum + (Number(t.TaskAmount !== undefined ? t.TaskAmount : (t.taskAmount || 0))), 0);
+        elTotalAmount.textContent = '₹' + total.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+}
+
+function updateTaskStats(tasks) {
+    const total = tasks.length;
+    const completed = tasks.filter(t => (t.Status || t.status) === 'Completed').length;
+    const inProgress = tasks.filter(t => (t.Status || t.status) === 'In Progress').length;
+    const totalAmount = tasks.reduce((sum, t) => sum + (Number(t.TaskAmount !== undefined ? t.TaskAmount : (t.taskAmount || 0))), 0);
+
+    const elTotal = document.getElementById('statTotalTasks');
+    const elCompleted = document.getElementById('statCompletedTasks');
+    const elInProgress = document.getElementById('statInProgressTasks');
+    const elTotalAmount = document.getElementById('statTotalTaskAmount');
+
+    if (elTotal) elTotal.textContent = total;
+    if (elCompleted) elCompleted.textContent = completed;
+    if (elInProgress) elInProgress.textContent = inProgress;
+    if (elTotalAmount) elTotalAmount.textContent = '₹' + totalAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+function renderTasks(tasks) {
+    const tbody = document.getElementById('tasksTableBody');
+    const emptyState = document.getElementById('tasksEmptyState');
+    const tableWrap = document.getElementById('tasksTableWrap');
+
+    if (!tasks || tasks.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        if (tableWrap) tableWrap.style.display = 'none';
+        if (tbody) tbody.innerHTML = '';
+        return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (tableWrap) tableWrap.style.display = 'block';
+
+    let html = '';
+    tasks.forEach((t, idx) => {
+        const id = t.Id !== undefined ? t.Id : t.id;
+        const projId = t.ProjectId !== undefined ? t.ProjectId : t.projectId;
+        const code = t.TaskCode || t.taskCode || '';
+        const name = t.TaskName || t.taskName || '';
+        const desc = t.Description || t.description || '';
+        const projName = t.ProjectName || t.projectName || '—';
+        const projCode = t.ProjectCode || t.projectCode || '';
+        const msId = t.MilestoneId !== undefined ? t.MilestoneId : t.milestoneId;
+        const msName = t.MilestoneName || t.milestoneName || '';
+        const member = t.AssignedMember || t.assignedMember || '';
+        const start = t.StartDate || t.startDate || '—';
+        const due = t.DueDate || t.dueDate || '—';
+        const amount = Number(t.TaskAmount !== undefined ? t.TaskAmount : (t.taskAmount || 0));
+        const completed = Number(t.CompletedAmount !== undefined ? t.CompletedAmount : (t.completedAmount || 0));
+        const pending = Number(t.PendingAmount !== undefined ? t.PendingAmount : (t.pendingAmount || Math.max(0, amount - completed)));
+        const progress = Number(t.ProgressPercent !== undefined ? t.ProgressPercent : (t.progressPercent || 0));
+        const priority = t.Priority || t.priority || 'Medium';
+        const status = t.Status || t.status || 'Pending';
+        const progressColor = progress >= 100 ? 'fill-green' : (progress >= 50 ? 'fill-blue' : 'fill-orange');
+
+        // Dependency fields
+        const seqIndex = t.SequenceIndex || t.sequenceIndex || (idx + 1);
+        const isLocked = t.IsLocked || t.isLocked || false;
+        const lockReason = t.LockReason || t.lockReason || '';
+        const prereqTaskCode = t.PrerequisiteTaskCode || t.prerequisiteTaskCode || '';
+
+        html += `
+        <tr data-id="${id}" style="${isLocked ? 'background:#fffbfb;' : ''}">
+            <td style="text-align:center;">
+                <span class="badge ${seqIndex === 1 ? 'badge-purple' : 'badge-secondary'}" style="font-weight:700;font-size:11px;">#${seqIndex}</span>
+            </td>
+            <td>
+                <span class="badge badge-code">${escapeHtml(code)}</span>
+                ${isLocked ? `<span class="badge badge-danger" style="margin-left:4px;font-size:10px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;" title="${escapeHtml(lockReason)}"><i class="bi bi-lock-fill"></i></span>` : ''}
+            </td>
+            <td>
+                <strong>${escapeHtml(name)}</strong>
+                ${desc ? `<div class="table-subtext">${escapeHtml(desc)}</div>` : ''}
+            </td>
+            <td>
+                ${projId ? `
+                    <a href="/Work/ProjectDetails?id=${projId}&tab=task" class="table-lead-link">
+                        <i class="bi bi-folder2-open"></i> ${escapeHtml(projName)}
+                    </a>
+                    ${projCode ? `<div class="table-subtext"><span class="badge badge-code-sm">${escapeHtml(projCode)}</span></div>` : ''}
+                ` : '<span class="text-muted">—</span>'}
+            </td>
+            <td>
+                ${msName ? `<span class="badge badge-purple"><i class="bi bi-flag"></i> ${escapeHtml(msName)}</span>` : '<span class="badge badge-secondary">Direct Task</span>'}
+            </td>
+            <td>
+                ${member ? `<div class="user-chip-cell"><i class="bi bi-person-circle"></i> ${escapeHtml(member)}</div>` : '<span class="text-muted">—</span>'}
+            </td>
+            <td>
+                <div style="font-size:12px;"><strong>${escapeHtml(start)}</strong></div>
+                <div class="table-subtext">Due: ${escapeHtml(due)}</div>
+            </td>
+            <td><strong>₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong></td>
+            <td>
+                <div class="progress-wrap" style="width:90px;">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill ${progressColor}" style="width:${Math.min(100, Math.max(0, progress))}%"></div>
+                    </div>
+                    <span class="progress-label font-bold">${progress}%</span>
+                </div>
+            </td>
+            <td>
+                ${isLocked ? `
+                    <span class="badge badge-danger" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;font-weight:700;font-size:10.5px;" title="${escapeHtml(lockReason)}">
+                        <i class="bi bi-lock-fill"></i> Locked (${escapeHtml(prereqTaskCode || `T#${seqIndex-1}`)})
+                    </span>
+                ` : `
+                    <span class="badge badge-success" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:10.5px;">
+                        <i class="bi bi-unlock-fill"></i> Unlocked
+                    </span>
+                `}
+            </td>
+            <td>${getPriorityBadge(priority)}</td>
+            <td>${getTaskBadge(status)}</td>
+            <td style="text-align:right;">
+                <div class="action-btns justify-end">
+                    ${projId ? `
+                        <a class="btn-action btn-view" href="/Work/ProjectDetails?id=${projId}&tab=task" title="View in Project Details">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    ` : ''}
+                    <button type="button" class="btn-action btn-edit" onclick="openEditTaskById(${id})" title="Edit Task">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button type="button" class="btn-action btn-delete" onclick="handleDeleteTask(${id}, '${escapeHtml(name).replace(/'/g, "\\'")}')" title="Delete Task">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    if (tbody) tbody.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Save Task (TaskApi.create / TaskApi.update)
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleSaveTask(e) {
+    e.preventDefault();
+    const id = parseInt(document.getElementById('gtId').value, 10) || 0;
+    const isEdit = id > 0;
+    const msVal = parseInt(document.getElementById('gtMilestoneId').value, 10);
+    const status = document.getElementById('gtStatus').value;
+
+    const hasDep = document.getElementById('gtOptionDependency')?.checked || false;
+    const depTaskIdVal = parseInt(document.getElementById('gtDependencyTaskId')?.value, 10);
+    const depTaskId = (hasDep && depTaskIdVal > 0) ? depTaskIdVal : null;
+
+    if (hasDep && !depTaskId) {
+        const depSelect = document.getElementById('gtDependencyTaskId');
+        if (depSelect && depSelect.options.length > 1) {
+            alert('Please select a Dependency Task from the list, or choose "No Dependency".');
+            depSelect.focus();
+            return;
+        }
+    }
+
+    const payload = {
+        Id: id,
+        ProjectId: parseInt(document.getElementById('gtProjectId').value, 10),
+        MilestoneId: msVal > 0 ? msVal : null,
+        TaskName: document.getElementById('gtName').value.trim(),
+        AssignedMember: document.getElementById('gtAssigned').value,
+        TaskAmount: parseFloat(document.getElementById('gtAmount').value) || 0,
+        CompletedAmount: parseFloat(document.getElementById('gtCompleted').value) || 0,
+        StartDate: document.getElementById('gtStart').value,
+        DueDate: document.getElementById('gtDue').value,
+        Priority: document.getElementById('gtPriority').value,
+        Status: status,
+        Description: document.getElementById('gtDesc').value.trim(),
+        Notes: document.getElementById('gtNotes').value.trim(),
+        HasDependency: hasDep,
+        DependencyTaskId: depTaskId
+    };
+
+    const saveBtn = document.getElementById('saveTaskBtn');
+    if (saveBtn) saveBtn.disabled = true;
+
+    try {
+        if (isEdit) {
+            await TaskApi.update(id, payload);
+        } else {
+            await TaskApi.create(payload);
+        }
+        closeModal('globalTaskModal');
+        await loadTasksData();
+    } catch (err) {
+        alert(`Error saving task: ${err.message}`);
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delete Task (TaskApi.delete)
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleDeleteTask(id, name) {
+    if (!confirm(`Are you sure you want to delete task "${name}"?`)) {
+        return;
+    }
+
+    try {
+        await TaskApi.delete(id);
+        await loadTasksData();
+    } catch (err) {
+        alert(`Error deleting task: ${err.message}`);
+    }
+}
+
+function openCreateTaskModal() {
+    document.getElementById('gtId').value = 0;
+    setSelectValue('gtProjectId', '');
+    document.getElementById('gtMilestoneId').innerHTML = '<option value="0">-- Direct Task (No Milestone) --</option>';
+    document.getElementById('gtName').value = '';
+    document.getElementById('gtDesc').value = '';
+    setSelectValue('gtAssigned', '');
+    document.getElementById('gtStart').value = new Date().toISOString().split('T')[0];
+    document.getElementById('gtDue').value = '';
+    document.getElementById('gtAmount').value = 0;
+    document.getElementById('gtCompleted').value = 0;
+    setSelectValue('gtPriority', 'Medium');
+    setSelectValue('gtStatus', 'Pending');
+    document.getElementById('gtNotes').value = '';
+
+    // Reset Dependency Options to "No Dependency" by default
+    const chkDep = document.getElementById('gtOptionDependency');
+    const chkNoDep = document.getElementById('gtOptionNoDependency');
+    if (chkDep) chkDep.checked = false;
+    if (chkNoDep) chkNoDep.checked = true;
+
+    const depSection = document.getElementById('gtDependencyTaskSection');
+    if (depSection) depSection.style.display = 'none';
+
+    const depTaskSelect = document.getElementById('gtDependencyTaskId');
+    if (depTaskSelect) depTaskSelect.innerHTML = '<option value="">-- Choose Prerequisite Task --</option>';
+
+    const listContent = document.getElementById('gtExistingTasksListContent');
+    if (listContent) listContent.innerHTML = '<span class="text-muted" style="font-size:12px;">Select a project first to load its existing tasks.</span>';
+
+    document.getElementById('globalTaskTitle').textContent = 'Add Task';
+    document.getElementById('globalTaskSub').textContent = 'Create a new task with optional dependency and project assignment';
+
+    const panel = document.getElementById('gtProjectDetailsPanel');
+    if (panel) panel.style.display = 'none';
+
+    if (projectsList.length === 1) {
+        const pId = projectsList[0].Id !== undefined ? projectsList[0].Id : projectsList[0].id;
+        setSelectValue('gtProjectId', pId.toString());
+        handleTaskProjectChange(pId, false);
+    }
+
+    openModal('globalTaskModal');
+}
+
+async function openEditTaskById(id) {
+    const t = tasksData.find(x => (x.Id !== undefined ? x.Id : x.id) === id);
+    if (!t) {
+        console.warn('Task not found with ID:', id);
+        return;
+    }
+
+    const projId = t.ProjectId !== undefined ? t.ProjectId : t.projectId;
+    const msId = t.MilestoneId !== undefined ? t.MilestoneId : (t.milestoneId || 0);
+
+    document.getElementById('gtId').value = id;
+    setSelectValue('gtProjectId', projId.toString());
+    handleProjectChange(projId, msId);
+    document.getElementById('gtName').value = t.TaskName || t.taskName || '';
+    document.getElementById('gtDesc').value = t.Description || t.description || '';
+    setSelectValue('gtAssigned', t.AssignedMember || t.assignedMember || '');
+    document.getElementById('gtStart').value = t.StartDate || t.startDate || '';
+    document.getElementById('gtDue').value = t.DueDate || t.dueDate || '';
+    document.getElementById('gtAmount').value = t.TaskAmount !== undefined ? t.TaskAmount : (t.taskAmount || 0);
+    document.getElementById('gtCompleted').value = t.CompletedAmount !== undefined ? t.CompletedAmount : (t.completedAmount || 0);
+    setSelectValue('gtPriority', t.Priority || t.priority || 'Medium');
+    setSelectValue('gtStatus', t.Status || t.status || 'Pending');
+    document.getElementById('gtNotes').value = t.Notes || t.notes || '';
+    document.getElementById('globalTaskTitle').textContent = `Edit Task (${t.TaskCode || t.taskCode || ''})`;
+
+    // Restore Dependency state
+    const hasDep = t.HasDependency !== undefined ? t.HasDependency : (t.hasDependency || false);
+    const depTaskId = t.DependencyTaskId !== undefined ? t.DependencyTaskId : (t.dependencyTaskId || null);
+
+    const chkDep = document.getElementById('gtOptionDependency');
+    const chkNoDep = document.getElementById('gtOptionNoDependency');
+    if (chkDep) chkDep.checked = hasDep;
+    if (chkNoDep) chkNoDep.checked = !hasDep;
+
+    const depSection = document.getElementById('gtDependencyTaskSection');
+    if (depSection) depSection.style.display = hasDep ? 'block' : 'none';
+
+    await handleTaskDependencyEvaluation(projId, msId, true, id);
+
+    if (depTaskId) {
+        setSelectValue('gtDependencyTaskId', depTaskId.toString());
+        highlightSelectedDependencyCard(depTaskId);
+    }
+
+    openModal('globalTaskModal');
+}
+
+function setSelectValue(id, val) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === val) { sel.selectedIndex = i; return; }
+    }
+    if (sel.options.length > 0) sel.selectedIndex = 0;
+}
+
+function filterTasksTable() {
+    var query = (document.getElementById('taskSearchInput')?.value || '').toLowerCase();
+    var rows = document.querySelectorAll('#tasksTable tbody tr');
+    rows.forEach(function(row) {
+        var text = row.textContent.toLowerCase();
+        row.style.display = text.indexOf(query) > -1 ? '' : 'none';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadTasksData();
+});
+</script>
+}

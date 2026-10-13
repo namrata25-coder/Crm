@@ -1,0 +1,327 @@
+@model CrmLeadManagement.Models.WorkProject?
+@using CrmLeadManagement.Models
+@{
+    ViewData["Title"] = "Work Reports";
+    var projects = ViewData["Projects"] as List<WorkProject> ?? new();
+
+    var totalPortfolioProjects = projects.Count;
+    var totalPortfolioBudget   = projects.Sum(p => p.Budget);
+    var totalPortfolioCompleted = projects.Sum(p => p.CompletedAmount);
+    var totalPortfolioInvoices = projects.Sum(p => p.Invoices.Sum(i => i.GrandTotal));
+    var totalPortfolioPaid     = projects.Sum(p => p.Invoices.Where(i => i.PaymentStatus == "Paid").Sum(i => i.GrandTotal));
+    var totalPortfolioOutstanding = Math.Max(0, totalPortfolioInvoices - totalPortfolioPaid);
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-bar-chart-line" style="color:var(--brand-600);"></i> Work & Project Reports</h1>
+        <p class="page-sub">Comprehensive analytics, progress metrics, and financial reporting across all projects</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+        <label style="font-size:13px;font-weight:600;color:var(--ink-700);margin:0;"><i class="bi bi-folder2-open"></i> Select Project:</label>
+        <form method="get" asp-action="Reports" id="projectReportForm">
+            <select name="projectId" class="form-control form-select-custom" style="padding:8px 14px;border-radius:8px;border:1px solid var(--ink-300);font-size:13.5px;font-weight:600;" onchange="this.form.submit()">
+                @if (!projects.Any())
+                {
+                    <option value="">No projects found</option>
+                }
+                else
+                {
+                    @foreach (var p in projects)
+                    {
+                        <option value="@p.Id" selected="@(Model != null && Model.Id == p.Id)">
+                            @p.ProjectCode - @p.ProjectName (@p.ClientName)
+                        </option>
+                    }
+                }
+            </select>
+        </form>
+    </div>
+</div>
+
+<!-- PORTFOLIO HIGH LEVEL STATS -->
+<div class="work-stats-grid">
+    <div class="work-stat-card">
+        <div class="stat-icon bg-blue-subtle text-primary"><i class="bi bi-folder2-open"></i></div>
+        <div>
+            <div class="stat-val">@totalPortfolioProjects</div>
+            <div class="stat-lbl">Total Projects</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-purple-subtle text-purple"><i class="bi bi-currency-rupee"></i></div>
+        <div>
+            <div class="stat-val">₹@totalPortfolioBudget.ToString("N0")</div>
+            <div class="stat-lbl">Total Portfolio Budget</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-green-subtle text-success"><i class="bi bi-check2-circle"></i></div>
+        <div>
+            <div class="stat-val">₹@totalPortfolioCompleted.ToString("N0")</div>
+            <div class="stat-lbl">Completed Work Value</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-amber-subtle text-warning"><i class="bi bi-receipt"></i></div>
+        <div>
+            <div class="stat-val">₹@totalPortfolioInvoices.ToString("N0")</div>
+            <div class="stat-lbl">Total Invoiced</div>
+        </div>
+    </div>
+</div>
+
+@if (Model == null)
+{
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="empty-state">
+                <i class="bi bi-bar-chart" style="font-size:3rem;color:var(--ink-300);"></i>
+                <h4 style="margin-top:1rem;font-weight:700;color:var(--ink-700);">No project selected</h4>
+                <p style="color:var(--ink-500);margin-bottom:1.25rem;">Create a project or select one from the dropdown above to view its detailed dynamic report.</p>
+                <a asp-action="Projects" class="btn btn-primary"><i class="bi bi-folder-plus"></i> Go to Projects</a>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    var totalMilestones     = Model.Milestones.Count;
+    var completedMilestones = Model.Milestones.Count(m => m.Status == "Completed");
+    var inProgressMilestones = Model.Milestones.Count(m => m.Status == "In Progress");
+    var pendingMilestones   = totalMilestones - completedMilestones;
+
+    var totalTasks          = Model.Tasks.Count;
+    var completedTasks      = Model.Tasks.Count(t => t.Status == "Completed");
+    var inProgressTasks     = Model.Tasks.Count(t => t.Status == "In Progress");
+    var pendingTasks        = totalTasks - completedTasks;
+
+    var invoicedAmount      = Model.Invoices.Sum(i => i.GrandTotal);
+    var paidAmount          = Model.Invoices.Where(i => i.PaymentStatus == "Paid").Sum(i => i.GrandTotal);
+    var outstandingAmount   = Math.Max(0, invoicedAmount - paidAmount);
+
+    <div class="card mt-3" style="background:linear-gradient(135deg, #1f4b8f 0%, #132140 100%);color:#fff;border:none;">
+        <div class="card-body" style="padding:22px 28px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+                <div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                        <span class="badge" style="background:rgba(255,255,255,.2);color:#fff;font-family:monospace;font-size:13px;">@Model.ProjectCode</span>
+                        <h2 style="margin:0;font-size:1.45rem;font-weight:700;color:#fff;">@Model.ProjectName</h2>
+                        <span class="badge @StatusBadge(Model.Status)">@Model.Status</span>
+                    </div>
+                    <div style="font-size:13.5px;color:#cdd7ee;">
+                        <i class="bi bi-building"></i> Client: <strong>@(string.IsNullOrWhiteSpace(Model.ClientName) ? "—" : Model.ClientName)</strong> @(string.IsNullOrWhiteSpace(Model.ClientCompany) ? "" : $"({Model.ClientCompany})")
+                        &bull; <i class="bi bi-tag"></i> Type: <strong>@Model.ProjectType</strong>
+                        &bull; <i class="bi bi-person-badge"></i> Manager: <strong>@(string.IsNullOrWhiteSpace(Model.ProjectManager) ? "Unassigned" : Model.ProjectManager)</strong>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <a class="btn btn-outline" style="color:#fff;border-color:rgba(255,255,255,.4);" asp-action="ProjectDetails" asp-route-id="@Model.Id">
+                        <i class="bi bi-eye"></i> View Full Details
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAILED REPORT SECTIONS -->
+    <div class="report-dashboard-grid mt-3">
+        <!-- 1. PROJECT SUMMARY -->
+        <div class="card report-box">
+            <div class="card-header-row">
+                <h4 class="card-title"><i class="bi bi-info-circle text-primary"></i> Project Summary</h4>
+                <span class="badge badge-code">@Model.ProjectCode</span>
+            </div>
+            <div class="card-body">
+                <div class="report-table-list">
+                    <div class="report-item-row"><span>Project Name</span><strong>@Model.ProjectName</strong></div>
+                    <div class="report-item-row"><span>Project Code</span><strong>@Model.ProjectCode</strong></div>
+                    <div class="report-item-row"><span>Client</span><strong>@(string.IsNullOrWhiteSpace(Model.ClientName) ? "—" : Model.ClientName)</strong></div>
+                    <div class="report-item-row"><span>Client Company</span><strong>@(string.IsNullOrWhiteSpace(Model.ClientCompany) ? "—" : Model.ClientCompany)</strong></div>
+                    <div class="report-item-row"><span>Project Type</span><span class="badge @TypeBadge(Model.ProjectType)">@Model.ProjectType</span></div>
+                    <div class="report-item-row"><span>Start Date</span><strong>@(string.IsNullOrWhiteSpace(Model.StartDate) ? "—" : Model.StartDate)</strong></div>
+                    <div class="report-item-row"><span>Deadline</span><strong>@(string.IsNullOrWhiteSpace(Model.Deadline) ? "—" : Model.Deadline)</strong></div>
+                    <div class="report-item-row"><span>Project Manager</span><strong>@(string.IsNullOrWhiteSpace(Model.ProjectManager) ? "—" : Model.ProjectManager)</strong></div>
+                    <div class="report-item-row"><span>Assigned Members</span><strong>@(string.IsNullOrWhiteSpace(Model.AssignedMembers) ? "—" : Model.AssignedMembers)</strong></div>
+                    <div class="report-item-row"><span>Status</span><span class="badge @StatusBadge(Model.Status)">@Model.Status</span></div>
+                    <div class="report-item-row"><span>Budget</span><strong class="text-primary font-bold">₹@Model.Budget.ToString("N0")</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. PROGRESS SUMMARY -->
+        <div class="card report-box">
+            <div class="card-header-row">
+                <h4 class="card-title"><i class="bi bi-graph-up text-success"></i> Progress Summary</h4>
+                <span class="badge badge-info">Realtime Progress</span>
+            </div>
+            <div class="card-body">
+                <div class="report-progress-hero">
+                    <div class="report-progress-large">
+                        <div class="progress-donut-val">@Model.ProgressPercent%</div>
+                        <div class="progress-donut-sub">Overall Completed</div>
+                    </div>
+                    <div class="progress-wrap w-full my-2">
+                        <div class="progress-bar-track">
+                            <div class="progress-bar-fill @(Model.ProgressPercent >= 100 ? "fill-green" : Model.ProgressPercent >= 50 ? "fill-blue" : "fill-orange")"
+                                 style="width:@Model.ProgressPercent%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="report-table-list">
+                    <div class="report-item-row"><span>Total Budget</span><strong>₹@Model.Budget.ToString("N0")</strong></div>
+                    <div class="report-item-row"><span>Completed Work Value</span><strong class="text-success">₹@Model.CompletedAmount.ToString("N0")</strong></div>
+                    <div class="report-item-row"><span>Pending Work Value</span><strong class="text-warning">₹@Model.PendingAmount.ToString("N0")</strong></div>
+                    <div class="report-item-row"><span>Completion Rate</span><strong>@Model.ProgressPercent%</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. MILESTONE SUMMARY -->
+        <div class="card report-box">
+            <div class="card-header-row">
+                <h4 class="card-title"><i class="bi bi-flag text-purple"></i> Milestone Summary</h4>
+                <span class="badge badge-purple">@totalMilestones Milestones</span>
+            </div>
+            <div class="card-body">
+                <div class="mini-stat-pills">
+                    <div class="mini-pill">
+                        <div class="pill-num">@totalMilestones</div>
+                        <div class="pill-txt">Total</div>
+                    </div>
+                    <div class="mini-pill text-success">
+                        <div class="pill-num text-success">@completedMilestones</div>
+                        <div class="pill-txt">Completed</div>
+                    </div>
+                    <div class="mini-pill text-warning">
+                        <div class="pill-num text-warning">@pendingMilestones</div>
+                        <div class="pill-txt">Pending / Active</div>
+                    </div>
+                </div>
+                <div class="report-table-list mt-3">
+                    @if (!Model.Milestones.Any())
+                    {
+                        <div class="empty-subtasks"><span class="text-muted">No milestones in this project</span></div>
+                    }
+                    else
+                    {
+                        @foreach (var ms in Model.Milestones)
+                        {
+                            <div class="report-item-row">
+                                <span><span class="badge badge-code-sm">@ms.MilestoneCode</span> <strong>@ms.MilestoneName</strong></span>
+                                <span class="badge @MsBadge(ms.Status)">@ms.Status (@ms.ProgressPercent%)</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. TASK SUMMARY -->
+        <div class="card report-box">
+            <div class="card-header-row">
+                <h4 class="card-title"><i class="bi bi-check2-square text-cyan"></i> Task Summary</h4>
+                <span class="badge badge-cyan">@totalTasks Tasks</span>
+            </div>
+            <div class="card-body">
+                <div class="mini-stat-pills">
+                    <div class="mini-pill">
+                        <div class="pill-num">@totalTasks</div>
+                        <div class="pill-txt">Total</div>
+                    </div>
+                    <div class="mini-pill text-success">
+                        <div class="pill-num text-success">@completedTasks</div>
+                        <div class="pill-txt">Completed</div>
+                    </div>
+                    <div class="mini-pill text-warning">
+                        <div class="pill-num text-warning">@pendingTasks</div>
+                        <div class="pill-txt">Pending / Active</div>
+                    </div>
+                </div>
+                <div class="report-table-list mt-3">
+                    <div class="report-item-row"><span>Task Completion Rate</span><strong>@(totalTasks > 0 ? (completedTasks * 100 / totalTasks) : 0)%</strong></div>
+                    <div class="report-item-row"><span>High Priority Tasks</span><strong class="text-danger">@Model.Tasks.Count(t => t.Priority == "High")</strong></div>
+                    <div class="report-item-row"><span>Medium Priority Tasks</span><strong class="text-warning">@Model.Tasks.Count(t => t.Priority == "Medium")</strong></div>
+                    <div class="report-item-row"><span>Low Priority Tasks</span><strong class="text-success">@Model.Tasks.Count(t => t.Priority == "Low")</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. FINANCIAL SUMMARY -->
+        <div class="card report-box report-box-full">
+            <div class="card-header-row">
+                <h4 class="card-title"><i class="bi bi-currency-rupee text-success"></i> Financial Summary</h4>
+                <span class="badge badge-success">Dynamic Financial Breakdown</span>
+            </div>
+            <div class="card-body">
+                <div class="fin-summary-grid">
+                    <div class="fin-card">
+                        <div class="fin-card-lbl">Project Budget</div>
+                        <div class="fin-card-val text-primary">₹@Model.Budget.ToString("N0")</div>
+                    </div>
+                    <div class="fin-card">
+                        <div class="fin-card-lbl">Completed Work Value</div>
+                        <div class="fin-card-val text-success">₹@Model.CompletedAmount.ToString("N0")</div>
+                    </div>
+                    <div class="fin-card">
+                        <div class="fin-card-lbl">Pending Work Value</div>
+                        <div class="fin-card-val text-warning">₹@Model.PendingAmount.ToString("N0")</div>
+                    </div>
+                    <div class="fin-card">
+                        <div class="fin-card-lbl">Invoiced Amount</div>
+                        <div class="fin-card-val text-purple">₹@invoicedAmount.ToString("N0")</div>
+                    </div>
+                    <div class="fin-card">
+                        <div class="fin-card-lbl">Paid Amount</div>
+                        <div class="fin-card-val text-success">₹@paidAmount.ToString("N0")</div>
+                    </div>
+                    <div class="fin-card">
+                        <div class="fin-card-lbl">Outstanding Amount</div>
+                        <div class="fin-card-val text-danger">₹@outstandingAmount.ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@functions {
+    string StatusBadge(string s) => s switch
+    {
+        "Active"    => "badge-success",
+        "Completed" => "badge-info",
+        "On Hold"   => "badge-warning",
+        "Cancelled" => "badge-danger",
+        _           => "badge-secondary"
+    };
+
+    string TypeBadge(string? t) => (t ?? "") switch
+    {
+        "Milestone Based Project" => "badge-purple",
+        "Task Based Project"      => "badge-cyan",
+        _                         => "badge-info"
+    };
+
+    string MsBadge(string? s) => (s ?? "") switch
+    {
+        "Completed"   => "badge-success",
+        "In Progress" => "badge-info",
+        "On Hold"     => "badge-warning",
+        _             => "badge-secondary"
+    };
+}
+
+@section Scripts {
+<script src="~/js/project/work-api.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        const projectId = @(Model != null ? Model.Id.ToString() : "null");
+        const reportData = await WorkApi.getReports(projectId);
+        console.log('[Reports] Loaded report data from WorkApi.getReports:', reportData);
+    } catch (err) {
+        console.warn('[Reports] API sync note:', err.message);
+    }
+});
+</script>
+}

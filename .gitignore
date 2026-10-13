@@ -1,0 +1,25 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.log
+
+# Visual Studio / VS Code
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+.vscode/
+
+# Sensitive development settings
+appsettings.Development.json
+appsettings.*.local.json
+
+# Local history and uploads
+.history/
+**/wwwroot/uploads/
+
+# User / OS specific
+.DS_Store
+Thumbs.db

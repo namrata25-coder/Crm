@@ -1,0 +1,753 @@
+@{
+    ViewData["Title"] = "Recurring Invoices";
+    ViewData["ActivePage"] = "FinanceRecurring";
+}
+
+<div class="page-container" style="max-width:1440px;margin:0 auto;padding:1.5rem 1.75rem;">
+    <!-- Top Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+        <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;">Finance</span>
+                <i class="bi bi-chevron-right" style="font-size:10px;color:var(--ink-400);"></i>
+                <span style="font-size:12px;font-weight:600;color:var(--brand-600);">Recurring Invoices</span>
+            </div>
+            <h1 style="font-size:1.6rem;font-weight:800;color:var(--ink-900);margin:0;letter-spacing:-0.5px;">
+                <i class="bi bi-arrow-repeat" style="color:var(--brand-600);margin-right:8px;"></i>Recurring Invoice Schedules
+            </h1>
+            <p style="font-size:13px;color:var(--ink-500);margin:3px 0 0 0;">Automate periodic retainer billing, monthly support, and recurring milestone contracts.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <button class="btn btn-outline" type="button" onclick="loadProfiles()" title="Refresh schedules" style="display:inline-flex;align-items:center;gap:6px;font-weight:600;">
+                <i class="bi bi-arrow-clockwise" id="refreshIcon"></i> Refresh
+            </button>
+            <button class="btn btn-primary" type="button" onclick="openProfileModal(0)" style="display:inline-flex;align-items:center;gap:6px;font-weight:600;box-shadow:0 2px 8px rgba(79,70,229,0.25);">
+                <i class="bi bi-plus-lg"></i> Create Recurring Profile
+            </button>
+        </div>
+    </div>
+
+    <!-- 4 KPI Summary Cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1rem;margin-bottom:1.5rem;">
+        <div class="stat-card" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+            <div style="width:48px;height:48px;border-radius:10px;background:#eef2ff;color:#4f46e5;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">
+                <i class="bi bi-arrow-repeat"></i>
+            </div>
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;">Active Profiles</div>
+                <div id="statActiveProfiles" style="font-size:1.4rem;font-weight:800;color:var(--ink-900);margin-top:2px;">0</div>
+                <div id="statTotalProfiles" style="font-size:11.5px;color:var(--ink-400);margin-top:1px;">0 total profiles</div>
+            </div>
+        </div>
+
+        <div class="stat-card" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+            <div style="width:48px;height:48px;border-radius:10px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">
+                <i class="bi bi-graph-up-arrow"></i>
+            </div>
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;">Recurring Value / Mo</div>
+                <div id="statMonthlyValue" style="font-size:1.4rem;font-weight:800;color:#059669;margin-top:2px;">₹0</div>
+                <div style="font-size:11.5px;color:#059669;font-weight:600;margin-top:1px;">Monthly recurring run rate</div>
+            </div>
+        </div>
+
+        <div class="stat-card" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+            <div style="width:48px;height:48px;border-radius:10px;background:#fffbeb;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">
+                <i class="bi bi-clock-history"></i>
+            </div>
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;">Total Cycles Executed</div>
+                <div id="statCompletedCycles" style="font-size:1.4rem;font-weight:800;color:#d97706;margin-top:2px;">0</div>
+                <div style="font-size:11.5px;color:var(--ink-400);margin-top:1px;">generated invoice instances</div>
+            </div>
+        </div>
+
+        <div class="stat-card" style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+            <div style="width:48px;height:48px;border-radius:10px;background:#f8fafc;color:var(--ink-700);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">
+                <i class="bi bi-calendar3"></i>
+            </div>
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;">Next Upcoming Bill</div>
+                <div id="statNextDate" style="font-size:1.25rem;font-weight:800;color:var(--ink-900);margin-top:2px;">—</div>
+                <div style="font-size:11.5px;color:var(--ink-400);margin-top:1px;">earliest scheduled trigger</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Toolbar -->
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex:1;">
+            <div style="position:relative;min-width:260px;flex:1;max-width:380px;">
+                <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-400);font-size:14px;"></i>
+                <input type="text" id="recSearchInput" placeholder="Search by profile #, client, project..." 
+                       style="width:100%;padding:7px 12px 7px 34px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none;"
+                       oninput="filterProfiles()" />
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12.5px;font-weight:600;color:var(--ink-600);margin:0;">Status:</label>
+                <select id="recStatusFilter" onchange="filterProfiles()" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none;background:#fff;">
+                    <option value="All">All Statuses</option>
+                    <option value="Active">Active</option>
+                    <option value="Paused">Paused</option>
+                    <option value="Completed">Completed</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="recTableCount" style="font-size:12.5px;color:var(--ink-500);font-weight:600;">
+            Showing 0 profiles
+        </div>
+    </div>
+
+    <!-- Profiles Table -->
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px;">
+                <thead style="background:#f8fafc;border-bottom:1px solid var(--line);">
+                    <tr>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Profile #</th>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Client / Customer</th>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Project & Milestone</th>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Frequency</th>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Next Invoice Date</th>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:right;">Amount (₹)</th>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:center;">Cycles</th>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:center;">Status</th>
+                        <th style="padding:12px 16px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:center;width:150px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="recurringTableBody">
+                    <tr>
+                        <td colspan="9" style="padding:3rem;text-align:center;color:var(--ink-400);">
+                            <div style="display:inline-block;animation:spin 1s linear infinite;font-size:24px;color:var(--brand-600);margin-bottom:8px;">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </div>
+                            <div style="font-weight:600;">Loading recurring profiles from database...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- CREATE / EDIT RECURRING PROFILE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="profileModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(3px);z-index:1050;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;">
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:8px;background:#eef2ff;color:var(--brand-600);display:flex;align-items:center;justify-content:center;font-size:18px;">
+                    <i class="bi bi-arrow-repeat"></i>
+                </div>
+                <div>
+                    <h3 id="recModalTitle" style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Create Recurring Profile</h3>
+                    <p style="font-size:12px;color:var(--ink-500);margin:2px 0 0 0;">Stored in Database & Generates Dynamic Invoices</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeProfileModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:20px;cursor:pointer;">
+                &times;
+            </button>
+        </div>
+
+        <div style="padding:1.5rem;overflow-y:auto;flex:1;">
+            <form id="profileForm" onsubmit="submitProfileForm(event)">
+                <input type="hidden" id="modalProfId" value="0" />
+
+                <!-- Profile # & Client -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Profile Code
+                        </label>
+                        <input type="text" id="modalProfNumber" readonly
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700;background:#f1f5f9;color:var(--ink-800);" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Client / Customer <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="modalRecClient" required onchange="onRecClientSelected()"
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="">-- Select Client --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Project & Milestone -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Project <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="modalRecProject" required onchange="onRecProjectSelected()"
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="">-- Select Client First --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Milestone (Optional)
+                        </label>
+                        <select id="modalRecMilestone" onchange="onRecMilestoneSelected()"
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="">-- Entire Project --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Frequency, Start Date, Total Cycles -->
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Frequency <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="modalRecFreq" required
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Half-Yearly">Half-Yearly</option>
+                            <option value="Yearly">Yearly</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Start Date <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="date" id="modalRecStartDate" required
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Total Cycles
+                        </label>
+                        <input type="number" id="modalRecCycles" min="1" value="12"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                </div>
+
+                <!-- Amount, Tax, Discount -->
+                <div style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:1rem;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
+                                Base Amount (₹) <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="number" id="modalRecAmount" step="0.01" min="0" required oninput="calcRecTotals()"
+                                   style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;" />
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
+                                Tax Master
+                            </label>
+                            <select id="modalRecTaxRate" onchange="calcRecTotals()"
+                                    style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                                @foreach (var t in LookupData.Taxes)
+                                {
+                                    <option value="@t.TaxRate" data-type="@t.TaxType" data-name="@t.TaxName" selected="@(t.TaxRate == 18 && t.TaxType == "GST")">
+                                        @t.TaxName (@t.TaxRate.ToString("0.##")%) [@t.TaxType]
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
+                                Discount (₹)
+                            </label>
+                            <input type="number" id="modalRecDiscount" step="0.01" min="0" value="0" oninput="calcRecTotals()"
+                                   style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                        </div>
+                    </div>
+
+                    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);display:flex;justify-content:flex-end;">
+                        <span style="font-size:14px;font-weight:700;color:var(--ink-900);">
+                            Calculated Recurring Total: <strong id="recCalcGrandTotal" style="color:var(--brand-600);">₹0.00</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        Profile Notes / Terms
+                    </label>
+                    <textarea id="modalRecNotes" rows="2" placeholder="Schedule terms, monthly scope..."
+                              style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;"></textarea>
+                </div>
+            </form>
+        </div>
+
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#f8fafc;">
+            <button type="button" class="btn btn-outline" onclick="closeProfileModal()" style="font-weight:600;">Cancel</button>
+            <button type="submit" form="profileForm" id="btnSaveRecProfile" class="btn btn-primary" style="font-weight:600;min-width:130px;">
+                <i class="bi bi-check-lg"></i> Save Profile
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toastNotification" style="display:none;position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.2);z-index:9999;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:10px;transition:opacity 0.3s ease;">
+    <i class="bi bi-check-circle-fill" style="color:#10b981;font-size:18px;"></i>
+    <span id="toastMessage">Success</span>
+</div>
+
+@section Scripts {
+<script>
+    let rawProfiles = [];
+    let recClients = [];
+    let recProjects = [];
+    let recMilestones = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadProfiles();
+        loadClientsForModal();
+    });
+
+    function showToast(msg) {
+        const t = document.getElementById('toastNotification');
+        document.getElementById('toastMessage').textContent = msg;
+        t.style.display = 'flex';
+        t.style.opacity = '1';
+        setTimeout(() => {
+            t.style.opacity = '0';
+            setTimeout(() => t.style.display = 'none', 300);
+        }, 3500);
+    }
+
+    async function loadProfiles() {
+        const icon = document.getElementById('refreshIcon');
+        if (icon) icon.classList.add('bi-spin');
+
+        try {
+            const res = await fetch('/api/recurring-invoices');
+            if (!res.ok) throw new Error('Failed to fetch recurring profiles');
+            rawProfiles = await res.json();
+
+            updateKPIs(rawProfiles);
+            filterProfiles();
+        } catch (err) {
+            console.error(err);
+            document.getElementById('recurringTableBody').innerHTML = `
+                <tr>
+                    <td colspan="9" style="padding:2.5rem;text-align:center;color:#ef4444;">
+                        <i class="bi bi-exclamation-circle" style="font-size:24px;"></i>
+                        <div style="margin-top:6px;font-weight:600;">Error loading recurring schedules</div>
+                        <div style="font-size:12px;color:var(--ink-500);margin-top:4px;">${err.message}</div>
+                    </td>
+                </tr>
+            `;
+        } finally {
+            if (icon) icon.classList.remove('bi-spin');
+        }
+    }
+
+    function updateKPIs(profiles) {
+        const active = profiles.filter(p => p.Status === 'Active');
+        const activeCount = active.length;
+        const totalCompletedCycles = profiles.reduce((s, p) => s + (Number(p.CompletedCycles) || 0), 0);
+
+        // MRR estimate
+        const mrr = active.reduce((s, p) => {
+            const amt = Number(p.GrandTotal) || 0;
+            if (p.Frequency === 'Yearly') return s + (amt / 12);
+            if (p.Frequency === 'Quarterly') return s + (amt / 3);
+            if (p.Frequency === 'Half-Yearly') return s + (amt / 6);
+            return s + amt;
+        }, 0);
+
+        // Earliest next date
+        const sortedDates = active
+            .map(p => p.NextInvoiceDate)
+            .filter(d => !!d)
+            .sort();
+        const earliest = sortedDates.length ? sortedDates[0] : '—';
+
+        document.getElementById('statActiveProfiles').textContent = activeCount;
+        document.getElementById('statTotalProfiles').textContent = `${profiles.length} total profiles`;
+        document.getElementById('statMonthlyValue').textContent = '₹' + Math.round(mrr).toLocaleString('en-IN');
+        document.getElementById('statCompletedCycles').textContent = totalCompletedCycles;
+        document.getElementById('statNextDate').textContent = earliest;
+    }
+
+    function filterProfiles() {
+        const search = (document.getElementById('recSearchInput').value || '').trim().toLowerCase();
+        const status = document.getElementById('recStatusFilter').value;
+
+        let filtered = rawProfiles.filter(p => {
+            if (status !== 'All' && p.Status !== status) return false;
+
+            if (search) {
+                const combined = `${p.ProfileNumber} ${p.ClientName} ${p.ClientCompany} ${p.ProjectName} ${p.Title}`.toLowerCase();
+                if (!combined.includes(search)) return false;
+            }
+
+            return true;
+        });
+
+        renderTable(filtered);
+    }
+
+    function renderTable(profiles) {
+        const tbody = document.getElementById('recurringTableBody');
+        const countSpan = document.getElementById('recTableCount');
+        countSpan.textContent = `Showing ${profiles.length} of ${rawProfiles.length} profiles`;
+
+        if (!profiles.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="padding:3.5rem;text-align:center;color:var(--ink-400);">
+                        <i class="bi bi-inbox" style="font-size:32px;color:var(--ink-300);"></i>
+                        <h4 style="margin-top:10px;font-weight:700;color:var(--ink-700);">No recurring profiles found</h4>
+                        <p style="font-size:12.5px;color:var(--ink-500);margin-bottom:1rem;">Set up recurring schedules to automate periodic client billing.</p>
+                        <button class="btn btn-primary" onclick="openProfileModal(0)">
+                            <i class="bi bi-plus-lg"></i> Create Recurring Profile
+                        </button>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = profiles.map(p => `
+            <tr style="border-bottom:1px solid var(--line);transition:background 0.15s ease;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+                <td style="padding:12px 16px;font-family:monospace;font-weight:700;color:var(--brand-600);">
+                    ${escapeHtml(p.ProfileNumber || 'REC')}
+                </td>
+                <td style="padding:12px 16px;">
+                    <strong>${escapeHtml(p.ClientCompany || p.ClientName || '—')}</strong>
+                    ${p.ClientCompany && p.ClientName ? `<div style="font-size:11.5px;color:var(--ink-500);">${escapeHtml(p.ClientName)}</div>` : ''}
+                </td>
+                <td style="padding:12px 16px;">
+                    <strong>${escapeHtml(p.ProjectName || '—')}</strong>
+                    ${p.MilestoneName ? `<div style="font-size:11.5px;color:var(--brand-600);"><i class="bi bi-flag"></i> ${escapeHtml(p.MilestoneName)}</div>` : ''}
+                </td>
+                <td style="padding:12px 16px;">
+                    <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e0f2fe;font-size:11.5px;font-weight:700;color:#0369a1;">
+                        ${escapeHtml(p.Frequency || 'Monthly')}
+                    </span>
+                </td>
+                <td style="padding:12px 16px;color:var(--ink-800);font-weight:600;">
+                    ${escapeHtml(p.NextInvoiceDate || '—')}
+                </td>
+                <td style="padding:12px 16px;text-align:right;font-weight:700;color:var(--ink-900);">
+                    ₹${Number(p.GrandTotal || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                </td>
+                <td style="padding:12px 16px;text-align:center;font-size:12px;color:var(--ink-600);">
+                    <strong>${p.CompletedCycles}</strong> / ${p.TotalCycles}
+                </td>
+                <td style="padding:12px 16px;text-align:center;">
+                    <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700;background:${p.Status === 'Active' ? '#ecfdf5' : '#f1f5f9'};color:${p.Status === 'Active' ? '#059669' : '#64748b'};">
+                        ${escapeHtml(p.Status || 'Active')}
+                    </span>
+                </td>
+                <td style="padding:12px 16px;text-align:center;white-space:nowrap;">
+                    <div style="display:inline-flex;align-items:center;gap:6px;">
+                        <button type="button" class="btn-action" onclick="generateInvoiceNow(${p.Id})" title="Generate Invoice Instance Now" style="padding:5px 8px;border-radius:6px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;">
+                            <i class="bi bi-play-fill"></i> Generate
+                        </button>
+                        <button type="button" class="btn-action" onclick="openProfileModal(${p.Id})" title="Edit Profile" style="padding:5px 8px;border-radius:6px;background:#eef2ff;color:var(--brand-600);border:1px solid #c7d2fe;">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button type="button" class="btn-action" onclick="deleteProfile(${p.Id}, '${escapeHtml(p.ProfileNumber)}')" title="Delete Profile" style="padding:5px 8px;border-radius:6px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function generateInvoiceNow(id) {
+        if (!confirm('Generate a new real invoice right now in the database from this recurring profile?')) return;
+
+        try {
+            const res = await fetch(`/api/recurring-invoices/${id}/generate`, { method: 'POST' });
+            if (!res.ok) throw new Error('Failed to generate invoice');
+            const data = await res.json();
+
+            showToast(`Invoice ${data.invoiceNumber || ''} generated successfully!`);
+            await loadProfiles();
+        } catch (err) {
+            alert('Error generating invoice: ' + err.message);
+        }
+    }
+
+    async function loadClientsForModal() {
+        try {
+            const res = await fetch('/api/clients');
+            if (!res.ok) return;
+            recClients = await res.json();
+
+            const sel = document.getElementById('modalRecClient');
+            sel.innerHTML = '<option value="">-- Select Client --</option>';
+            recClients.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.ClientName || c.CompanyName;
+                opt.dataset.name = c.ClientName || '';
+                opt.dataset.company = c.CompanyName || '';
+                opt.textContent = c.CompanyName ? `${c.CompanyName} (${c.ClientName})` : c.ClientName;
+                sel.appendChild(opt);
+            });
+        } catch (e) {
+            console.error('Error loading clients:', e);
+        }
+    }
+
+    async function onRecClientSelected(selectedProjectId = 0) {
+        const client = document.getElementById('modalRecClient').value;
+        const projSel = document.getElementById('modalRecProject');
+        const msSel = document.getElementById('modalRecMilestone');
+
+        projSel.innerHTML = '<option value="">Loading projects...</option>';
+        msSel.innerHTML = '<option value="">-- Entire Project --</option>';
+
+        if (!client) {
+            projSel.innerHTML = '<option value="">-- Select Client First --</option>';
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/clients/${encodeURIComponent(client)}/projects`);
+            if (!res.ok) throw new Error('Failed to load projects');
+            recProjects = await res.json();
+
+            projSel.innerHTML = '<option value="">-- Select Project --</option>';
+            recProjects.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.Id;
+                opt.textContent = `${p.ProjectName} (${p.ProjectCode || 'PRJ'})`;
+                projSel.appendChild(opt);
+            });
+
+            if (selectedProjectId > 0) {
+                projSel.value = selectedProjectId;
+                await onRecProjectSelected();
+            }
+        } catch (e) {
+            projSel.innerHTML = '<option value="">Error loading projects</option>';
+        }
+    }
+
+    async function onRecProjectSelected(selectedMilestoneId = 0) {
+        const projId = parseInt(document.getElementById('modalRecProject').value);
+        const msSel = document.getElementById('modalRecMilestone');
+
+        if (!projId) {
+            msSel.innerHTML = '<option value="">-- Entire Project --</option>';
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/milestones?projectId=${projId}`);
+            if (!res.ok) throw new Error('Failed to load milestones');
+            recMilestones = await res.json();
+
+            msSel.innerHTML = '<option value="">-- Entire Project --</option>';
+            recMilestones.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.Id;
+                const amt = Number(m.Amount || m.EffectiveAmount || 0);
+                opt.dataset.amount = amt;
+                opt.textContent = `${m.MilestoneName} - ₹${amt.toLocaleString('en-IN')}`;
+                msSel.appendChild(opt);
+            });
+
+            if (selectedMilestoneId > 0) {
+                msSel.value = selectedMilestoneId;
+            }
+        } catch (e) {
+            msSel.innerHTML = '<option value="">-- Entire Project --</option>';
+        }
+    }
+
+    function onRecMilestoneSelected() {
+        const msSel = document.getElementById('modalRecMilestone');
+        const selectedOpt = msSel.options[msSel.selectedIndex];
+        if (selectedOpt && selectedOpt.dataset.amount) {
+            const amt = parseFloat(selectedOpt.dataset.amount) || 0;
+            if (amt > 0) {
+                document.getElementById('modalRecAmount').value = amt;
+                calcRecTotals();
+            }
+        }
+    }
+
+    function calcRecTotals() {
+        const amt = parseFloat(document.getElementById('modalRecAmount').value) || 0;
+        const taxSel = document.getElementById('modalRecTaxRate');
+        const taxRate = parseFloat(taxSel?.value) || 0;
+        const disc = parseFloat(document.getElementById('modalRecDiscount').value) || 0;
+
+        const taxable = Math.max(0, amt - disc);
+        const tax = Math.round((taxable * (taxRate / 100)) * 100) / 100;
+        const grand = taxable + tax;
+
+        document.getElementById('recCalcGrandTotal').textContent = '₹' + grand.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function openProfileModal(id = 0) {
+        document.getElementById('modalProfId').value = id;
+
+        if (id === 0) {
+            document.getElementById('recModalTitle').textContent = 'Create Recurring Profile';
+            document.getElementById('modalRecClient').value = '';
+            document.getElementById('modalRecProject').innerHTML = '<option value="">-- Select Client First --</option>';
+            document.getElementById('modalRecMilestone').innerHTML = '<option value="">-- Entire Project --</option>';
+            document.getElementById('modalRecFreq').value = 'Monthly';
+            document.getElementById('modalRecStartDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('modalRecCycles').value = '12';
+            document.getElementById('modalRecAmount').value = '';
+            document.getElementById('modalRecTaxRate').value = '18';
+            document.getElementById('modalRecDiscount').value = '0';
+            document.getElementById('modalRecNotes').value = '';
+
+            try {
+                const res = await fetch('/api/recurring-invoices/next-code');
+                const data = await res.json();
+                document.getElementById('modalProfNumber').value = data.profileNumber || 'REC-0001';
+            } catch {
+                document.getElementById('modalProfNumber').value = 'REC-0001';
+            }
+
+            calcRecTotals();
+            document.getElementById('profileModal').style.display = 'flex';
+        } else {
+            document.getElementById('recModalTitle').textContent = 'Edit Recurring Profile';
+            const prof = rawProfiles.find(p => p.Id === id || p.id === id);
+            if (!prof) return;
+
+            document.getElementById('modalProfNumber').value = prof.ProfileNumber || prof.profileNumber || '';
+            document.getElementById('modalRecFreq').value = prof.Frequency || prof.frequency || 'Monthly';
+            document.getElementById('modalRecStartDate').value = prof.StartDate || prof.startDate || '';
+            document.getElementById('modalRecCycles').value = prof.TotalCycles || prof.totalCycles || 12;
+            document.getElementById('modalRecAmount').value = prof.Amount || prof.amount || 0;
+            
+            const taxRateVal = prof.TaxRate !== undefined ? prof.TaxRate : (prof.taxRate !== undefined ? prof.taxRate : 0);
+            const taxSel = document.getElementById('modalRecTaxRate');
+            if (taxSel) {
+                let matched = false;
+                for (let i = 0; i < taxSel.options.length; i++) {
+                    if (Math.abs(parseFloat(taxSel.options[i].value) - taxRateVal) < 0.001) {
+                        taxSel.selectedIndex = i;
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    const opt = document.createElement('option');
+                    opt.value = taxRateVal;
+                    opt.textContent = `Tax (${taxRateVal}%)`;
+                    opt.selected = true;
+                    taxSel.appendChild(opt);
+                }
+            }
+
+            document.getElementById('modalRecDiscount').value = prof.Discount || prof.discount || 0;
+            document.getElementById('modalRecNotes').value = prof.Notes || prof.notes || '';
+
+            const clientVal = prof.ClientName || prof.ClientCompany || prof.clientName || prof.clientCompany;
+            document.getElementById('modalRecClient').value = clientVal;
+            await onRecClientSelected(prof.ProjectId || prof.projectId);
+            if (prof.MilestoneId || prof.milestoneId) {
+                await onRecProjectSelected(prof.MilestoneId || prof.milestoneId);
+            }
+
+            calcRecTotals();
+            document.getElementById('profileModal').style.display = 'flex';
+        }
+    }
+
+    function closeProfileModal() {
+        document.getElementById('profileModal').style.display = 'none';
+    }
+
+    async function submitProfileForm(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('modalProfId').value) || 0;
+        const btn = document.getElementById('btnSaveRecProfile');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+        const clientSel = document.getElementById('modalRecClient');
+        const selectedOpt = clientSel.options[clientSel.selectedIndex];
+
+        const taxSel = document.getElementById('modalRecTaxRate');
+        const selectedTaxOpt = taxSel ? taxSel.options[taxSel.selectedIndex] : null;
+        const recTaxRate = parseFloat(taxSel?.value) || 0;
+        const recTaxType = selectedTaxOpt ? (selectedTaxOpt.getAttribute('data-type') || 'GST') : 'GST';
+        const recTaxName = selectedTaxOpt ? (selectedTaxOpt.getAttribute('data-name') || '') : '';
+
+        const payload = {
+            ProjectId: parseInt(document.getElementById('modalRecProject').value),
+            MilestoneId: parseInt(document.getElementById('modalRecMilestone').value) || null,
+            ProfileNumber: document.getElementById('modalProfNumber').value.trim(),
+            ClientName: selectedOpt?.dataset.name || clientSel.value,
+            ClientCompany: selectedOpt?.dataset.company || clientSel.value,
+            Frequency: document.getElementById('modalRecFreq').value,
+            StartDate: document.getElementById('modalRecStartDate').value,
+            NextInvoiceDate: document.getElementById('modalRecStartDate').value,
+            TotalCycles: parseInt(document.getElementById('modalRecCycles').value) || 12,
+            Amount: parseFloat(document.getElementById('modalRecAmount').value) || 0,
+            TaxRate: recTaxRate,
+            TaxName: recTaxName,
+            TaxType: recTaxType,
+            Discount: parseFloat(document.getElementById('modalRecDiscount').value) || 0,
+            Notes: document.getElementById('modalRecNotes').value.trim()
+        };
+
+        try {
+            const url = id === 0 ? '/api/recurring-invoices' : `/api/recurring-invoices/${id}`;
+            const method = id === 0 ? 'POST' : 'PUT';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || 'Failed to save recurring profile');
+            }
+
+            const saved = await res.json();
+            showToast(id === 0 ? `Profile ${saved.ProfileNumber} created!` : `Profile ${saved.ProfileNumber} updated!`);
+            closeProfileModal();
+            await loadProfiles();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Save Profile';
+        }
+    }
+
+    async function deleteProfile(id, num) {
+        if (!confirm(`Are you sure you want to delete recurring profile "${num}"?`)) return;
+
+        try {
+            const res = await fetch(`/api/recurring-invoices/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete profile');
+
+            showToast(`Profile ${num} deleted.`);
+            await loadProfiles();
+        } catch (err) {
+            alert('Error deleting profile: ' + err.message);
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+</script>
+}

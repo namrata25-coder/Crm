@@ -1,0 +1,531 @@
+@model List<CrmLeadManagement.Models.WorkProject>
+@using CrmLeadManagement.Models
+@{
+    ViewData["Title"] = "Projects";
+    var employees = ViewData["Employees"] as List<string> ?? new();
+    var clients = ViewData["Clients"] as dynamic;
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-folder2-open" style="color:var(--brand-600);"></i> Projects</h1>
+        <p class="page-sub">Manage, track, and monitor all work projects dynamically</p>
+    </div>
+    <button class="btn btn-primary" onclick="openAddProjectModal()">
+        <i class="bi bi-plus-lg"></i> Add Project
+    </button>
+</div>
+
+<!-- STATS SUMMARY CARDS -->
+<div class="work-stats-grid">
+    <div class="work-stat-card">
+        <div class="stat-icon bg-blue-subtle text-primary"><i class="bi bi-folder2-open"></i></div>
+        <div>
+            <div class="stat-val" id="statTotalProjects">0</div>
+            <div class="stat-lbl">Total Projects</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-green-subtle text-success"><i class="bi bi-play-circle"></i></div>
+        <div>
+            <div class="stat-val" id="statActiveProjects">0</div>
+            <div class="stat-lbl">Active Projects</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-purple-subtle text-purple"><i class="bi bi-currency-rupee"></i></div>
+        <div>
+            <div class="stat-val" id="statTotalBudget">₹0</div>
+            <div class="stat-lbl">Total Budget</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-amber-subtle text-warning"><i class="bi bi-check2-circle"></i></div>
+        <div>
+            <div class="stat-val" id="statCompletedValue">₹0</div>
+            <div class="stat-lbl">Completed Value</div>
+        </div>
+    </div>
+</div>
+
+<!-- PROJECT LIST TABLE -->
+<div class="card mt-3">
+    <div class="card-header-row">
+        <h3 class="card-title"><i class="bi bi-list-task"></i> Project List</h3>
+        <div class="table-search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="projectSearchInput" placeholder="Filter projects..." onkeyup="filterProjectTable()" />
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <!-- Dynamic Empty State -->
+        <div class="empty-state" id="projectsEmptyState" style="display:none;">
+            <i class="bi bi-folder-plus" style="font-size:3rem;color:var(--ink-300);"></i>
+            <h4 style="margin-top:1rem;font-weight:700;color:var(--ink-700);">No projects created yet</h4>
+            <p style="color:var(--ink-500);margin-bottom:1.25rem;">Start by creating your first dynamic project with milestones and tasks.</p>
+            <button class="btn btn-primary" onclick="openAddProjectModal()">
+                <i class="bi bi-plus-lg"></i> Create First Project
+            </button>
+        </div>
+
+        <!-- Dynamic Table Container -->
+        <div class="table-responsive" id="projectsTableWrap">
+            <table class="data-table" id="projectsTable">
+                <thead>
+                    <tr>
+                        <th>Project Code</th>
+                        <th>Project Name</th>
+                        <th>Client</th>
+                        <th>Project Type</th>
+                        <th>Start Date</th>
+                        <th>Deadline</th>
+                        <th>Budget</th>
+                        <th>Completed</th>
+                        <th>Pending</th>
+                        <th>Progress</th>
+                        <th>Status</th>
+                        <th style="text-align:right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="projectsTableBody">
+                    <tr>
+                        <td colspan="12" style="text-align:center;padding:24px;color:var(--ink-500);">
+                            <i class="bi bi-arrow-repeat spin" style="font-size:1.2rem;display:inline-block;margin-right:8px;"></i> Loading projects from server...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ADD / EDIT PROJECT MODAL -->
+<div class="modal-backdrop-custom" id="addProjectModal">
+    <div class="modal-box modal-lg">
+        <div class="modal-box-head">
+            <div>
+                <h3 id="projectModalTitle"><i class="bi bi-folder-plus" style="color:var(--brand-600);"></i> <span id="projectModalTitleText">Add New Project</span></h3>
+                <p id="projectModalSubtitle">Enter dynamic project details</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('addProjectModal')">&times;</button>
+        </div>
+        <div class="modal-box-body">
+            <form id="projectForm" onsubmit="handleSaveProject(event)">
+                <input type="hidden" name="id" id="projectId" value="0"/>
+
+                <div class="form-grid">
+                    <div class="form-field full">
+                        <label>Project Name <span class="req">*</span></label>
+                        <input type="text" name="projectName" id="fProjectName" required placeholder="e.g., Enterprise Web Application"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Client Name</label>
+                        <input type="text" name="clientName" id="fClientName" placeholder="Client or contact name" list="clientsDatalist"/>
+                        <datalist id="clientsDatalist">
+                            @if (clients != null)
+                            {
+                                foreach (var c in clients)
+                                {
+                                    <option value="@c.LeadName">@c.CompanyName</option>
+                                }
+                            }
+                        </datalist>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Client Company</label>
+                        <input type="text" name="clientCompany" id="fClientCompany" placeholder="Company Name"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Project Type <span class="req">*</span></label>
+                        <select name="projectType" id="fProjectType" required>
+                            @foreach (var t in WorkLookup.ProjectTypes)
+                            {
+                                <option value="@t">@t</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Budget / Total Amount (₹) <span class="req">*</span></label>
+                        <input type="number" name="budget" id="fBudget" min="0" step="0.01" required placeholder="0.00"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Start Date</label>
+                        <input type="date" name="startDate" id="fStartDate"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Deadline</label>
+                        <input type="date" name="deadline" id="fDeadline"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Project Manager</label>
+                        <select name="projectManager" id="fProjectManager">
+                            <option value="">-- Select Project Manager --</option>
+                            @foreach (var e in employees)
+                            {
+                                <option value="@e">@e</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Assigned Members</label>
+                        <input type="text" name="assignedMembers" id="fAssignedMembers" placeholder="e.g., Rohan, Priya, Vikram"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Priority</label>
+                        <select name="priority" id="fPriority">
+                            @foreach (var pr in WorkLookup.Priorities)
+                            {
+                                <option value="@pr" selected="@(pr == "Medium")">@pr</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Status</label>
+                        <select name="status" id="fStatus">
+                            @foreach (var s in WorkLookup.ProjectStatuses)
+                            {
+                                <option value="@s" selected="@(s == "Active")">@s</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field full">
+                        <label>Description</label>
+                        <textarea name="description" id="fDescription" rows="2" placeholder="Brief summary of goals, scope, and objectives..."></textarea>
+                    </div>
+
+                    <div class="form-field full">
+                        <label>Notes</label>
+                        <textarea name="notes" id="fNotes" rows="2" placeholder="Additional notes or specifications..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('addProjectModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveProjectBtn"><i class="bi bi-check-lg"></i> Save Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="~/js/project/work-api.js"></script>
+<script src="~/js/project/project-api.js"></script>
+<script>
+let projectsData = [];
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getStatusBadge(status) {
+    status = status || 'Active';
+    let cls = 'badge-secondary';
+    if (status === 'Active') cls = 'badge-success';
+    else if (status === 'Completed') cls = 'badge-info';
+    else if (status === 'On Hold') cls = 'badge-warning';
+    else if (status === 'Cancelled') cls = 'badge-danger';
+    return `<span class="badge ${cls}">${escapeHtml(status)}</span>`;
+}
+
+function getTypeBadge(type) {
+    type = type || 'Direct Project';
+    let cls = 'badge-info';
+    if (type === 'Milestone Based Project') cls = 'badge-purple';
+    else if (type === 'Task Based Project') cls = 'badge-cyan';
+    return `<span class="badge ${cls}">${escapeHtml(type)}</span>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Load Projects and Work Summary via separated API services
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadProjects() {
+    const tbody = document.getElementById('projectsTableBody');
+
+    try {
+        console.log('[Projects] Loading data from WorkApi and ProjectApi...');
+
+        const [summaryResult, projectsResult] = await Promise.allSettled([
+            WorkApi.getSummary(),
+            ProjectApi.getAll()
+        ]);
+
+        if (summaryResult.status === 'fulfilled' && summaryResult.value) {
+            updateWorkSummaryCards(summaryResult.value);
+        }
+
+        if (projectsResult.status === 'fulfilled') {
+            projectsData = Array.isArray(projectsResult.value) ? projectsResult.value : [];
+            renderProjects(projectsData);
+            if (summaryResult.status !== 'fulfilled') {
+                updateStatsFallback(projectsData);
+            }
+        } else {
+            throw projectsResult.reason || new Error('Failed to load projects');
+        }
+    } catch (err) {
+        console.error('[Projects] Load error:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--danger, #dc2626);">
+                <i class="bi bi-exclamation-triangle" style="margin-right:6px;"></i> Error loading projects: ${escapeHtml(err.message)}
+            </td></tr>`;
+        }
+    }
+}
+
+function updateWorkSummaryCards(summary) {
+    if (!summary) return;
+    const elTotal = document.getElementById('statTotalProjects');
+    const elActive = document.getElementById('statActiveProjects');
+    const elBudget = document.getElementById('statTotalBudget');
+    const elCompleted = document.getElementById('statCompletedValue');
+
+    if (elTotal) elTotal.textContent = summary.TotalProjects || summary.totalProjects || 0;
+    if (elActive) elActive.textContent = summary.ActiveProjects || summary.activeProjects || 0;
+    if (elBudget) elBudget.textContent = '₹' + (Number(summary.TotalBudget || summary.totalBudget || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    if (elCompleted) elCompleted.textContent = '₹' + (Number(summary.CompletedValue || summary.completedValue || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+function updateStatsFallback(projects) {
+    const totalProjects = projects.length;
+    const activeProjects = projects.filter(p => (p.Status || p.status) === 'Active').length;
+    const totalBudget = projects.reduce((sum, p) => sum + (Number(p.Budget !== undefined ? p.Budget : p.budget) || 0), 0);
+    const totalCompleted = projects.reduce((sum, p) => sum + (Number(p.CompletedAmount !== undefined ? p.CompletedAmount : p.completedAmount) || 0), 0);
+
+    const elTotal = document.getElementById('statTotalProjects');
+    const elActive = document.getElementById('statActiveProjects');
+    const elBudget = document.getElementById('statTotalBudget');
+    const elCompleted = document.getElementById('statCompletedValue');
+
+    if (elTotal) elTotal.textContent = totalProjects;
+    if (elActive) elActive.textContent = activeProjects;
+    if (elBudget) elBudget.textContent = '₹' + totalBudget.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    if (elCompleted) elCompleted.textContent = '₹' + totalCompleted.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+function renderProjects(projects) {
+    const tbody = document.getElementById('projectsTableBody');
+    const emptyState = document.getElementById('projectsEmptyState');
+    const tableWrap = document.getElementById('projectsTableWrap');
+
+    if (!projects || projects.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        if (tableWrap) tableWrap.style.display = 'none';
+        if (tbody) tbody.innerHTML = '';
+        return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (tableWrap) tableWrap.style.display = 'block';
+
+    let html = '';
+    projects.forEach(p => {
+        const id = p.Id !== undefined ? p.Id : p.id;
+        const code = p.ProjectCode || p.projectCode || '';
+        const name = p.ProjectName || p.projectName || 'Untitled';
+        const client = p.ClientName || p.clientName || '—';
+        const company = p.ClientCompany || p.clientCompany || '';
+        const type = p.ProjectType || p.projectType || 'Direct Project';
+        const start = p.StartDate || p.startDate || '—';
+        const deadline = p.Deadline || p.deadline || '—';
+        const budget = Number(p.Budget !== undefined ? p.Budget : p.budget) || 0;
+        const completed = Number(p.CompletedAmount !== undefined ? p.CompletedAmount : p.completedAmount) || 0;
+        const pending = Number(p.PendingAmount !== undefined ? p.PendingAmount : p.pendingAmount) || 0;
+        const progress = Number(p.ProgressPercent !== undefined ? p.ProgressPercent : p.progressPercent) || 0;
+        const status = p.Status || p.status || 'Active';
+        const manager = p.ProjectManager || p.projectManager || '';
+
+        const progressColor = progress >= 100 ? 'fill-green' : (progress >= 50 ? 'fill-blue' : 'fill-orange');
+
+        html += `
+        <tr data-id="${id}">
+            <td><span class="badge badge-code">${escapeHtml(code)}</span></td>
+            <td>
+                <a href="/Work/ProjectDetails?id=${id}" class="table-lead-link">
+                    <strong>${escapeHtml(name)}</strong>
+                </a>
+                ${manager ? `<div class="table-subtext"><i class="bi bi-person-badge"></i> ${escapeHtml(manager)}</div>` : ''}
+            </td>
+            <td>
+                <div><strong>${escapeHtml(client)}</strong></div>
+                ${company ? `<div class="table-subtext">${escapeHtml(company)}</div>` : ''}
+            </td>
+            <td>
+                ${getTypeBadge(type)}
+            </td>
+            <td>${escapeHtml(start)}</td>
+            <td>${escapeHtml(deadline)}</td>
+            <td><strong>₹${budget.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</strong></td>
+            <td class="text-success">₹${completed.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+            <td class="text-danger">₹${pending.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+            <td>
+                <div class="progress-cell">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill ${progressColor}" style="width:${Math.min(100, Math.max(0, progress))}%"></div>
+                    </div>
+                    <span class="progress-label">${progress}%</span>
+                </div>
+            </td>
+            <td>${getStatusBadge(status)}</td>
+            <td style="text-align:right;">
+                <div class="action-btns justify-end">
+                    <a class="btn-action btn-view" href="/Work/ProjectDetails?id=${id}" title="View Project Details">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    <button type="button" class="btn-action btn-edit" onclick="openEditProjectModalById(${id})" title="Edit Project">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button type="button" class="btn-action btn-delete" onclick="handleDeleteProject(${id}, '${escapeHtml(name).replace(/'/g, "\\'")}')" title="Delete Project">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    if (tbody) tbody.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Save Project (ProjectApi.create / ProjectApi.update)
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleSaveProject(e) {
+    e.preventDefault();
+    const id = parseInt(document.getElementById('projectId').value, 10) || 0;
+    const isEdit = id > 0;
+
+    const payload = {
+        Id: id,
+        ProjectName: document.getElementById('fProjectName').value.trim(),
+        ClientName: document.getElementById('fClientName').value.trim(),
+        ClientCompany: document.getElementById('fClientCompany').value.trim(),
+        ProjectType: document.getElementById('fProjectType').value,
+        Budget: parseFloat(document.getElementById('fBudget').value) || 0,
+        StartDate: document.getElementById('fStartDate').value,
+        Deadline: document.getElementById('fDeadline').value,
+        ProjectManager: document.getElementById('fProjectManager').value,
+        AssignedMembers: document.getElementById('fAssignedMembers').value.trim(),
+        Priority: document.getElementById('fPriority').value,
+        Status: document.getElementById('fStatus').value,
+        Description: document.getElementById('fDescription').value.trim(),
+        Notes: document.getElementById('fNotes').value.trim()
+    };
+
+    const saveBtn = document.getElementById('saveProjectBtn');
+    if (saveBtn) saveBtn.disabled = true;
+
+    try {
+        if (isEdit) {
+            await ProjectApi.update(id, payload);
+        } else {
+            await ProjectApi.create(payload);
+        }
+        closeModal('addProjectModal');
+        await loadProjects();
+    } catch (err) {
+        alert(`Error saving project: ${err.message}`);
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delete Project (ProjectApi.delete)
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleDeleteProject(id, projectName) {
+    if (!confirm(`Are you sure you want to delete project "${projectName}" and all its milestones, tasks, and invoices?`)) {
+        return;
+    }
+
+    try {
+        await ProjectApi.delete(id);
+        await loadProjects();
+    } catch (err) {
+        alert(`Error deleting project: ${err.message}`);
+    }
+}
+
+function openAddProjectModal() {
+    document.getElementById('projectId').value = 0;
+    document.getElementById('fProjectName').value = '';
+    document.getElementById('fClientName').value = '';
+    document.getElementById('fClientCompany').value = '';
+    setSelectValue('fProjectType', 'Direct Project');
+    document.getElementById('fDescription').value = '';
+    document.getElementById('fStartDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('fDeadline').value = '';
+    setSelectValue('fProjectManager', '');
+    document.getElementById('fAssignedMembers').value = '';
+    document.getElementById('fBudget').value = 0;
+    setSelectValue('fPriority', 'Medium');
+    setSelectValue('fStatus', 'Active');
+    document.getElementById('fNotes').value = '';
+    document.getElementById('projectModalTitleText').textContent = 'Add New Project';
+    openModal('addProjectModal');
+}
+
+function openEditProjectModalById(id) {
+    const p = projectsData.find(x => (x.Id !== undefined ? x.Id : x.id) === id);
+    if (!p) {
+        console.warn('Project not found with ID:', id);
+        return;
+    }
+
+    document.getElementById('projectId').value = id;
+    document.getElementById('fProjectName').value = p.ProjectName || p.projectName || '';
+    document.getElementById('fClientName').value = p.ClientName || p.clientName || '';
+    document.getElementById('fClientCompany').value = p.ClientCompany || p.clientCompany || '';
+    setSelectValue('fProjectType', p.ProjectType || p.projectType || 'Direct Project');
+    document.getElementById('fDescription').value = p.Description || p.description || '';
+    document.getElementById('fStartDate').value = p.StartDate || p.startDate || '';
+    document.getElementById('fDeadline').value = p.Deadline || p.deadline || '';
+    setSelectValue('fProjectManager', p.ProjectManager || p.projectManager || '');
+    document.getElementById('fAssignedMembers').value = p.AssignedMembers || p.assignedMembers || '';
+    document.getElementById('fBudget').value = p.Budget !== undefined ? p.Budget : (p.budget || 0);
+    setSelectValue('fPriority', p.Priority || p.priority || 'Medium');
+    setSelectValue('fStatus', p.Status || p.status || 'Active');
+    document.getElementById('fNotes').value = p.Notes || p.notes || '';
+    document.getElementById('projectModalTitleText').textContent = `Edit Project (${p.ProjectCode || p.projectCode || ''})`;
+    openModal('addProjectModal');
+}
+
+function setSelectValue(id, val) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === val) { sel.selectedIndex = i; return; }
+    }
+    if (sel.options.length > 0) sel.selectedIndex = 0;
+}
+
+function filterProjectTable() {
+    var query = (document.getElementById('projectSearchInput')?.value || '').toLowerCase();
+    var rows = document.querySelectorAll('#projectsTable tbody tr');
+    rows.forEach(function(row) {
+        var text = row.textContent.toLowerCase();
+        row.style.display = text.indexOf(query) > -1 ? '' : 'none';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadProjects();
+});
+</script>
+}

@@ -1,0 +1,419 @@
+@model CrmLeadManagement.Models.SettingsViewModel
+
+<div class="breadcrumb-row">
+    <a asp-controller="Home" asp-action="Index">Home</a><span class="sep">/</span><span class="current">Settings</span>
+</div>
+<div class="page-head">
+    <div>
+        <h1>Settings</h1>
+        <p>Configure the lookup values and workflow rules used across CRM.</p>
+    </div>
+</div>
+
+    <!-- ============ LEAD STATUS ============ -->
+    <div class="panel" id="lead-status" style="margin-bottom:22px;">
+        <div class="panel-header">
+            <div>
+                <h2><i class="bi bi-flag" style="color:var(--brand-600);margin-right:6px;"></i> Lead Status</h2>
+                <div class="hint">Statuses available across the Lead List, Assigned List and Lead Details</div>
+            </div>
+        </div>
+        <div class="panel-body">
+            <form method="post" asp-controller="Settings" asp-action="AddStatus" style="display:flex;gap:10px;margin-bottom:18px;">
+                <input type="text" name="NewStatus" placeholder="e.g., Re-engaged" required
+                       style="flex:1;border:1px solid var(--ink-300);border-radius:8px;padding:9px 12px;font-size:13.5px;" />
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add</button>
+            </form>
+
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                @foreach (var s in Model.Statuses)
+                {
+                    <div style="display:flex;align-items:center;gap:8px;background:var(--ink-100);border-radius:20px;padding:6px 8px 6px 14px;font-size:13px;font-weight:600;color:var(--ink-700);">
+                        <span>@s</span>
+                        <form method="post" asp-controller="Settings" asp-action="RemoveStatus" style="display:inline;">
+                            <input type="hidden" name="status" value="@s" />
+                            <button type="submit" class="icon-btn" style="width:24px;height:24px;border:none;background:transparent;color:var(--ink-500);" title="Remove">
+                                <i class="bi bi-x-lg" style="font-size:11px;"></i>
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+<!-- ============ USERS / ROLES ============ -->
+<div class="panel" id="users-roles" style="margin-bottom:22px;">
+    <div class="panel-header">
+        <div>
+            <h2><i class="bi bi-people" style="color:var(--brand-600);margin-right:6px;"></i> Users &amp; Roles</h2>
+            <div class="hint">Team members who can be assigned leads</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <a asp-controller="Team" asp-action="Roles" class="btn btn-secondary btn-sm"><i class="bi bi-shield-lock"></i> Configure Roles &amp; Permissions</a>
+            <button type="button" class="btn btn-primary btn-sm" onclick="openModal('addUserModal')"><i class="bi bi-person-plus"></i> Add User</button>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var u in Model.Users)
+                {
+                    <tr>
+                        <td>
+                            <div class="avatar-chip">
+                                <div class="initials">@Initials(u.Name)</div>
+                                <span class="cell-primary">@u.Name</span>
+                            </div>
+                        </td>
+                        <td>@u.Email</td>
+                        <td>@u.Role</td>
+                        <td>
+                            @if (u.Status == "Active")
+                            {
+                                <span class="badge-status st-qualified">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge-status st-lost">Inactive</span>
+                            }
+                        </td>
+                        <td>
+                            <form method="post" asp-controller="Settings" asp-action="RemoveUser"
+                                  onsubmit="return confirm('Remove @u.Name from the team?')">
+                                <input type="hidden" name="email" value="@u.Email" />
+                                <button type="submit" class="icon-btn" title="Remove" style="color:#c81e1e;border-color:#fda29b;">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============ FOLLOW-UP SETTINGS ============ -->
+<div class="panel" id="followup-settings">
+    <div class="panel-header">
+        <div>
+            <h2><i class="bi bi-calendar-check" style="color:var(--accent);margin-right:6px;"></i> Follow-up Settings</h2>
+            <div class="hint">Defaults and reminder rules used when scheduling follow-ups</div>
+        </div>
+    </div>
+    <div class="panel-body">
+        <form method="post" asp-controller="Settings" asp-action="SaveFollowUp">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label>Default Follow-up Type</label>
+                    <select name="FollowUpInput.DefaultFollowUpType">
+                        @foreach (var t in LookupData.FollowUpTypes)
+                        {
+                            @if (t == Model.FollowUp.DefaultFollowUpType)
+                            {
+                                <option selected>@t</option>
+                            }
+                            else
+                            {
+                                <option>@t</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>Reminder — Days Before Follow-up</label>
+                    <input type="number" min="0" max="14" name="FollowUpInput.DefaultReminderDaysBefore" value="@Model.FollowUp.DefaultReminderDaysBefore" />
+                </div>
+                <div class="form-field">
+                    <label>Auto-escalate After (days overdue)</label>
+                    <input type="number" min="0" max="30" name="FollowUpInput.AutoEscalateAfterDaysOverdue" value="@Model.FollowUp.AutoEscalateAfterDaysOverdue" />
+                </div>
+                <div class="form-field">
+                    <label>Notification Channels</label>
+                    <div style="display:flex;gap:18px;align-items:center;height:100%;padding-top:6px;">
+                        <label style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:500;color:var(--ink-700);">
+                            <input type="checkbox" name="FollowUpInput.EnableEmailReminders" value="true" @(Model.FollowUp.EnableEmailReminders ? "checked" : "") style="width:16px;height:16px;" />
+                            <input type="hidden" name="FollowUpInput.EnableEmailReminders" value="false" />
+                            Email
+                        </label>
+                        <label style="display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:500;color:var(--ink-700);">
+                            <input type="checkbox" name="FollowUpInput.EnableSmsReminders" value="true" @(Model.FollowUp.EnableSmsReminders ? "checked" : "") style="width:16px;height:16px;" />
+                            <input type="hidden" name="FollowUpInput.EnableSmsReminders" value="false" />
+                            SMS
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Follow-up Settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============ TAX MASTER ============ -->
+<div class="panel" id="tax-master" style="margin-bottom:22px;">
+    <div class="panel-header">
+        <div>
+            <h2><i class="bi bi-receipt" style="color:var(--brand-600);margin-right:6px;"></i> Tax Master</h2>
+            <div class="hint">Configure GST, CGST, SGST, and IGST tax rates dynamically used across all Finance modules (Estimations, Quotations, Proposals, Invoices &amp; Payments)</div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openModal('addTaxModal')"><i class="bi bi-plus-lg"></i> Add Tax</button>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Tax Name</th>
+                    <th>Type</th>
+                    <th>Rate (%)</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Taxes != null && Model.Taxes.Any())
+                {
+                    @foreach (var t in Model.Taxes)
+                    {
+                        <tr>
+                            <td>
+                                <strong style="color:var(--ink-900);font-weight:600;">@t.TaxName</strong>
+                            </td>
+                            <td>
+                                @if (t.TaxType == "GST")
+                                {
+                                    <span class="badge-status" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;">GST</span>
+                                }
+                                else if (t.TaxType == "CGST")
+                                {
+                                    <span class="badge-status" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a;">CGST</span>
+                                }
+                                else if (t.TaxType == "SGST")
+                                {
+                                    <span class="badge-status" style="background:#f3e8ff;color:#7e22ce;border:1px solid #e9d5ff;">SGST</span>
+                                }
+                                else if (t.TaxType == "IGST")
+                                {
+                                    <span class="badge-status" style="background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;">IGST</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-status st-negotiation">@t.TaxType</span>
+                                }
+                            </td>
+                            <td>
+                                <span style="font-weight:700;font-size:14px;color:var(--ink-800);">@t.TaxRate.ToString("0.##")%</span>
+                            </td>
+                            <td style="color:var(--ink-600);font-size:13px;">@(string.IsNullOrWhiteSpace(t.Description) ? "—" : t.Description)</td>
+                            <td>
+                                @if (t.Status == "Active")
+                                {
+                                    <span class="badge-status st-qualified">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-status st-lost">Inactive</span>
+                                }
+                            </td>
+                            <td style="text-align:right;">
+                                <div style="display:inline-flex;gap:6px;align-items:center;">
+                                    <button type="button" class="icon-btn" title="Edit Tax"
+                                            onclick="openEditTaxModal(@t.Id, '@Html.Raw(JavaScriptEncoder(t.TaxName))', '@Html.Raw(JavaScriptEncoder(t.TaxType))', @t.TaxRate, '@Html.Raw(JavaScriptEncoder(t.Description ?? ""))', '@Html.Raw(JavaScriptEncoder(t.Status))')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form method="post" asp-controller="Settings" asp-action="ToggleTaxStatus" style="display:inline;">
+                                        <input type="hidden" name="id" value="@t.Id" />
+                                        <button type="submit" class="icon-btn" title="@(t.Status == "Active" ? "Deactivate" : "Activate")" style="color:var(--ink-600);">
+                                            <i class="bi @(t.Status == "Active" ? "bi-toggle-on" : "bi-toggle-off")" style="font-size:15px;color:@(t.Status == "Active" ? "#16a34a" : "#94a3b8");"></i>
+                                        </button>
+                                    </form>
+                                    <form method="post" asp-controller="Settings" asp-action="DeleteTax" style="display:inline;"
+                                          onsubmit="return confirm('Are you sure you want to delete @t.TaxName?')">
+                                        <input type="hidden" name="id" value="@t.Id" />
+                                        <button type="submit" class="icon-btn" title="Delete Tax" style="color:#c81e1e;border-color:#fda29b;">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" style="text-align:center;color:var(--ink-500);padding:24px;">No tax configurations found. Click &quot;Add Tax&quot; to create one.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============ ADD TAX MODAL ============ -->
+<div class="modal-backdrop-custom" id="addTaxModal">
+    <div class="modal-box">
+        <div class="modal-box-head">
+            <div>
+                <h3><i class="bi bi-receipt" style="color:var(--brand-600);"></i> Add Tax</h3>
+                <p>Create a new tax entry for Finance calculations</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('addTaxModal')">&times;</button>
+        </div>
+        <div class="modal-box-body">
+            <form method="post" asp-controller="Settings" asp-action="AddTax">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>Tax Name <span class="req">*</span></label>
+                        <input type="text" name="NewTax.TaxName" required placeholder="e.g., GST 18%, IGST 18%" />
+                    </div>
+                    <div class="form-field">
+                        <label>Tax Type <span class="req">*</span></label>
+                        <select name="NewTax.TaxType" required>
+                            <option value="GST">GST (General / Dual Tax)</option>
+                            <option value="CGST">CGST (Central GST)</option>
+                            <option value="SGST">SGST (State GST)</option>
+                            <option value="IGST">IGST (Integrated GST)</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Tax Rate (%) <span class="req">*</span></label>
+                        <input type="number" step="0.01" min="0" max="100" name="NewTax.TaxRate" required placeholder="e.g., 18.00" />
+                    </div>
+                    <div class="form-field">
+                        <label>Status</label>
+                        <select name="NewTax.Status">
+                            <option value="Active" selected>Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="form-field full">
+                        <label>Description</label>
+                        <input type="text" name="NewTax.Description" placeholder="e.g., Standard rate for intra-state services" />
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('addTaxModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Tax</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============ EDIT TAX MODAL ============ -->
+<div class="modal-backdrop-custom" id="editTaxModal">
+    <div class="modal-box">
+        <div class="modal-box-head">
+            <div>
+                <h3><i class="bi bi-pencil-square" style="color:var(--brand-600);"></i> Edit Tax</h3>
+                <p>Update tax configuration and rates</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('editTaxModal')">&times;</button>
+        </div>
+        <div class="modal-box-body">
+            <form method="post" asp-controller="Settings" asp-action="UpdateTax">
+                <input type="hidden" id="editTaxId" name="Tax.Id" />
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label>Tax Name <span class="req">*</span></label>
+                        <input type="text" id="editTaxName" name="Tax.TaxName" required />
+                    </div>
+                    <div class="form-field">
+                        <label>Tax Type <span class="req">*</span></label>
+                        <select id="editTaxType" name="Tax.TaxType" required>
+                            <option value="GST">GST (General / Dual Tax)</option>
+                            <option value="CGST">CGST (Central GST)</option>
+                            <option value="SGST">SGST (State GST)</option>
+                            <option value="IGST">IGST (Integrated GST)</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Tax Rate (%) <span class="req">*</span></label>
+                        <input type="number" step="0.01" min="0" max="100" id="editTaxRate" name="Tax.TaxRate" required />
+                    </div>
+                    <div class="form-field">
+                        <label>Status</label>
+                        <select id="editTaxStatus" name="Tax.Status">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="form-field full">
+                        <label>Description</label>
+                        <input type="text" id="editTaxDesc" name="Tax.Description" />
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('editTaxModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Update Tax</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============ ADD USER MODAL ============ -->
+<div class="modal-backdrop-custom" id="addUserModal">
+    <div class="modal-box">
+        <div class="modal-box-head">
+            <div>
+                <h3><i class="bi bi-person-plus-fill" style="color:var(--brand-600);"></i> Add User</h3>
+                <p>New team member who can be assigned leads</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('addUserModal')">&times;</button>
+        </div>
+        <div class="modal-box-body">
+            <form method="post" asp-controller="Settings" asp-action="AddUser">
+                <div class="form-grid">
+                    <div class="form-field"><label>Full Name <span class="req">*</span></label><input type="text" name="NewUser.Name" required placeholder="e.g., Isha Patil" /></div>
+                    <div class="form-field"><label>Email <span class="req">*</span></label><input type="email" name="NewUser.Email" required placeholder="name@nimbuscrm.com" /></div>
+                    <div class="form-field"><label>Role</label><input type="text" name="NewUser.Role" placeholder="e.g., Sales Executive" /></div>
+                    <div class="form-field">
+                        <label>Status</label>
+                        <select name="NewUser.Status">
+                            <option selected>Active</option>
+                            <option>Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('addUserModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Add User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openEditTaxModal(id, name, type, rate, desc, status) {
+        document.getElementById('editTaxId').value = id;
+        document.getElementById('editTaxName').value = name;
+        document.getElementById('editTaxType').value = type;
+        document.getElementById('editTaxRate').value = rate;
+        document.getElementById('editTaxDesc').value = desc;
+        document.getElementById('editTaxStatus').value = status;
+        openModal('editTaxModal');
+    }
+</script>
+
+@functions {
+    string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}" : name.Substring(0, Math.Min(2, name.Length));
+    }
+
+    string JavaScriptEncoder(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return "";
+        return input.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n");
+    }
+}

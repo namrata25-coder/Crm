@@ -1,0 +1,1 @@
+-- Generated idempotent schema script located at repo root schema.sql

@@ -1,0 +1,189 @@
+@model List<CrmLeadManagement.Controllers.FinanceListRow>
+
+<div class="breadcrumb-row">
+    <a asp-controller="Home" asp-action="Index">Home</a><span class="sep">/</span>
+    <span>Finance</span><span class="sep">/</span><span class="current">Quotation List</span>
+</div>
+<div class="page-head">
+    <div>
+        <h1>Quotation List</h1>
+        <p>All quotations raised across every lead, in one place.</p>
+    </div>
+    <div class="action-toolbar">
+        <button type="button" class="btn btn-primary" onclick="openModal('selectLeadQuotationModal')">
+            <i class="bi bi-plus-lg"></i> New Quotation
+        </button>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="top"><div class="icon" style="background:var(--brand-100);color:var(--brand-700);"><i class="bi bi-file-earmark-text"></i></div></div>
+        <div class="val">@Model.Count</div>
+        <div class="lbl">Total Quotations</div>
+    </div>
+    <div class="stat-card">
+        <div class="top"><div class="icon" style="background:#fef6e7;color:#b25e09;"><i class="bi bi-send"></i></div></div>
+        <div class="val">@Model.Count(r => r.Status == "Sent")</div>
+        <div class="lbl">Sent</div>
+    </div>
+    <div class="stat-card">
+        <div class="top"><div class="icon" style="background:#eafaf0;color:#127a45;"><i class="bi bi-patch-check"></i></div></div>
+        <div class="val">@Model.Count(r => r.Status == "Approved")</div>
+        <div class="lbl">Approved</div>
+    </div>
+    <div class="stat-card">
+        <div class="top"><div class="icon" style="background:#eef2ff;color:#3538cd;"><i class="bi bi-currency-rupee"></i></div></div>
+        <div class="val">@FinanceHelpers.SumTotals(Model.Select(r => r.Total))</div>
+        <div class="lbl">Total Value</div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>All Quotations</h2>
+            <div class="hint" id="quotationCountHint">@Model.Count quotation(s) found</div>
+        </div>
+        <div class="filter-bar">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" id="financeListSearch" onkeyup="filterFinanceTable('quotationTable','financeListSearch','financeStatusFilter')" placeholder="Search by lead, number, email..." />
+            </div>
+            <select id="financeStatusFilter" onchange="filterFinanceTable('quotationTable','financeListSearch','financeStatusFilter')">
+                <option value="">All Status</option>
+                @foreach (var s in LookupData.FinanceStatuses)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="clearFinanceFilters('financeListSearch','financeStatusFilter','quotationTable')">
+                <i class="bi bi-x-circle"></i> Clear
+            </button>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table" id="quotationTable">
+            <thead>
+                <tr>
+                    <th>Lead Name</th>
+                    <th>Contact Number</th>
+                    <th>Email</th>
+                    <th>Quotation Date</th>
+                    <th>Q-ID</th>
+                    <th>Total Amount</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr id="emptyQuotationRow"><td colspan="8"><div class="empty-state"><i class="bi bi-file-earmark-text"></i><p>No quotations created yet. Click "+ New Quotation" to create one.</p></div></td></tr>
+                }
+                @foreach (var r in Model)
+                {
+                    <tr data-status="@r.Status">
+                        <td class="cell-primary">@r.LeadName <div style="font-size:11.5px;color:var(--ink-500);font-weight:400;">@r.CompanyName</div></td>
+                        <td>@r.MobileNumber</td>
+                        <td>@r.Email</td>
+                        <td>@r.Date</td>
+                        <td class="cell-primary">@r.Number</td>
+                        <td>@FinanceHelpers.Money(r.Total)</td>
+                        <td>@Html.Raw(FinanceHelpers.StatusBadge(r.Status))</td>
+                        <td>
+                            <div style="display:flex;gap:6px;">
+                                <a asp-controller="Finance" asp-action="QuotationDetails" asp-route-leadId="@r.LeadId" asp-route-number="@r.Number" class="btn btn-soft btn-sm" title="View">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                                <form method="post" asp-controller="Finance" asp-action="DeleteQuotation" style="display:inline;" onsubmit="return confirm('Delete quotation @r.Number? This cannot be undone.')">
+                                    <input type="hidden" name="leadId" value="@r.LeadId" />
+                                    <input type="hidden" name="number" value="@r.Number" />
+                                    <button type="submit" class="icon-btn" title="Delete" style="color:#c81e1e;border-color:#fda29b;">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Select Lead for New Quotation -->
+<div class="modal-backdrop-custom" id="selectLeadQuotationModal">
+    <div class="modal-card" style="max-width:480px;">
+        <div class="modal-header">
+            <div>
+                <h3>Create New Quotation</h3>
+                <div class="sub">Select a lead to open their finance quotation sheet</div>
+            </div>
+            <button type="button" class="modal-close-btn" onclick="closeModal('selectLeadQuotationModal')">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding:20px;">
+            <div class="form-field" style="margin-bottom:16px;">
+                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Select Lead <span style="color:#b42318;">*</span></label>
+                <select id="quotationLeadSelector" style="width:100%;padding:10px 12px;border:1px solid var(--ink-300);border-radius:8px;font-size:13.5px;">
+                    @foreach (var l in LeadStore.Leads)
+                    {
+                        <option value="@l.LeadId">@l.LeadName — @l.CompanyName (@l.LeadId)</option>
+                    }
+                </select>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('selectLeadQuotationModal')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="proceedToLeadFinance('quotationLeadSelector','quotation')">
+                    Proceed <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function filterFinanceTable(tableId, inputId, statusId) {
+            var q = (document.getElementById(inputId)?.value || '').toLowerCase();
+            var st = document.getElementById(statusId)?.value || '';
+            var rows = document.querySelectorAll('#' + tableId + ' tbody tr[data-status]');
+            var visibleCount = 0;
+
+            rows.forEach(function (row) {
+                var text = row.innerText.toLowerCase();
+                var rowStatus = row.getAttribute('data-status') || '';
+                var matchesSearch = !q || text.indexOf(q) > -1;
+                var matchesStatus = !st || rowStatus === st;
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            var hint = document.getElementById('quotationCountHint');
+            if (hint) hint.textContent = visibleCount + ' quotation(s) found';
+        }
+
+        function clearFinanceFilters(inputId, statusId, tableId) {
+            var inp = document.getElementById(inputId);
+            var st = document.getElementById(statusId);
+            if (inp) inp.value = '';
+            if (st) st.value = '';
+            filterFinanceTable(tableId, inputId, statusId);
+        }
+
+        function proceedToLeadFinance(selectorId, subtab) {
+            var sel = document.getElementById(selectorId);
+            if (sel && sel.value) {
+                window.location.href = '/Lead/Details?id=' + encodeURIComponent(sel.value) + '&tab=finance&subtab=' + encodeURIComponent(subtab);
+            }
+        }
+    </script>
+}

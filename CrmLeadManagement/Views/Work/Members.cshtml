@@ -1,0 +1,768 @@
+@model CrmLeadManagement.Models.WorkMembersViewModel
+@using CrmLeadManagement.Models
+@{
+    ViewData["Title"] = "Team Members";
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-people" style="color:var(--brand-600);"></i> Team Members</h1>
+        <p class="page-sub">Manage team members, designations, contact details, project assignments, and workload</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+        <a asp-controller="Team" asp-action="Roles" class="btn btn-secondary">
+            <i class="bi bi-shield-lock-fill" style="color:var(--brand-600);"></i> Roles &amp; Permissions
+        </a>
+        <button class="btn btn-primary" onclick="openCreateMemberModal()">
+            <i class="bi bi-person-plus-fill"></i> Add Member
+        </button>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success" style="padding:12px 16px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:8px;font-size:13.5px;">
+        <i class="bi bi-check-circle-fill" style="color:#059669;font-size:16px;"></i>
+        <span>@TempData["SuccessMessage"]</span>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger" style="padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:8px;font-size:13.5px;">
+        <i class="bi bi-exclamation-triangle-fill" style="color:#dc2626;font-size:16px;"></i>
+        <span>@TempData["ErrorMessage"]</span>
+    </div>
+}
+
+<!-- 1. HIGH-LEVEL METRICS -->
+<div class="work-stats-grid">
+    <div class="work-stat-card">
+        <div class="stat-icon bg-blue-subtle text-primary"><i class="bi bi-people-fill"></i></div>
+        <div>
+            <div class="stat-val" id="statTotalMembers">@Model.TotalMembers</div>
+            <div class="stat-lbl">Total Members</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-green-subtle text-success"><i class="bi bi-person-check-fill"></i></div>
+        <div>
+            <div class="stat-val" id="statActiveMembers">@Model.ActiveMembers</div>
+            <div class="stat-lbl">Active Members</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-purple-subtle text-purple"><i class="bi bi-folder2-open"></i></div>
+        <div>
+            <div class="stat-val">@Model.TotalAssignedProjects</div>
+            <div class="stat-lbl">Assigned Projects</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-amber-subtle text-warning"><i class="bi bi-check2-square"></i></div>
+        <div>
+            <div class="stat-val">@Model.TotalAssignedTasks</div>
+            <div class="stat-lbl">Assigned Tasks</div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. MEMBER TABLE LIST -->
+<div class="card mt-3">
+    <div class="card-header-row" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);">
+        <h3 class="card-title" style="margin:0;font-size:15.5px;font-weight:700;display:flex;align-items:center;gap:8px;">
+            <i class="bi bi-table" style="color:var(--brand-600);"></i> Team Members List
+        </h3>
+        
+        <!-- Search & Filter Controls -->
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1;justify-content:flex-end;">
+            <div class="table-search-box" style="min-width:240px;max-width:340px;flex:1;">
+                <i class="bi bi-search"></i>
+                <input type="text" id="memberSearchInput" placeholder="Search by name, email, or role..." onkeyup="filterMembersTable()" />
+            </div>
+
+            <select id="roleFilterSelect" class="form-control form-select-custom" style="width:auto;min-width:140px;padding:7px 12px;border-radius:8px;font-size:13px;border:1px solid var(--ink-300);" onchange="filterMembersTable()">
+                <option value="">All Roles</option>
+                @foreach (var role in Model.AvailableRoles)
+                {
+                    <option value="@role">@role</option>
+                }
+            </select>
+
+            <select id="statusFilterSelect" class="form-control form-select-custom" style="width:auto;min-width:130px;padding:7px 12px;border-radius:8px;font-size:13px;border:1px solid var(--ink-300);" onchange="filterMembersTable()">
+                <option value="">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="card-body p-0">
+        @if (!Model.Members.Any())
+        {
+            <div class="empty-state py-5 text-center">
+                <i class="bi bi-people" style="font-size:3rem;color:var(--ink-300);"></i>
+                <h4 style="margin-top:1rem;font-weight:700;color:var(--ink-700);">No team members yet</h4>
+                <p style="color:var(--ink-500);margin-bottom:1.25rem;">Add your first team member to assign them to projects, milestones, and tasks.</p>
+                <button class="btn btn-primary" onclick="openCreateMemberModal()">
+                    <i class="bi bi-person-plus-fill"></i> Add First Member
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="data-table" id="memberTable">
+                    <thead>
+                        <tr>
+                            <th style="min-width:220px;">Member Name</th>
+                            <th style="min-width:140px;">Role / Designation</th>
+                            <th style="min-width:200px;">Email</th>
+                            <th style="min-width:110px;">Status</th>
+                            <th style="min-width:160px;">Assigned Projects</th>
+                            <th style="min-width:180px;">Tasks (Done / Total)</th>
+                            <th style="min-width:120px;">Logged Hours</th>
+                            <th style="text-align:right;min-width:130px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var member in Model.Members)
+                        {
+                            var initials = string.Join("", (member.Name ?? "U").Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(s => s[0])).ToUpperInvariant();
+                            if (initials.Length > 2) initials = initials.Substring(0, 2);
+                            if (string.IsNullOrEmpty(initials)) initials = "U";
+                            var isActive = string.Equals(member.Status, "Active", StringComparison.OrdinalIgnoreCase);
+
+                            <tr class="member-row" data-name="@member.Name?.ToLowerInvariant()" data-email="@member.Email?.ToLowerInvariant()" data-role="@member.Role?.ToLowerInvariant()" data-status="@member.Status">
+                                <td>
+                                    <div class="avatar-chip">
+                                        <div class="initials @(isActive ? "avatar-active-dot" : "avatar-inactive-dot")" style="width:36px;height:36px;font-size:13px;font-weight:700;background:var(--brand-100);color:var(--brand-700);border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;">
+                                            @initials
+                                        </div>
+                                        <div>
+                                            <div class="cell-primary" style="font-size:13.5px;">@member.Name</div>
+                                            <div class="cell-sub">ID: #@member.Id</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge-role">@member.Role</span>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(member.Email))
+                                    {
+                                        <a href="mailto:@member.Email" class="email-link" title="Send email to @member.Email">
+                                            <i class="bi bi-envelope"></i> @member.Email
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:var(--ink-500);font-size:12px;font-style:italic;">No email</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (isActive)
+                                    {
+                                        <span class="badge-status st-won">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-status st-lost">Inactive</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div style="display:flex;flex-direction:column;gap:3px;">
+                                        <div style="font-weight:600;color:var(--ink-900);font-size:13px;">
+                                            <i class="bi bi-folder2-open" style="color:var(--brand-600);margin-right:4px;"></i>@member.TotalProjects @(member.TotalProjects == 1 ? "project" : "projects")
+                                        </div>
+                                        @if (member.AssignedProjects.Any())
+                                        {
+                                            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;">
+                                                @foreach (var prj in member.AssignedProjects.Take(2))
+                                                {
+                                                    <span class="project-pill" title="@prj">@prj</span>
+                                                }
+                                                @if (member.AssignedProjects.Count > 2)
+                                                {
+                                                    <span class="project-pill more">+@(member.AssignedProjects.Count - 2) more</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="display:flex;flex-direction:column;gap:5px;">
+                                        <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;">
+                                            <span>@member.CompletedTasks / @member.TotalTasks Done</span>
+                                            @if (member.TotalTasks > 0)
+                                            {
+                                                var pct = (int)Math.Round((double)member.CompletedTasks / member.TotalTasks * 100);
+                                                <span style="color:var(--brand-600);font-size:11.5px;">@pct%</span>
+                                            }
+                                        </div>
+                                        @if (member.TotalTasks > 0)
+                                        {
+                                            var pct = (int)Math.Round((double)member.CompletedTasks / member.TotalTasks * 100);
+                                            <div style="width:100%;height:6px;background:var(--ink-100);border-radius:3px;overflow:hidden;">
+                                                <div style="width:@pct%;height:100%;background:linear-gradient(90deg, var(--brand-600), #12b76a);border-radius:3px;"></div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div style="font-size:11.5px;color:var(--ink-500);font-style:italic;">No tasks assigned</div>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="hours-badge">
+                                        <i class="bi bi-clock-history"></i> @member.LoggedHours.ToString("0.#") hrs
+                                    </span>
+                                </td>
+                                <td style="text-align:right;">
+                                    <div style="display:inline-flex;gap:5px;align-items:center;">
+                                        <button type="button" class="btn btn-outline btn-sm" title="Setup Permissions" onclick="selectUserInSetup('@Html.Raw(member.Name?.Replace("'", "\\'"))')">
+                                            <i class="bi bi-shield-check"></i> Setup
+                                        </button>
+                                        <button type="button" class="btn btn-outline btn-sm" title="View Work Summary" onclick="showMemberWorkModal(@member.Id, '@Html.Raw(member.Name?.Replace("'", "\\'"))', '@Html.Raw(member.Role?.Replace("'", "\\'"))', @member.TotalProjects, @member.TotalTasks, @member.CompletedTasks, @member.PendingTasks)">
+                                            <i class="bi bi-eye"></i> View
+                                        </button>
+                                        <button type="button" class="icon-btn-sm" title="Edit Member" onclick="openEditMemberModal(@member.Id, '@Html.Raw(member.Name?.Replace("'", "\\'"))', '@Html.Raw(member.Email?.Replace("'", "\\'"))', '@Html.Raw(member.Role?.Replace("'", "\\'"))', '@Html.Raw(member.Status?.Replace("'", "\\'"))')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="icon-btn-sm text-danger" title="Delete Member" onclick="confirmDeleteMember(@member.Id, '@Html.Raw(member.Name?.Replace("'", "\\'"))')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- No search match banner -->
+            <div id="noMatchMessage" style="display:none;padding:36px;text-align:center;">
+                <i class="bi bi-search" style="font-size:2.2rem;color:var(--ink-300);display:block;margin-bottom:8px;"></i>
+                <h5 style="color:var(--ink-700);font-weight:700;margin-bottom:4px;">No matching members found</h5>
+                <p style="color:var(--ink-500);font-size:13px;margin:0;">Try adjusting your search keyword or clearing the filters.</p>
+            </div>
+        }
+    </div>
+</div>
+
+@{
+    var appModulesList = new List<string> {
+        "Lead List",
+        "Assigned Leads",
+        "Estimation",
+        "Quotation",
+        "Proposal",
+        "Invoice",
+        "Payment",
+        "Project",
+        "Milestone",
+        "Task",
+        "Report",
+        "Member",
+        "Settings"
+    };
+}
+
+<!-- =========================================================================
+     3. USER SETUP (MODULE PERMISSIONS)
+     ========================================================================= -->
+<div class="card mt-4" id="userSetupCard" style="border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 24px;">
+    <div style="padding: 16px 20px; border-bottom: 1px solid var(--line); background: #ffffff;">
+        <h2 style="font-size: 16.5px; font-weight: 700; color: var(--ink-800, #1e293b); margin: 0; display: flex; align-items: center; gap: 8px;">
+            <i class="bi bi-shield-check" style="color: var(--brand-600, #2563eb);"></i> User Setup
+        </h2>
+    </div>
+
+    <div style="padding: 22px 24px;">
+        <form asp-action="SaveUserSetup" method="post" id="userSetupForm">
+            <!-- User Name Input Field -->
+            <div style="margin-bottom: 22px; max-width: 500px;">
+                <label for="setupUserName" style="font-weight: 600; font-size: 13.5px; color: var(--ink-700, #334155); display: block; margin-bottom: 8px;">
+                    User Name <span style="color: #ef4444;">*</span>
+                </label>
+                <div style="display: flex; gap: 10px;">
+                    <div style="position: relative; flex: 1;">
+                        <input type="text" name="userName" id="setupUserName" class="form-control" list="existingUsersDatalist" required placeholder="Enter or select user name" style="height: 40px; font-size: 13.5px; border-radius: 8px; padding-left: 36px;" oninput="onUserNameInputChange()" />
+                        <i class="bi bi-person" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-500); font-size: 15px;"></i>
+                    </div>
+                    <select id="userQuickSelect" class="form-control" style="width: auto; min-width: 160px; height: 40px; font-size: 13px; border-radius: 8px;" onchange="onUserQuickSelectChange(this.value)">
+                        <option value="">-- Select Member --</option>
+                        @foreach (var m in Model.Members)
+                        {
+                            <option value="@m.Name">@m.Name (@m.Role)</option>
+                        }
+                    </select>
+                </div>
+                <datalist id="existingUsersDatalist">
+                    @foreach (var m in Model.Members)
+                    {
+                        <option value="@m.Name">@m.Role</option>
+                    }
+                </datalist>
+            </div>
+
+            <!-- Module Permissions Checkboxes -->
+            <div style="margin-bottom: 22px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <label style="font-weight: 600; font-size: 13.5px; color: var(--ink-700, #334155); margin: 0;">
+                        Module Permissions
+                    </label>
+                    <div style="font-size: 12.5px; display: flex; gap: 10px;">
+                        <a href="javascript:void(0)" onclick="setAllModuleCheckboxes(true)" style="color: var(--brand-600, #2563eb); text-decoration: none; font-weight: 500;">Select All</a>
+                        <span style="color: var(--ink-300, #cbd5e1);">|</span>
+                        <a href="javascript:void(0)" onclick="setAllModuleCheckboxes(false)" style="color: var(--ink-500, #64748b); text-decoration: none; font-weight: 500;">Clear All</a>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 18px; background: var(--ink-50, #f8fafc); border: 1px solid var(--line, #e2e8f0); border-radius: 8px;">
+                    @foreach (var mod in appModulesList)
+                    {
+                        var chkId = "mod_" + mod.ToLower().Replace(" ", "_");
+                        <div style="display: flex; align-items: center; gap: 9px;">
+                            <input type="checkbox" name="selectedModules" value="@mod" id="@chkId" class="setup-module-checkbox" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--brand-600, #2563eb);" checked />
+                            <label for="@chkId" style="font-size: 13.5px; color: var(--ink-800, #1e293b); cursor: pointer; margin: 0; user-select: none; font-weight: 500;">
+                                @mod
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div>
+                <button type="submit" class="btn btn-primary" style="padding: 9px 24px; font-weight: 600; font-size: 13.5px; border-radius: 8px;">
+                    <i class="bi bi-check2"></i> Save
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 4. ADD / EDIT MEMBER MODAL FORM -->
+<div class="custom-modal-backdrop" id="memberModalBackdrop" style="display:none;" onclick="closeMemberModal(event)">
+    <div class="custom-modal" onclick="event.stopPropagation()" style="max-width:500px;">
+        <div class="custom-modal-header">
+            <h3 id="memberModalTitle" style="font-size:16px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px;">
+                <i class="bi bi-person-plus-fill" style="color:var(--brand-600);"></i> Add Team Member
+            </h3>
+            <button type="button" class="close-modal-btn" onclick="closeMemberModal()">&times;</button>
+        </div>
+        <form asp-action="SaveMember" method="post" id="memberForm">
+            <div class="custom-modal-body" style="padding:22px;">
+                <input type="hidden" name="id" id="memberId" value="0" />
+
+                <div class="form-group mb-3">
+                    <label class="form-label" style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Full Name <span style="color:#ef4444;">*</span></label>
+                    <div style="position:relative;">
+                        <input type="text" name="name" id="memberName" class="form-control" required placeholder="e.g. Rahul Sharma" style="padding-left:36px;" />
+                        <i class="bi bi-person" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-500);font-size:14px;"></i>
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label" style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Email Address <span style="color:#ef4444;">*</span></label>
+                    <div style="position:relative;">
+                        <input type="email" name="email" id="memberEmail" class="form-control" required placeholder="e.g. rahul.sharma@company.com" style="padding-left:36px;" />
+                        <i class="bi bi-envelope" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-500);font-size:14px;"></i>
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label" style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Role / Designation</label>
+                    <div style="position:relative;">
+                        <input type="text" name="role" id="memberRole" class="form-control" list="roleSuggestions" placeholder="e.g. Sales Executive, Project Manager, Developer" style="padding-left:36px;" />
+                        <i class="bi bi-briefcase" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-500);font-size:14px;"></i>
+                    </div>
+                    <datalist id="roleSuggestions">
+                        <option value="Project Manager" />
+                        <option value="Sales Manager" />
+                        <option value="Sales Executive" />
+                        <option value="Software Developer" />
+                        <option value="Frontend Developer" />
+                        <option value="Backend Developer" />
+                        <option value="UI/UX Designer" />
+                        <option value="Telecaller" />
+                        <option value="Accountant" />
+                        <option value="QA Engineer" />
+                    </datalist>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label" style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Account Status</label>
+                    <div style="position:relative;">
+                        <select name="status" id="memberStatus" class="form-control" style="padding-left:36px;">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                        <i class="bi bi-shield-check" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-500);font-size:14px;"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="custom-modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeMemberModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="saveMemberBtn">
+                    <i class="bi bi-check-lg"></i> Save Member
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 4. VIEW MEMBER WORK MODAL -->
+<div class="custom-modal-backdrop" id="memberWorkModalBackdrop" style="display:none;" onclick="closeMemberWorkModal(event)">
+    <div class="custom-modal" onclick="event.stopPropagation()" style="max-width:520px;">
+        <div class="custom-modal-header">
+            <div>
+                <h3 id="workModalMemberName" style="margin:0;font-size:16px;font-weight:700;"><i class="bi bi-person-badge" style="color:var(--brand-600);"></i> Work Summary</h3>
+                <div id="workModalMemberRole" style="font-size:12px;color:var(--ink-500);margin-top:2px;">Role</div>
+            </div>
+            <button type="button" class="close-modal-btn" onclick="closeMemberWorkModal()">&times;</button>
+        </div>
+        <div class="custom-modal-body" style="padding:20px;">
+            <!-- Summary Stats -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">
+                <div style="background:var(--ink-100);padding:12px;border-radius:10px;text-align:center;">
+                    <div id="workModalProjectsCount" style="font-size:20px;font-weight:700;color:var(--brand-700);">0</div>
+                    <div style="font-size:11px;color:var(--ink-500);font-weight:600;margin-top:2px;">Projects</div>
+                </div>
+                <div style="background:var(--ink-100);padding:12px;border-radius:10px;text-align:center;">
+                    <div id="workModalTasksCount" style="font-size:20px;font-weight:700;color:var(--ink-900);">0</div>
+                    <div style="font-size:11px;color:var(--ink-500);font-weight:600;margin-top:2px;">Total Tasks</div>
+                </div>
+                <div style="background:var(--ink-100);padding:12px;border-radius:10px;text-align:center;">
+                    <div id="workModalCompletedCount" style="font-size:20px;font-weight:700;color:#127a45;">0</div>
+                    <div style="font-size:11px;color:var(--ink-500);font-weight:600;margin-top:2px;">Completed</div>
+                </div>
+            </div>
+
+            <div style="border-top:1px solid var(--line);padding-top:16px;">
+                <h4 style="font-size:13px;font-weight:700;margin-bottom:10px;"><i class="bi bi-lightning-charge-fill" style="color:#f59e0b;"></i> Quick Links & Workflows</h4>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <a asp-action="Projects" class="btn btn-outline btn-block" style="justify-content:flex-start;padding:10px 14px;border-radius:8px;">
+                        <i class="bi bi-folder2-open" style="color:var(--brand-600);font-size:15px;"></i> Browse Projects Assigned
+                    </a>
+                    <a asp-action="Tasks" class="btn btn-outline btn-block" style="justify-content:flex-start;padding:10px 14px;border-radius:8px;">
+                        <i class="bi bi-check2-square" style="color:#026aa2;font-size:15px;"></i> View All Project Tasks
+                    </a>
+                    <a asp-action="Reports" class="btn btn-outline btn-block" style="justify-content:flex-start;padding:10px 14px;border-radius:8px;">
+                        <i class="bi bi-bar-chart-line" style="color:#b25e09;font-size:15px;"></i> Check Performance Report
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="custom-modal-footer">
+            <button type="button" class="btn btn-primary btn-sm" onclick="closeMemberWorkModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- 5. DELETE CONFIRMATION FORM -->
+<form id="deleteMemberForm" asp-action="DeleteMember" method="post" style="display:none;">
+    <input type="hidden" name="id" id="deleteMemberId" value="0" />
+</form>
+
+<style>
+/* Clean & Simple Member Table Styles */
+.badge-role {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--ink-100);
+    color: var(--ink-700);
+}
+
+.email-link {
+    color: var(--brand-600);
+    text-decoration: none;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.email-link:hover {
+    text-decoration: underline;
+    color: var(--brand-700);
+}
+
+.project-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: #eef4ff;
+    color: #3538cd;
+    white-space: nowrap;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+}
+.project-pill.more {
+    background: var(--ink-100);
+    color: var(--ink-500);
+}
+
+.hours-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #fdf2fa;
+    color: #c11574;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.icon-btn-sm {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--ink-300);
+    background: #fff;
+    color: var(--ink-700);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12.5px;
+    transition: all .15s ease;
+}
+
+.icon-btn-sm:hover {
+    background: var(--ink-100);
+    color: var(--ink-900);
+}
+
+.icon-btn-sm.text-danger:hover {
+    background: #fef3f2;
+    border-color: #fda29b;
+    color: #b42318;
+}
+
+/* Modals */
+.custom-modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(16, 24, 40, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.custom-modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 100%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    animation: modalIn .2s ease-out;
+}
+
+@@keyframes modalIn {
+    from { opacity: 0; transform: scale(.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.custom-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.close-modal-btn {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--ink-500);
+    cursor: pointer;
+}
+
+.custom-modal-footer {
+    padding: 14px 20px;
+    background: #fbfcfe;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--ink-300);
+    border-radius: 8px;
+    font-size: 13.5px;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.form-control:focus {
+    border-color: var(--brand-600);
+    box-shadow: 0 0 0 3px rgba(37, 99, 168, 0.12);
+}
+</style>
+
+@section Scripts {
+<script src="~/js/project/work-api.js"></script>
+<script>
+    function filterMembersTable() {
+        const query = (document.getElementById('memberSearchInput').value || '').toLowerCase().trim();
+        const role = (document.getElementById('roleFilterSelect').value || '').toLowerCase().trim();
+        const status = (document.getElementById('statusFilterSelect').value || '').toLowerCase().trim();
+
+        const rows = document.querySelectorAll('#memberTable tbody tr.member-row');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const rName = row.getAttribute('data-name') || '';
+            const rEmail = row.getAttribute('data-email') || '';
+            const rRole = row.getAttribute('data-role') || '';
+            const rStatus = (row.getAttribute('data-status') || '').toLowerCase();
+
+            const matchesQuery = !query || rName.includes(query) || rEmail.includes(query) || rRole.includes(query);
+            const matchesRole = !role || rRole === role;
+            const matchesStatus = !status || rStatus === status;
+
+            if (matchesQuery && matchesRole && matchesStatus) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const noMatch = document.getElementById('noMatchMessage');
+        if (noMatch) {
+            noMatch.style.display = (visibleCount === 0 && rows.length > 0) ? 'block' : 'none';
+        }
+    }
+
+    function openCreateMemberModal() {
+        document.getElementById('memberModalTitle').innerHTML = '<i class="bi bi-person-plus-fill" style="color:var(--brand-600);"></i> Add Team Member';
+        document.getElementById('memberId').value = '0';
+        document.getElementById('memberName').value = '';
+        document.getElementById('memberEmail').value = '';
+        document.getElementById('memberRole').value = '';
+        document.getElementById('memberStatus').value = 'Active';
+        document.getElementById('saveMemberBtn').innerHTML = '<i class="bi bi-check-lg"></i> Save Member';
+        document.getElementById('memberModalBackdrop').style.display = 'flex';
+        setTimeout(() => document.getElementById('memberName').focus(), 50);
+    }
+
+    function openEditMemberModal(id, name, email, role, status) {
+        document.getElementById('memberModalTitle').innerHTML = '<i class="bi bi-pencil-square" style="color:var(--brand-600);"></i> Edit Member Details';
+        document.getElementById('memberId').value = id;
+        document.getElementById('memberName').value = name;
+        document.getElementById('memberEmail').value = email;
+        document.getElementById('memberRole').value = role;
+        document.getElementById('memberStatus').value = status || 'Active';
+        document.getElementById('saveMemberBtn').innerHTML = '<i class="bi bi-check-lg"></i> Update Member';
+        document.getElementById('memberModalBackdrop').style.display = 'flex';
+        setTimeout(() => document.getElementById('memberName').focus(), 50);
+    }
+
+    function closeMemberModal(event) {
+        if (event && event.target !== document.getElementById('memberModalBackdrop')) return;
+        document.getElementById('memberModalBackdrop').style.display = 'none';
+    }
+
+    function showMemberWorkModal(id, name, role, projectsCount, tasksCount, completedCount, pendingCount) {
+        document.getElementById('workModalMemberName').innerHTML = '<i class="bi bi-person-badge" style="color:var(--brand-600);"></i> ' + name;
+        document.getElementById('workModalMemberRole').innerText = role || 'Team Member';
+        document.getElementById('workModalProjectsCount').innerText = projectsCount;
+        document.getElementById('workModalTasksCount').innerText = tasksCount;
+        document.getElementById('workModalCompletedCount').innerText = completedCount;
+        document.getElementById('memberWorkModalBackdrop').style.display = 'flex';
+    }
+
+    function closeMemberWorkModal(event) {
+        if (event && event.target !== document.getElementById('memberWorkModalBackdrop')) return;
+        document.getElementById('memberWorkModalBackdrop').style.display = 'none';
+    }
+
+    function confirmDeleteMember(id, name) {
+        if (confirm(`Are you sure you want to remove member "${name}"?`)) {
+            document.getElementById('deleteMemberId').value = id;
+            document.getElementById('deleteMemberForm').submit();
+        }
+    }
+
+    // Close modals on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const memberModal = document.getElementById('memberModalBackdrop');
+            const workModal = document.getElementById('memberWorkModalBackdrop');
+            if (memberModal && memberModal.style.display === 'flex') memberModal.style.display = 'none';
+            if (workModal && workModal.style.display === 'flex') workModal.style.display = 'none';
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  USER SETUP (MODULE PERMISSIONS) SCRIPT LOGIC
+    // ─────────────────────────────────────────────────────────────────────────
+    var memberPermissionsMap = {
+@foreach (var m in Model.Members)
+{
+    @: '@Html.Raw(m.Name?.Replace("'", "\\'"))': '@Html.Raw(m.ModulePermissions?.Replace("'", "\\'"))',
+}
+    };
+
+    function onUserQuickSelectChange(userName) {
+        if (!userName) return;
+        document.getElementById('setupUserName').value = userName;
+        loadPermissionsForUser(userName);
+    }
+
+    function onUserNameInputChange() {
+        var val = document.getElementById('setupUserName').value.trim();
+        var select = document.getElementById('userQuickSelect');
+        if (select) select.value = val;
+        loadPermissionsForUser(val);
+    }
+
+    function loadPermissionsForUser(userName) {
+        var perms = memberPermissionsMap[userName];
+        var checkboxes = document.querySelectorAll('.setup-module-checkbox');
+        if (perms !== undefined && perms !== null) {
+            if (perms.trim() === '') {
+                checkboxes.forEach(cb => cb.checked = true);
+            } else {
+                var allowed = perms.split(',').map(s => s.trim().toLowerCase());
+                checkboxes.forEach(cb => {
+                    cb.checked = allowed.includes(cb.value.toLowerCase());
+                });
+            }
+        } else {
+            checkboxes.forEach(cb => cb.checked = true);
+        }
+    }
+
+    function setAllModuleCheckboxes(checked) {
+        document.querySelectorAll('.setup-module-checkbox').forEach(cb => cb.checked = checked);
+    }
+
+    function selectUserInSetup(userName) {
+        document.getElementById('setupUserName').value = userName;
+        var select = document.getElementById('userQuickSelect');
+        if (select) select.value = userName;
+        loadPermissionsForUser(userName);
+        var card = document.getElementById('userSetupCard');
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+</script>
+}

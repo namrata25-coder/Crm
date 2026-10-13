@@ -1,0 +1,1552 @@
+@model List<CrmLeadManagement.Models.WorkMilestone>
+@using CrmLeadManagement.Models
+@{
+    ViewData["Title"] = "Milestones";
+    var projects = ViewData["Projects"] as List<WorkProject> ?? new();
+    var employees = ViewData["Employees"] as List<string> ?? new();
+}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="bi bi-flag" style="color:var(--brand-600);"></i> Milestones</h1>
+        <p class="page-sub">Complete milestone history across all projects &bull; 1 Milestone = 1 Invoice Integration</p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreateMilestoneModal()">
+        <i class="bi bi-plus-lg"></i> Create Milestone
+    </button>
+</div>
+
+<!-- STATS SUMMARY CARDS -->
+<div class="work-stats-grid">
+    <div class="work-stat-card">
+        <div class="stat-icon bg-purple-subtle text-purple"><i class="bi bi-flag"></i></div>
+        <div>
+            <div class="stat-val" id="statTotalMilestones">0</div>
+            <div class="stat-lbl">Total Milestones</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-green-subtle text-success"><i class="bi bi-check2-circle"></i></div>
+        <div>
+            <div class="stat-val" id="statCompletedMilestones">0</div>
+            <div class="stat-lbl">Completed</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-blue-subtle text-primary"><i class="bi bi-arrow-repeat"></i></div>
+        <div>
+            <div class="stat-val" id="statInProgressMilestones">0</div>
+            <div class="stat-lbl">In Progress</div>
+        </div>
+    </div>
+    <div class="work-stat-card">
+        <div class="stat-icon bg-amber-subtle text-warning"><i class="bi bi-currency-rupee"></i></div>
+        <div>
+            <div class="stat-val" id="statTotalMilestoneAmount">₹0</div>
+            <div class="stat-lbl">Total Milestone Value</div>
+        </div>
+    </div>
+</div>
+
+<!-- MILESTONES PIPELINE OVERVIEW -->
+<div id="milestonePipelineCard" class="card mt-3" style="display:none;padding:1rem 1.25rem;background:linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);border-left:4px solid var(--brand-600);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+        <div style="display:flex;align-items:center;gap:8px;">
+            <i class="bi bi-diagram-3-fill text-purple" style="font-size:1.15rem;"></i>
+            <h4 style="margin:0;font-size:13.5px;font-weight:700;color:var(--ink-900);">Strict Sequential Dependency Pipeline: 1 Milestone = 1 Invoice Integration</h4>
+        </div>
+        <span class="badge badge-purple" style="font-size:11px;"><i class="bi bi-shield-lock-fill"></i> Sequential Lock Enforced</span>
+    </div>
+    <p style="margin:0;font-size:12.5px;color:var(--ink-600);line-height:1.5;">
+        <strong>Rule:</strong> Milestones follow a strict sequential dependency. <strong>Milestone 1 must be 100% completed and its complete invoice generated &amp; paid</strong> before Milestone 2 can be unlocked/started. Every subsequent milestone and task is locked until the previous milestone is completed and fully paid.
+    </p>
+</div>
+
+<!-- MILESTONES TABLE -->
+<div class="card mt-3">
+    <div class="card-header-row">
+        <h3 class="card-title"><i class="bi bi-list-stars"></i> All Milestones &amp; Sequential Dependencies</h3>
+        <div class="table-search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="milestoneSearchInput" placeholder="Filter milestones or projects..." onkeyup="filterMilestonesTable()" />
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <!-- Empty State -->
+        <div class="empty-state" id="milestonesEmptyState" style="display:none;">
+            <i class="bi bi-flag" style="font-size:3rem;color:var(--ink-300);"></i>
+            <h4 style="margin-top:1rem;font-weight:700;color:var(--ink-700);">No milestones found</h4>
+            <p style="color:var(--ink-500);margin-bottom:1.25rem;">Create milestones to track phases, timelines, and deliverables across your projects.</p>
+            <button class="btn btn-primary" onclick="openCreateMilestoneModal()">
+                <i class="bi bi-plus-lg"></i> Create Milestone
+            </button>
+        </div>
+
+        <!-- Table Container -->
+        <div class="table-responsive" id="milestonesTableWrap">
+            <table class="data-table" id="milestonesTable">
+                <thead>
+                    <tr>
+                        <th style="width:70px;">Seq</th>
+                        <th>Milestone Code</th>
+                        <th>Milestone Name</th>
+                        <th>Project &amp; Client</th>
+                        <th>Timeline</th>
+                        <th>Amount</th>
+                        <th>Progress</th>
+                        <th>Invoice State</th>
+                        <th>Dependency &amp; Lock</th>
+                        <th>Status</th>
+                        <th style="text-align:right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="milestonesTableBody">
+                    <tr>
+                        <td colspan="11" style="text-align:center;padding:24px;color:var(--ink-500);">
+                            <i class="bi bi-arrow-repeat spin" style="font-size:1.2rem;display:inline-block;margin-right:8px;"></i> Loading milestones from server...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 1. GLOBAL CREATE / EDIT MILESTONE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="globalMilestoneModal">
+    <div class="modal-box modal-lg" style="max-width:820px;max-height:92vh;display:flex;flex-direction:column;">
+        <div class="modal-box-head">
+            <div>
+                <h3><i class="bi bi-flag" style="color:var(--brand-600);"></i> <span id="globalMsTitle">Create Milestone</span></h3>
+                <p id="globalMsSub">Auto-populates Project Details and computes sequential Dependency Type</p>
+            </div>
+            <button class="modal-close" type="button" onclick="closeModal('globalMilestoneModal')">&times;</button>
+        </div>
+        <div class="modal-box-body" style="overflow-y:auto;padding:1.25rem 1.5rem;">
+            <form id="milestoneForm" onsubmit="handleSaveMilestone(event)">
+                <input type="hidden" name="id" id="gmsId" value="0"/>
+
+                <!-- 1. PROJECT SELECTION -->
+                <div class="form-field full mb-3">
+                    <label style="font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;">
+                        <span>Select Project <span class="req">*</span></span>
+                        <span id="gmsProjectBadge" class="badge badge-purple" style="display:none;">Auto-generating details...</span>
+                    </label>
+                    <select name="projectId" id="gmsProjectId" required onchange="handleMilestoneProjectSelection(this.value)" style="font-weight:600;">
+                        <option value="">-- Choose Project to Auto-Generate Complete Details &amp; Dependency --</option>
+                        @foreach (var p in projects)
+                        {
+                            <option value="@p.Id">@p.ProjectCode - @p.ProjectName (@p.ClientName)</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- 2. AUTO-GENERATED COMPLETE PROJECT DETAILS & DEPENDENCY PANEL -->
+                <div id="gmsProjectDetailsPanel" style="display:none;margin-bottom:1.25rem;">
+                    <!-- Project Details Card -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
+                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--brand-600);">
+                                <i class="bi bi-folder-check"></i> Project Details (Auto-Generated)
+                            </span>
+                            <span id="gmsProjTypeBadge" class="badge badge-secondary" style="font-size:11px;">Direct Project</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;font-size:12.5px;">
+                            <div><span style="color:var(--ink-500);">Project:</span> <strong id="gmsProjCodeNameText" style="color:var(--ink-900);">—</strong></div>
+                            <div><span style="color:var(--ink-500);">Client:</span> <strong id="gmsProjClientText" style="color:var(--ink-900);">—</strong></div>
+                            <div><span style="color:var(--ink-500);">Budget:</span> <strong id="gmsProjBudgetText" style="color:#16a34a;">₹0</strong></div>
+                            <div><span style="color:var(--ink-500);">Timeline:</span> <strong id="gmsProjTimelineText" style="color:var(--ink-900);">—</strong></div>
+                            <div><span style="color:var(--ink-500);">Manager:</span> <strong id="gmsProjManagerText" style="color:var(--ink-900);">—</strong></div>
+                            <div><span style="color:var(--ink-500);">Assigned:</span> <strong id="gmsProjMembersText" style="color:var(--ink-900);">—</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Dependency Type & Strict Sequence Card -->
+                    <div id="gmsDependencyCard" style="background:#fdf4ff;border:1px solid #f0abfc;border-radius:10px;padding:10px 14px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                            <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#701a75;">
+                                <i class="bi bi-shield-lock-fill" style="color:#86198f;"></i>
+                                <strong style="color:#86198f;">Dependency Type:</strong>
+                                <span id="gmsDepTypeText" style="color:#701a75;font-weight:600;">Strict Finish-to-Start (Sequential with 100% Completion &amp; Full Invoice Paid Requirement)</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <span id="gmsDepSeqTitle" style="font-size:12px;font-weight:700;color:#86198f;">Milestone #1</span>
+                                <span id="gmsDepLockStatusBadge" class="badge badge-success"><i class="bi bi-unlock"></i> Unlocked</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. MILESTONE FORM FIELDS -->
+                <div class="form-grid">
+                    <div class="form-field full">
+                        <label>Milestone Name <span class="req">*</span></label>
+                        <input type="text" name="milestoneName" id="gmsName" required placeholder="e.g., Phase 2: Backend Architecture &amp; Database API"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Milestone Percentage <span class="req">*</span></label>
+                        <select name="milestonePercentage" id="gmsPercentage" onchange="calculateGlobalMilestoneAmount()" required>
+                            <option value="">Select %</option>
+                            <option value="10">10%</option>
+                            <option value="20">20%</option>
+                            <option value="30">30%</option>
+                            <option value="40">40%</option>
+                            <option value="50">50%</option>
+                            <option value="60">60%</option>
+                            <option value="70">70%</option>
+                            <option value="80">80%</option>
+                            <option value="90">90%</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Milestone Amount</label>
+                        <input type="text" id="gmsAmountDisplay" readonly style="background:#f8fafc;cursor:not-allowed;font-weight:600;color:var(--brand-700);" placeholder="₹0" value="₹0"/>
+                        <input type="hidden" name="amount" id="gmsAmount" value="0"/>
+                        <input type="hidden" name="completedAmount" id="gmsCompleted" value="0"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Start Date</label>
+                        <input type="date" name="startDate" id="gmsStart"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Due Date</label>
+                        <input type="date" name="dueDate" id="gmsDue"/>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Priority</label>
+                        <select name="priority" id="gmsPriority">
+                            @foreach (var p in WorkLookup.Priorities)
+                            {
+                                <option value="@p">@p</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Status <span id="gmsStatusLockHint" style="display:none;color:#dc2626;font-size:11px;font-weight:700;">(🔒 Locked until previous milestone is completed &amp; paid)</span></label>
+                        <select name="status" id="gmsStatus">
+                            @foreach (var s in WorkLookup.MilestoneStatuses)
+                            {
+                                <option value="@s">@s</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-field full">
+                        <label>Assigned Members</label>
+                        <input type="text" name="assignedMembers" id="gmsMembers" placeholder="e.g., Ananya, Sameer"/>
+                    </div>
+
+                    <div class="form-field full">
+                        <label>Description</label>
+                        <textarea name="description" id="gmsDesc" rows="2" placeholder="Milestone deliverables, scope, and acceptance criteria..."></textarea>
+                    </div>
+
+                    <div class="form-field full">
+                        <label>Notes</label>
+                        <textarea name="notes" id="gmsNotes" rows="2" placeholder="Additional dependency notes or payment milestones..."></textarea>
+                    </div>
+                </div>
+
+                <!-- MODAL ACTIONS WITH 'CREATE INVOICE' INTEGRATION -->
+                <div class="form-actions" style="margin-top:1.25rem;border-top:1px solid #e2e8f0;padding-top:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('globalMilestoneModal')">Cancel</button>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <button type="button" class="btn btn-outline" id="saveAndCreateInvoiceBtn" onclick="handleSaveMilestoneAndOpenInvoice(event)" style="font-weight:700;color:var(--brand-600);border-color:var(--brand-600);background:#eff6ff;">
+                            <i class="bi bi-receipt"></i> Create Invoice
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="saveMilestoneBtn">
+                            <i class="bi bi-check-lg"></i> Save Milestone
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 2. CREATE INVOICE FROM MILESTONE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="milestoneInvoiceModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(3px);z-index:1050;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:640px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;">
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:8px;background:#eef2ff;color:var(--brand-600);display:flex;align-items:center;justify-content:center;font-size:18px;">
+                    <i class="bi bi-receipt"></i>
+                </div>
+                <div>
+                    <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Create Milestone Invoice</h3>
+                    <p style="font-size:12px;color:var(--ink-500);margin:2px 0 0 0;">Generates invoice using actual milestone &amp; project data</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeModal('milestoneInvoiceModal')" style="border:none;background:transparent;color:var(--ink-400);font-size:20px;cursor:pointer;">
+                &times;
+            </button>
+        </div>
+
+        <div style="padding:1.5rem;max-height:80vh;overflow-y:auto;">
+            <form id="msInvForm" onsubmit="handleSaveMilestoneInvoice(event)">
+                <input type="hidden" id="msInvProjectId" value="0"/>
+                <input type="hidden" id="msInvMilestoneId" value="0"/>
+
+                <!-- Readonly Details Summary -->
+                <div style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:1.25rem;font-size:12.5px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                        <span style="color:var(--ink-600);">Client / Company:</span>
+                        <strong style="color:var(--ink-900);" id="msInvClientText">—</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                        <span style="color:var(--ink-600);">Project:</span>
+                        <strong style="color:var(--ink-900);" id="msInvProjectText">—</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;">
+                        <span style="color:var(--ink-600);">Milestone:</span>
+                        <strong style="color:var(--brand-600);" id="msInvMilestoneText">—</strong>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">Invoice Number <span style="color:#ef4444;">*</span></label>
+                        <input type="text" id="msInvNumber" required readonly
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700;background:#f8fafc;font-family:monospace;" />
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">Milestone Subtotal (₹) <span style="color:#ef4444;">*</span></label>
+                        <input type="number" id="msInvAmount" step="0.01" min="0" required oninput="calcMsInvTotals()"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700;color:var(--brand-600);" />
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">Invoice Date <span style="color:#ef4444;">*</span></label>
+                        <input type="date" id="msInvDate" required
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">Due Date <span style="color:#ef4444;">*</span></label>
+                        <input type="date" id="msInvDueDate" required
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">Discount (₹)</label>
+                        <input type="number" id="msInvDiscount" step="0.01" min="0" value="0" oninput="calcMsInvTotals()"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">Tax Master</label>
+                        <select id="msInvTaxRate" onchange="calcMsInvTotals()"
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            @foreach (var t in LookupData.Taxes)
+                            {
+                                <option value="@t.TaxRate" data-type="@t.TaxType" data-name="@t.TaxName" selected="@(t.TaxRate == 18 && t.TaxType == "GST")">
+                                    @t.TaxName (@t.TaxRate.ToString("0.##")%) [@t.TaxType]
+                                </option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Detailed Tax Calculation Breakdown -->
+                <div style="background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:1rem;font-size:12.5px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--ink-600);">
+                        <span>Taxable Value:</span>
+                        <strong style="color:var(--ink-800);" id="msInvTaxableText">₹0.00</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--ink-600);" id="msInvGstBreakdown">
+                        <span>Tax Breakdown:</span>
+                        <span id="msInvGstText">CGST 9%: ₹0.00 | SGST 9%: ₹0.00</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--ink-600);">
+                        <span>Total Tax Amount:</span>
+                        <strong style="color:var(--ink-800);" id="msInvTaxText">₹0.00</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;border-top:1px dashed #cbd5e1;padding-top:6px;font-size:14px;font-weight:800;color:var(--ink-900);">
+                        <span>Final Payable Amount:</span>
+                        <span id="msInvGrandText" style="color:var(--brand-600);font-size:16px;">₹0.00</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">Payment Terms / Notes</label>
+                    <textarea id="msInvNotes" rows="2" placeholder="Payment terms or instructions..."
+                              style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;"></textarea>
+                </div>
+            </form>
+        </div>
+
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#f8fafc;">
+            <button type="button" class="btn btn-outline" onclick="closeModal('milestoneInvoiceModal')">Cancel</button>
+            <button type="submit" form="msInvForm" id="btnSaveMsInv" class="btn btn-primary" style="min-width:130px;font-weight:700;">
+                <i class="bi bi-check-lg"></i> Save Invoice
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 3. VIEW PROFESSIONAL INVOICE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="milestoneViewInvoiceModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(4px);z-index:1060;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:860px;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;">
+        <!-- Modal Toolbar -->
+        <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <i class="bi bi-receipt" style="color:var(--brand-600);font-size:20px;"></i>
+                <div>
+                    <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;" id="viewModalHeaderTitle">Tax Invoice</h3>
+                    <p style="font-size:11.5px;color:var(--ink-500);margin:1px 0 0 0;">Standard Corporate Business Invoice Format</p>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="btn btn-primary" type="button" onclick="printModalInvoice()" style="font-weight:600;font-size:12.5px;background:#4f46e5;">
+                    <i class="bi bi-printer"></i> Print Invoice
+                </button>
+                <button class="btn btn-outline" type="button" onclick="downloadModalInvoicePdf()" style="font-weight:600;font-size:12.5px;color:#dc2626;border-color:#fca5a5;">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Download PDF
+                </button>
+                <a id="viewModalFullPageLink" href="#" class="btn btn-outline" style="font-weight:600;font-size:12.5px;">
+                    <i class="bi bi-box-arrow-up-right"></i> Open Full Page
+                </a>
+                <button type="button" onclick="closeModal('milestoneViewInvoiceModal')" style="border:none;background:transparent;color:var(--ink-400);font-size:22px;cursor:pointer;padding:0 6px;">
+                    &times;
+                </button>
+            </div>
+        </div>
+
+        <!-- Printable Document Body -->
+        <div id="modalInvoicePrintableArea" style="padding:2.25rem;overflow-y:auto;flex:1;background:#fff;font-family:'Inter',sans-serif;color:#1e293b;">
+            <!-- Rendered dynamically -->
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastNotification" style="display:none;position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.2);z-index:9999;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:10px;">
+    <i class="bi bi-check-circle-fill" style="color:#10b981;font-size:18px;"></i>
+    <span id="toastMessage">Success</span>
+</div>
+
+@section Scripts {
+<script src="~/js/project/work-api.js"></script>
+<script src="~/js/project/project-api.js"></script>
+<script src="~/js/project/milestone-api.js"></script>
+<script>
+let milestonesData = [];
+let projectsList = [];
+let invoicesList = [];
+let currentSelectedProjectDependency = null;
+let currentViewingInvoiceData = null;
+
+function showToast(msg, isError = false) {
+    const t = document.getElementById('toastNotification');
+    if (!t) return;
+    const icon = t.querySelector('i');
+    const msgSpan = document.getElementById('toastMessage');
+    msgSpan.textContent = msg;
+
+    if (isError) {
+        t.style.background = '#ef4444';
+        icon.className = 'bi bi-exclamation-triangle-fill';
+        icon.style.color = '#fff';
+    } else {
+        t.style.background = '#1e293b';
+        icon.className = 'bi bi-check-circle-fill';
+        icon.style.color = '#10b981';
+    }
+
+    t.style.display = 'flex';
+    t.style.opacity = '1';
+    setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.style.display = 'none', 300);
+    }, 3500);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatCurrency(num) {
+    const val = Number(num) || 0;
+    return '₹' + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function numberToIndianWords(num) {
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    num = Math.round(Number(num) || 0);
+    if (num === 0) return 'Rupees Zero Only';
+
+    function inWords(n) {
+        if (n < 20) return a[n];
+        const digit = n % 10;
+        return b[Math.floor(n / 10)] + (digit ? ' ' + a[digit] : ' ');
+    }
+
+    let str = '';
+    const crore = Math.floor(num / 10000000);
+    num %= 10000000;
+    const lakh = Math.floor(num / 100000);
+    num %= 100000;
+    const thousand = Math.floor(num / 1000);
+    num %= 1000;
+    const hundred = Math.floor(num / 100);
+    const rem = num % 100;
+
+    if (crore > 0) str += inWords(crore) + 'Crore ';
+    if (lakh > 0) str += inWords(lakh) + 'Lakh ';
+    if (thousand > 0) str += inWords(thousand) + 'Thousand ';
+    if (hundred > 0) str += inWords(hundred) + 'Hundred ';
+    if (rem > 0) {
+        if (str !== '') str += 'and ';
+        str += inWords(rem);
+    }
+
+    return 'Rupees ' + str.trim() + ' Only';
+}
+
+function getMsBadge(s) {
+    s = s || 'Pending';
+    let cls = 'badge-secondary';
+    if (s === 'Completed') cls = 'badge-success';
+    else if (s === 'In Progress') cls = 'badge-info';
+    else if (s === 'On Hold') cls = 'badge-warning';
+    return `<span class="badge ${cls}">${escapeHtml(s)}</span>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Load Milestones, Projects, Work Summary, and Invoices
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadMilestonesData() {
+    const tbody = document.getElementById('milestonesTableBody');
+
+    try {
+        const [milestonesResult, projectsResult, summaryResult, invoicesResult] = await Promise.allSettled([
+            MilestoneApi.getAll(),
+            ProjectApi.getAll(),
+            WorkApi.getSummary(),
+            fetch('/api/invoices').then(r => r.ok ? r.json() : [])
+        ]);
+
+        if (summaryResult.status === 'fulfilled' && summaryResult.value) {
+            updateMilestoneStatsFromWork(summaryResult.value);
+        }
+
+        if (projectsResult.status === 'fulfilled') {
+            projectsList = Array.isArray(projectsResult.value) ? projectsResult.value : [];
+            populateProjectSelect(projectsList);
+        }
+
+        if (invoicesResult.status === 'fulfilled') {
+            invoicesList = Array.isArray(invoicesResult.value) ? invoicesResult.value : [];
+        }
+
+        if (milestonesResult.status === 'fulfilled') {
+            milestonesData = Array.isArray(milestonesResult.value) ? milestonesResult.value : [];
+            renderMilestones(milestonesData);
+            if (summaryResult.status !== 'fulfilled') {
+                updateMilestoneStats(milestonesData);
+            }
+            const pipelineCard = document.getElementById('milestonePipelineCard');
+            if (pipelineCard && milestonesData.length > 0) pipelineCard.style.display = 'block';
+        } else {
+            throw milestonesResult.reason || new Error('Failed to load milestones');
+        }
+    } catch (err) {
+        console.error('[Milestones] Load error:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--danger, #dc2626);">
+                <i class="bi bi-exclamation-triangle" style="margin-right:6px;"></i> Error loading milestones: ${escapeHtml(err.message)}
+            </td></tr>`;
+        }
+    }
+}
+
+function populateProjectSelect(projects) {
+    const sel = document.getElementById('gmsProjectId');
+    if (!sel || !Array.isArray(projects)) return;
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">-- Choose Project to Auto-Generate Complete Details &amp; Dependency --</option>';
+    projects.forEach(p => {
+        const id = p.Id !== undefined ? p.Id : p.id;
+        const code = p.ProjectCode || p.projectCode || '';
+        const name = p.ProjectName || p.projectName || '';
+        const client = p.ClientName || p.clientName || '';
+        sel.innerHTML += `<option value="${id}">${escapeHtml(code)} - ${escapeHtml(name)} (${escapeHtml(client)})</option>`;
+    });
+    if (currentVal) sel.value = currentVal;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-generate Project Details & Sequential Dependency Logic when Project is selected
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleMilestoneProjectSelection(projectId, isEdit = false, editingMilestoneId = 0) {
+    const panel = document.getElementById('gmsProjectDetailsPanel');
+    const badge = document.getElementById('gmsProjectBadge');
+    if (!panel) return;
+
+    if (!projectId || projectId <= 0) {
+        panel.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        return;
+    }
+
+    if (badge) {
+        badge.style.display = 'inline-block';
+        badge.textContent = 'Auto-generating project details & dependency...';
+    }
+
+    try {
+        const res = await fetch(`/api/milestones/project-dependency/${projectId}`);
+        if (!res.ok) throw new Error('Failed to retrieve project dependency metadata');
+        const data = await res.json();
+        currentSelectedProjectDependency = data;
+
+        const proj = data.project || data.Project;
+        const milestones = data.milestones || data.Milestones || [];
+        const nextDep = data.nextMilestoneDependency || data.NextMilestoneDependency || {};
+
+        // 1. Populate Project Details UI
+        document.getElementById('gmsProjCodeNameText').textContent = `${proj.projectCode || proj.ProjectCode || ''} - ${proj.projectName || proj.ProjectName || ''}`;
+        document.getElementById('gmsProjClientText').textContent = proj.clientName || proj.ClientName || 'N/A';
+        document.getElementById('gmsProjTypeBadge').textContent = proj.projectType || proj.ProjectType || 'Direct Project';
+        document.getElementById('gmsProjBudgetText').textContent = '₹' + Number(proj.budget || proj.Budget || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        
+        const start = proj.startDate || proj.StartDate || 'N/A';
+        const deadline = proj.deadline || proj.Deadline || 'N/A';
+        document.getElementById('gmsProjTimelineText').textContent = `${start} → ${deadline}`;
+        document.getElementById('gmsProjManagerText').textContent = proj.projectManager || proj.ProjectManager || 'Unassigned';
+        document.getElementById('gmsProjMembersText').textContent = proj.assignedMembers || proj.AssignedMembers || '—';
+
+        currentSelectedProjectBudget = Number(proj.budget || proj.Budget || 0);
+        calculateGlobalMilestoneAmount();
+
+        // 2. Evaluate Dependency Chain
+        let depInfo = nextDep;
+        let isLocked = nextDep.isLocked ?? nextDep.IsLocked ?? false;
+        let seqIndex = (nextDep.sequenceIndex || nextDep.SequenceIndex || (milestones.length + 1));
+
+        if (isEdit && editingMilestoneId > 0) {
+            const found = milestones.find(m => (m.id || m.Id) === Number(editingMilestoneId));
+            if (found) {
+                seqIndex = found.sequenceIndex || found.SequenceIndex || 1;
+                isLocked = found.isLocked || found.IsLocked || false;
+            }
+        }
+
+        document.getElementById('gmsDepSeqTitle').textContent = `Milestone #${seqIndex}`;
+        document.getElementById('gmsDepTypeText').textContent = depInfo.dependencyType || depInfo.DependencyType || "Strict Finish-to-Start (Sequential with 100% Completion & Full Invoice Paid Requirement)";
+
+        const lockBadge = document.getElementById('gmsDepLockStatusBadge');
+        if (isLocked) {
+            lockBadge.className = 'badge badge-danger';
+            lockBadge.innerHTML = '<i class="bi bi-lock-fill"></i> Locked';
+            lockBadge.style.background = '#fee2e2';
+            lockBadge.style.color = '#dc2626';
+            lockBadge.style.border = '1px solid #fca5a5';
+        } else {
+            lockBadge.className = 'badge badge-success';
+            lockBadge.innerHTML = '<i class="bi bi-unlock-fill"></i> Unlocked / Ready';
+            lockBadge.style.background = '#dcfce7';
+            lockBadge.style.color = '#15803d';
+            lockBadge.style.border = '1px solid #86efac';
+        }
+
+        // 3. Auto-populate Smart Defaults if Creating New
+        if (!isEdit) {
+            const nameInput = document.getElementById('gmsName');
+            if (!nameInput.value || nameInput.value.startsWith('Phase ')) {
+                nameInput.value = `Phase ${seqIndex}: Milestone Deliverables`;
+            }
+
+            if (seqIndex > 1 && milestones[seqIndex - 2]) {
+                const prevDue = milestones[seqIndex - 2].dueDate || milestones[seqIndex - 2].DueDate;
+                if (prevDue) {
+                    const nextDate = new Date(prevDue);
+                    nextDate.setDate(nextDate.getDate() + 1);
+                    document.getElementById('gmsStart').value = nextDate.toISOString().split('T')[0];
+                }
+            } else if (proj.startDate || proj.StartDate) {
+                document.getElementById('gmsStart').value = proj.startDate || proj.StartDate;
+            }
+
+            setSelectValue('gmsPriority', proj.priority || proj.Priority || 'Medium');
+
+            if (proj.assignedMembers || proj.AssignedMembers) {
+                document.getElementById('gmsMembers').value = proj.assignedMembers || proj.AssignedMembers;
+            }
+        }
+
+        // Lock status handling
+        const statusLockHint = document.getElementById('gmsStatusLockHint');
+        if (isLocked) {
+            if (statusLockHint) statusLockHint.style.display = 'inline';
+            if (!isEdit) setSelectValue('gmsStatus', 'Pending');
+        } else {
+            if (statusLockHint) statusLockHint.style.display = 'none';
+        }
+
+        panel.style.display = 'block';
+        if (badge) {
+            badge.style.display = 'inline-block';
+            badge.textContent = `Auto-Populated (Milestone #${seqIndex})`;
+        }
+    } catch (err) {
+        console.warn('Error fetching project dependency:', err);
+        panel.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+    }
+}
+
+function updateMilestoneStatsFromWork(summary) {
+    if (!summary) return;
+    const elTotal = document.getElementById('statTotalMilestones');
+    const elCompleted = document.getElementById('statCompletedMilestones');
+    const elInProgress = document.getElementById('statInProgressMilestones');
+    const elTotalAmount = document.getElementById('statTotalMilestoneAmount');
+
+    if (elTotal) elTotal.textContent = summary.TotalMilestones || summary.totalMilestones || 0;
+    if (elCompleted) elCompleted.textContent = summary.CompletedMilestones || summary.completedMilestones || 0;
+    if (elInProgress) elInProgress.textContent = summary.InProgressMilestones || summary.inProgressMilestones || 0;
+    if (elTotalAmount) {
+        const total = milestonesData.reduce((sum, m) => sum + (Number(m.Amount || m.EffectiveAmount || m.amount || 0)), 0);
+        elTotalAmount.textContent = '₹' + total.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+}
+
+function updateMilestoneStats(data) {
+    const total = data.length;
+    const completed = data.filter(m => (m.Status || m.status) === 'Completed').length;
+    const inProgress = data.filter(m => (m.Status || m.status) === 'In Progress').length;
+    const totalAmount = data.reduce((sum, m) => sum + (Number(m.Amount !== undefined ? m.Amount : (m.amount || 0))), 0);
+
+    const elTotal = document.getElementById('statTotalMilestones');
+    const elCompleted = document.getElementById('statCompletedMilestones');
+    const elInProgress = document.getElementById('statInProgressMilestones');
+    const elTotalAmount = document.getElementById('statTotalMilestoneAmount');
+
+    if (elTotal) elTotal.textContent = total;
+    if (elCompleted) elCompleted.textContent = completed;
+    if (elInProgress) elInProgress.textContent = inProgress;
+    if (elTotalAmount) elTotalAmount.textContent = '₹' + totalAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+function renderMilestones(milestones) {
+    const tbody = document.getElementById('milestonesTableBody');
+    const emptyState = document.getElementById('milestonesEmptyState');
+    const tableWrap = document.getElementById('milestonesTableWrap');
+
+    if (!milestones || milestones.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        if (tableWrap) tableWrap.style.display = 'none';
+        if (tbody) tbody.innerHTML = '';
+        return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (tableWrap) tableWrap.style.display = 'block';
+
+    let html = '';
+    milestones.forEach((m, idx) => {
+        const id = m.Id !== undefined ? m.Id : m.id;
+        const projId = m.ProjectId !== undefined ? m.ProjectId : m.projectId;
+        const code = m.MilestoneCode || m.milestoneCode || '';
+        const name = m.MilestoneName || m.milestoneName || '';
+        const projName = m.ProjectName || m.projectName || '—';
+        const projCode = m.ProjectCode || m.projectCode || '';
+        const client = m.ClientName || m.clientName || '—';
+        const start = m.StartDate || m.startDate || '—';
+        const due = m.DueDate || m.dueDate || '—';
+        const amount = Number(m.EffectiveAmount !== undefined ? m.EffectiveAmount : (m.Amount !== undefined ? m.Amount : m.amount)) || 0;
+        const completed = Number(m.EffectiveCompletedAmount !== undefined ? m.EffectiveCompletedAmount : (m.CompletedAmount !== undefined ? m.CompletedAmount : m.completedAmount)) || 0;
+        const progress = Number(m.ProgressPercent !== undefined ? m.ProgressPercent : m.progressPercent) || 0;
+        const status = m.Status || m.status || 'Pending';
+        const tasksCount = Number(m.TasksCount !== undefined ? m.TasksCount : (m.tasksCount || 0));
+        const progressColor = progress >= 100 ? 'fill-green' : (progress >= 50 ? 'fill-blue' : 'fill-orange');
+
+        // Dependency properties
+        const seqIndex = m.SequenceIndex || m.sequenceIndex || (idx + 1);
+        const isLocked = m.IsLocked || m.isLocked || false;
+        const lockReason = m.LockReason || m.lockReason || '';
+        const prereqCode = m.PrerequisiteMilestoneCode || m.prerequisiteMilestoneCode || '';
+
+        // Check if invoice exists for this milestone
+        const inv = invoicesList.find(i => i.milestoneId === id) || (m.IsInvoiced ? { id: m.InvoiceId, invoiceNumber: m.InvoiceNumber, paymentStatus: m.InvoiceStatus } : null);
+        const isPaid = inv && (inv.paymentStatus === 'Paid' || inv.PaymentStatus === 'Paid');
+
+        html += `
+        <tr data-id="${id}" style="${isLocked ? 'background:#fffbfb;' : ''}">
+            <td style="text-align:center;">
+                <span class="badge ${seqIndex === 1 ? 'badge-purple' : 'badge-secondary'}" style="font-weight:700;font-size:11px;">#${seqIndex}</span>
+            </td>
+            <td>
+                <span class="badge badge-code">${escapeHtml(code)}</span>
+                ${isLocked ? `<span class="badge badge-danger" style="margin-left:4px;font-size:10px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;" title="${escapeHtml(lockReason)}"><i class="bi bi-lock-fill"></i></span>` : ''}
+            </td>
+            <td>
+                <strong>${escapeHtml(name)}</strong>
+                ${tasksCount > 0 ? `<div class="table-subtext"><i class="bi bi-list-check"></i> ${tasksCount} task(s) inside</div>` : ''}
+            </td>
+            <td>
+                ${projId ? `
+                    <a href="/Work/ProjectDetails?id=${projId}&tab=milestone" class="table-lead-link">
+                        <i class="bi bi-folder2-open"></i> ${escapeHtml(projName)}
+                    </a>
+                    ${projCode ? `<div class="table-subtext"><span class="badge badge-code-sm">${escapeHtml(projCode)}</span></div>` : ''}
+                ` : '<span class="text-muted">—</span>'}
+                ${client ? `<div class="table-subtext" style="font-size:11px;color:var(--ink-500);"><i class="bi bi-person"></i> ${escapeHtml(client)}</div>` : ''}
+            </td>
+            <td>
+                <div style="font-size:12px;"><strong>${escapeHtml(start)}</strong></div>
+                <div class="table-subtext">Due: ${escapeHtml(due)}</div>
+            </td>
+            <td><strong>₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong></td>
+            <td>
+                <div class="progress-wrap" style="width:100px;">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill ${progressColor}" style="width:${Math.min(100, Math.max(0, progress))}%"></div>
+                    </div>
+                    <span class="progress-label font-bold">${progress}%</span>
+                </div>
+            </td>
+            <td>
+                ${inv ? `
+                    <div style="display:flex;flex-direction:column;gap:3px;">
+                        <button type="button" class="badge badge-code" onclick="openViewInvoiceModal(${inv.id})" style="background:${isPaid ? '#dcfce7' : '#fef3c7'};color:${isPaid ? '#15803d' : '#b45309'};border:1px solid ${isPaid ? '#86efac' : '#fde68a'};font-weight:700;display:inline-flex;align-items:center;gap:4px;cursor:pointer;padding:4px 8px;" title="View Professional Invoice">
+                            <i class="bi bi-receipt"></i> ${escapeHtml(inv.invoiceNumber)}
+                        </button>
+                        <span style="font-size:10px;font-weight:700;color:${isPaid ? '#16a34a' : '#d97706'};">
+                            ${isPaid ? '✓ Paid in Full' : `⏳ ${escapeHtml(inv.paymentStatus || 'Pending')}`}
+                        </span>
+                    </div>
+                ` : `
+                    <button type="button" class="btn btn-xs btn-primary-outline" onclick="openCreateInvoiceFromMs(${id}, ${projId}, '${escapeHtml(name).replace(/'/g, "\\'")}', ${amount}, '${escapeHtml(client).replace(/'/g, "\\'")}', '${escapeHtml(projName).replace(/'/g, "\\'")}', '${escapeHtml(code).replace(/'/g, "\\'")}')" style="font-size:11px;padding:4px 8px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                        <i class="bi bi-receipt"></i> Create Invoice
+                    </button>
+                `}
+            </td>
+            <td>
+                ${isLocked ? `
+                    <div style="max-width:170px;" title="${escapeHtml(lockReason)}">
+                        <span class="badge badge-danger" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;font-weight:700;font-size:10.5px;">
+                            <i class="bi bi-lock-fill"></i> Locked (${escapeHtml(prereqCode || `M#${seqIndex-1}`)})
+                        </span>
+                        <div class="table-subtext" style="color:#b91c1c;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            Requires Complete &amp; Paid
+                        </div>
+                    </div>
+                ` : `
+                    <span class="badge badge-success" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:10.5px;">
+                        <i class="bi bi-unlock-fill"></i> Unlocked &amp; Ready
+                    </span>
+                `}
+            </td>
+            <td>${getMsBadge(status)}</td>
+            <td style="text-align:right;">
+                <div class="action-btns justify-end">
+                    ${inv ? `
+                        <button type="button" class="btn-action btn-view" onclick="openViewInvoiceModal(${inv.id})" title="View Invoice (${escapeHtml(inv.invoiceNumber)})" style="color:var(--brand-600);background:#eef2ff;">
+                            <i class="bi bi-receipt"></i>
+                        </button>
+                    ` : `
+                        <button type="button" class="btn-action btn-view" onclick="openCreateInvoiceFromMs(${id}, ${projId}, '${escapeHtml(name).replace(/'/g, "\\'")}', ${amount}, '${escapeHtml(client).replace(/'/g, "\\'")}', '${escapeHtml(projName).replace(/'/g, "\\'")}', '${escapeHtml(code).replace(/'/g, "\\'")}')" title="Create Invoice for ${escapeHtml(name)}">
+                            <i class="bi bi-plus-circle"></i>
+                        </button>
+                    `}
+                    ${projId ? `
+                        <a class="btn-action btn-view" href="/Work/ProjectDetails?id=${projId}&tab=milestone" title="View in Project Details">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    ` : ''}
+                    <button type="button" class="btn-action btn-edit" onclick="openEditMilestoneById(${id})" title="Edit Milestone">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button type="button" class="btn-action btn-delete" onclick="handleDeleteMilestone(${id}, '${escapeHtml(name).replace(/'/g, "\\'")}')" title="Delete Milestone">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    });
+
+    if (tbody) tbody.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Save Milestone and Immediately Open Invoice
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleSaveMilestoneAndOpenInvoice(e) {
+    if (e) e.preventDefault();
+    const id = parseInt(document.getElementById('gmsId').value, 10) || 0;
+    const isEdit = id > 0;
+    const projectId = parseInt(document.getElementById('gmsProjectId').value, 10);
+    const name = document.getElementById('gmsName').value.trim();
+    const amount = parseFloat(document.getElementById('gmsAmount').value) || 0;
+
+    if (!projectId) {
+        showToast('Please select a project first', true);
+        return;
+    }
+
+    if (!name) {
+        showToast('Milestone name is required', true);
+        return;
+    }
+
+    const payload = {
+        Id: id,
+        ProjectId: projectId,
+        MilestoneName: name,
+        Amount: amount,
+        CompletedAmount: parseFloat(document.getElementById('gmsCompleted').value) || 0,
+        StartDate: document.getElementById('gmsStart').value,
+        DueDate: document.getElementById('gmsDue').value,
+        Priority: document.getElementById('gmsPriority').value,
+        Status: document.getElementById('gmsStatus').value,
+        AssignedMembers: document.getElementById('gmsMembers').value.trim(),
+        Description: document.getElementById('gmsDesc').value.trim(),
+        Notes: document.getElementById('gmsNotes').value.trim()
+    };
+
+    const btn = document.getElementById('saveAndCreateInvoiceBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+        let savedMilestone;
+        if (isEdit) {
+            savedMilestone = await MilestoneApi.update(id, payload);
+        } else {
+            savedMilestone = await MilestoneApi.create(payload);
+        }
+
+        closeModal('globalMilestoneModal');
+        await loadMilestonesData();
+
+        const msId = savedMilestone.id || savedMilestone.Id || id;
+        const msName = savedMilestone.milestoneName || savedMilestone.MilestoneName || name;
+        const msCode = savedMilestone.milestoneCode || savedMilestone.MilestoneCode || '';
+        const msAmt = Number(savedMilestone.amount !== undefined ? savedMilestone.amount : (savedMilestone.Amount !== undefined ? savedMilestone.Amount : amount));
+        
+        const proj = projectsList.find(p => (p.id || p.Id) === projectId);
+        const projName = proj ? (proj.projectName || proj.ProjectName) : `Project #${projectId}`;
+        const clientName = proj ? (proj.clientName || proj.ClientName || proj.clientCompany || proj.ClientCompany) : 'Client';
+
+        // Check if an invoice already exists for this milestone
+        const existingInv = invoicesList.find(inv => inv.milestoneId === msId);
+        if (existingInv) {
+            showToast(`An invoice already exists for this milestone (${existingInv.invoiceNumber}). Opening invoice...`);
+            openViewInvoiceModal(existingInv.id);
+        } else {
+            openCreateInvoiceFromMs(msId, projectId, msName, msAmt, clientName, projName, msCode);
+        }
+    } catch (err) {
+        showToast(`Error saving milestone: ${err.message}`, true);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Open Create Invoice Modal with Milestone Data
+// ─────────────────────────────────────────────────────────────────────────────
+async function openCreateInvoiceFromMs(milestoneId, projectId, milestoneName, amount, clientName, projectName, milestoneCode) {
+    // Check if invoice already exists
+    const existing = invoicesList.find(i => i.milestoneId === milestoneId);
+    if (existing) {
+        showToast(`An invoice already exists for milestone "${milestoneName}" (${existing.invoiceNumber}). Opening invoice...`);
+        openViewInvoiceModal(existing.id);
+        return;
+    }
+
+    document.getElementById('msInvProjectId').value = projectId;
+    document.getElementById('msInvMilestoneId').value = milestoneId;
+    document.getElementById('msInvClientText').textContent = clientName || 'Client';
+    document.getElementById('msInvProjectText').textContent = projectName || `Project #${projectId}`;
+    document.getElementById('msInvMilestoneText').textContent = milestoneCode ? `${milestoneName} (${milestoneCode})` : milestoneName;
+    document.getElementById('msInvAmount').value = amount > 0 ? amount : 0;
+    document.getElementById('msInvDiscount').value = '0';
+    document.getElementById('msInvTaxRate').value = '18';
+    document.getElementById('msInvNotes').value = `Invoice generated for Milestone: ${milestoneName}`;
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('msInvDate').value = today;
+    const due = new Date();
+    due.setDate(due.getDate() + 15);
+    document.getElementById('msInvDueDate').value = due.toISOString().split('T')[0];
+
+    try {
+        const res = await fetch('/api/invoices/next-code');
+        const data = await res.json();
+        document.getElementById('msInvNumber').value = data.invoiceNumber || 'INV-0001';
+    } catch {
+        document.getElementById('msInvNumber').value = 'INV-0001';
+    }
+
+    calcMsInvTotals();
+    openModal('milestoneInvoiceModal');
+}
+
+function calcMsInvTotals() {
+    const subtotal = Math.max(0, parseFloat(document.getElementById('msInvAmount').value) || 0);
+    let discount = Math.max(0, parseFloat(document.getElementById('msInvDiscount').value) || 0);
+    if (discount > subtotal) discount = subtotal;
+
+    const taxableAmount = Math.max(0, subtotal - discount);
+    const taxSel = document.getElementById('msInvTaxRate');
+    const taxRate = parseFloat(taxSel?.value) || 0;
+    const selectedOpt = taxSel?.options[taxSel.selectedIndex];
+    const taxType = selectedOpt?.getAttribute('data-type') || 'GST';
+    const taxName = selectedOpt?.getAttribute('data-name') || '';
+    
+    const taxAmount = Math.round(taxableAmount * (taxRate / 100) * 100) / 100;
+    const grandTotal = taxableAmount + taxAmount;
+
+    document.getElementById('msInvTaxableText').textContent = formatCurrency(taxableAmount);
+    
+    if (taxType === 'IGST') {
+        document.getElementById('msInvGstText').textContent = `IGST ${taxRate}%: ${formatCurrency(taxAmount)}`;
+    } else if (taxType === 'CGST') {
+        document.getElementById('msInvGstText').textContent = `CGST ${taxRate}%: ${formatCurrency(taxAmount)}`;
+    } else if (taxType === 'SGST') {
+        document.getElementById('msInvGstText').textContent = `SGST ${taxRate}%: ${formatCurrency(taxAmount)}`;
+    } else {
+        const halfTaxRate = (taxRate / 2).toFixed(1).replace('.0', '');
+        const halfTaxAmount = (taxAmount / 2);
+        document.getElementById('msInvGstText').textContent = `CGST ${halfTaxRate}%: ${formatCurrency(halfTaxAmount)} | SGST ${halfTaxRate}%: ${formatCurrency(halfTaxAmount)}`;
+    }
+    
+    document.getElementById('msInvTaxText').textContent = formatCurrency(taxAmount);
+    document.getElementById('msInvGrandText').textContent = formatCurrency(grandTotal);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Save Invoice to Database
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleSaveMilestoneInvoice(e) {
+    e.preventDefault();
+    const projectId = parseInt(document.getElementById('msInvProjectId').value, 10);
+    const milestoneId = parseInt(document.getElementById('msInvMilestoneId').value, 10);
+    const clientName = document.getElementById('msInvClientText').textContent;
+    const taxSel = document.getElementById('msInvTaxRate');
+    const taxRate = parseFloat(taxSel?.value) || 0;
+    const selectedOpt = taxSel?.options[taxSel.selectedIndex];
+    const taxType = selectedOpt?.getAttribute('data-type') || 'GST';
+    const taxName = selectedOpt?.getAttribute('data-name') || '';
+
+    const payload = {
+        projectId: projectId,
+        milestoneId: milestoneId,
+        invoiceNumber: document.getElementById('msInvNumber').value.trim(),
+        clientName: clientName,
+        clientCompany: clientName,
+        invoiceDate: document.getElementById('msInvDate').value,
+        dueDate: document.getElementById('msInvDueDate').value,
+        amount: parseFloat(document.getElementById('msInvAmount').value) || 0,
+        discount: parseFloat(document.getElementById('msInvDiscount').value) || 0,
+        taxRate: taxRate,
+        taxName: taxName,
+        taxType: taxType,
+        notes: document.getElementById('msInvNotes').value.trim()
+    };
+
+    const btn = document.getElementById('btnSaveMsInv');
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/api/invoices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || 'Failed to create milestone invoice');
+        }
+
+        const createdInvoice = await res.json();
+        closeModal('milestoneInvoiceModal');
+        showToast(`Invoice ${createdInvoice.invoiceNumber} created and saved in Database!`);
+        await loadMilestonesData();
+
+        // Immediately open the professional view invoice
+        openViewInvoiceModal(createdInvoice.id);
+    } catch (err) {
+        showToast(`Error: ${err.message}`, true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// View Professional Standard Invoice Modal
+// ─────────────────────────────────────────────────────────────────────────────
+async function openViewInvoiceModal(invId) {
+    try {
+        showToast('Loading Invoice...');
+        const res = await fetch(`/api/invoices/${invId}/pdf`);
+        if (!res.ok) throw new Error('Failed to load invoice details');
+        const pdf = await res.json();
+        currentViewingInvoiceData = pdf;
+
+        document.getElementById('viewModalHeaderTitle').textContent = `Tax Invoice #${pdf.invoiceNumber}`;
+        document.getElementById('viewModalFullPageLink').href = `/Finance/InvoiceDetails/${invId}`;
+
+        const area = document.getElementById('modalInvoicePrintableArea');
+        const isPaid = pdf.paymentStatus === 'Paid';
+        const isOverdue = pdf.paymentStatus === 'Overdue';
+        const statusColor = isPaid ? '#15803d' : isOverdue ? '#b91c1c' : '#b45309';
+        const statusBg = isPaid ? '#dcfce7' : isOverdue ? '#fee2e2' : '#fffbeb';
+        const statusBorder = isPaid ? '#86efac' : isOverdue ? '#fca5a5' : '#fde68a';
+
+        const paymentRows = (pdf.paymentHistory || []).map(p => `
+            <tr style="border-bottom:1px solid #f1f5f9;font-size:12px;">
+                <td style="padding:7px 10px;font-family:monospace;font-weight:700;color:#4f46e5;">${escapeHtml(p.paymentNumber)}</td>
+                <td style="padding:7px 10px;color:#334155;">${escapeHtml(p.paymentDate || '—')}</td>
+                <td style="padding:7px 10px;font-weight:600;color:#0f172a;">${escapeHtml(p.paymentMethod || 'Bank Transfer')}</td>
+                <td style="padding:7px 10px;color:#64748b;font-family:monospace;">${escapeHtml(p.transactionReference || '—')}</td>
+                <td style="padding:7px 10px;text-align:right;font-weight:800;color:#059669;">${formatCurrency(p.amount)}</td>
+            </tr>
+        `).join('');
+
+        area.innerHTML = `
+            <div style="max-width:780px;margin:0 auto;background:#fff;color:#1e293b;font-family:'Inter',sans-serif;">
+                <!-- Header -->
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #4f46e5;padding-bottom:1.5rem;margin-bottom:1.5rem;gap:1rem;">
+                    <div style="display:flex;align-items:flex-start;gap:12px;">
+                        <div style="width:42px;height:42px;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;">N</div>
+                        <div>
+                            <h2 style="margin:0;font-size:1.35rem;font-weight:800;color:#0f172a;">${escapeHtml(pdf.companyName || 'Nimbus CRM Technologies Pvt. Ltd.')}</h2>
+                            <div style="font-size:12px;color:#64748b;margin-top:4px;line-height:1.4;">
+                                ${escapeHtml(pdf.companyAddress || 'Bangalore, India')}<br/>
+                                <strong>GSTIN:</strong> ${escapeHtml(pdf.companyGstin || '29AABCN1234F1Z5')} &bull; <strong>PAN:</strong> ${escapeHtml(pdf.companyPan || 'AABCN1234F')}<br/>
+                                <strong>Email:</strong> ${escapeHtml(pdf.companyEmail || 'billing@nimbuscrm.com')} &bull; <strong>Phone:</strong> ${escapeHtml(pdf.companyPhone || '+91 80 4123 4567')}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:1.8rem;font-weight:900;color:#4f46e5;letter-spacing:1px;line-height:1;">TAX INVOICE</div>
+                        <div style="font-size:15px;font-weight:800;font-family:monospace;color:#0f172a;margin-top:4px;"># ${escapeHtml(pdf.invoiceNumber)}</div>
+                        <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">Original for Recipient</div>
+                        <div style="display:inline-block;padding:3px 12px;border-radius:16px;font-size:11px;font-weight:800;text-transform:uppercase;background:${statusBg};color:${statusColor};border:1px solid ${statusBorder};margin-top:6px;">
+                            ${escapeHtml(pdf.paymentStatus || 'Pending')}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Meta Grid -->
+                <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem 1.25rem;">
+                        <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px;">BILLED TO / CLIENT DETAILS:</div>
+                        <div style="font-size:14.5px;font-weight:800;color:#0f172a;">${escapeHtml(pdf.clientCompany || pdf.clientName || 'Valued Client')}</div>
+                        ${pdf.clientCompany && pdf.clientName ? `<div style="font-size:13px;color:#334155;font-weight:600;">Attn: ${escapeHtml(pdf.clientName)}</div>` : ''}
+                        ${pdf.clientEmail ? `<div style="font-size:12px;color:#64748b;margin-top:3px;"><i class="bi bi-envelope"></i> ${escapeHtml(pdf.clientEmail)}</div>` : ''}
+                        ${pdf.clientMobile ? `<div style="font-size:12px;color:#64748b;"><i class="bi bi-telephone"></i> ${escapeHtml(pdf.clientMobile)}</div>` : ''}
+                    </div>
+
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem 1.25rem;font-size:12.5px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="color:#64748b;">Invoice Date:</span>
+                            <strong style="color:#0f172a;">${escapeHtml(pdf.invoiceDate)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="color:#64748b;">Due Date:</span>
+                            <strong style="color:#b91c1c;">${escapeHtml(pdf.dueDate)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="color:#64748b;">Project:</span>
+                            <strong style="color:#0f172a;">${escapeHtml(pdf.projectName)} (${escapeHtml(pdf.projectCode)})</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;">
+                            <span style="color:#64748b;">Milestone:</span>
+                            <strong style="color:#4f46e5;">${escapeHtml(pdf.milestoneName)} (${escapeHtml(pdf.milestoneCode || 'MLS')})</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Line Item Table -->
+                <div style="margin-bottom:1.5rem;">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                        <thead>
+                            <tr style="background:#f1f5f9;border-top:1px solid #cbd5e1;border-bottom:2px solid #cbd5e1;font-size:11.5px;text-align:left;color:#475569;">
+                                <th style="padding:8px 10px;">#</th>
+                                <th style="padding:8px 10px;">Milestone Scope &amp; Deliverables Description</th>
+                                <th style="padding:8px 10px;text-align:center;">Milestone Code</th>
+                                <th style="padding:8px 10px;text-align:right;">Amount (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #e2e8f0;">
+                                <td style="padding:12px 10px;color:#64748b;font-weight:700;">1</td>
+                                <td style="padding:12px 10px;">
+                                    <strong style="color:#0f172a;font-size:13.5px;">${escapeHtml(pdf.milestoneName)}</strong>
+                                    <div style="font-size:12px;color:#64748b;margin-top:3px;line-height:1.4;">
+                                        ${escapeHtml(pdf.milestoneDescription || pdf.notes || 'Full milestone scope and deliverables executed under agreement.')}
+                                    </div>
+                                    <div style="font-size:11.5px;color:#4f46e5;font-weight:600;margin-top:3px;">
+                                        Progress Completion: ${pdf.milestoneProgressPercent || 100}%
+                                    </div>
+                                </td>
+                                <td style="padding:12px 10px;text-align:center;font-family:monospace;font-weight:700;color:#4f46e5;">${escapeHtml(pdf.milestoneCode || 'MLS')}</td>
+                                <td style="padding:12px 10px;text-align:right;font-weight:800;font-size:14px;color:#0f172a;">${formatCurrency(pdf.subtotal)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Summary Grid -->
+                <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+                    <div>
+                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;font-size:12px;line-height:1.5;color:#334155;">
+                            <div style="font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:6px;">Bank Details &amp; Wire Transfer:</div>
+                            <div><strong>Bank:</strong> ${escapeHtml(pdf.bankName || 'HDFC Bank Ltd.')}</div>
+                            <div><strong>A/C Name:</strong> ${escapeHtml(pdf.bankAccountName || 'Nimbus CRM Technologies Pvt. Ltd.')}</div>
+                            <div><strong>A/C No:</strong> <span style="font-family:monospace;font-weight:700;">${escapeHtml(pdf.bankAccountNumber || '50200012345678')}</span></div>
+                            <div><strong>IFSC:</strong> <span style="font-family:monospace;font-weight:700;">${escapeHtml(pdf.bankIfsc || 'HDFC0000123')}</span> &bull; <strong>Branch:</strong> Koramangala, Bangalore</div>
+                            <div><strong>UPI ID:</strong> <span style="font-family:monospace;font-weight:700;color:#059669;">${escapeHtml(pdf.upiId || 'nimbuscrm@hdfcbank')}</span></div>
+                        </div>
+
+                        ${pdf.notes ? `
+                            <div style="margin-top:10px;font-size:11.5px;color:#64748b;line-height:1.4;">
+                                <strong>Notes / Instructions:</strong> ${escapeHtml(pdf.notes)}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:1rem 1.25rem;font-size:13px;">
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569;">
+                            <span>Subtotal:</span>
+                            <strong>${formatCurrency(pdf.subtotal)}</strong>
+                        </div>
+                        ${pdf.discount > 0 ? `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;color:#059669;">
+                                <span>Discount:</span>
+                                <strong>-${formatCurrency(pdf.discount)}</strong>
+                            </div>
+                        ` : ''}
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569;">
+                            <span>Taxable Amount:</span>
+                            <strong>${formatCurrency(pdf.taxableAmount || (pdf.subtotal - pdf.discount))}</strong>
+                        </div>
+                        ${pdf.taxType === 'IGST' ? `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>IGST (${pdf.taxRate || 0}%):</span>
+                                <strong>${formatCurrency(pdf.taxAmount || 0)}</strong>
+                            </div>
+                        ` : pdf.taxType === 'CGST' ? `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>CGST (${pdf.taxRate || 0}%):</span>
+                                <strong>${formatCurrency(pdf.taxAmount || 0)}</strong>
+                            </div>
+                        ` : pdf.taxType === 'SGST' ? `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>SGST (${pdf.taxRate || 0}%):</span>
+                                <strong>${formatCurrency(pdf.taxAmount || 0)}</strong>
+                            </div>
+                        ` : `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>CGST (${pdf.cgstRate || ((pdf.taxRate || 0)/2)}%):</span>
+                                <strong>${formatCurrency(pdf.cgstAmount || ((pdf.taxAmount || 0) / 2))}</strong>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>SGST (${pdf.sgstRate || ((pdf.taxRate || 0)/2)}%):</span>
+                                <strong>${formatCurrency(pdf.sgstAmount || ((pdf.taxAmount || 0) / 2))}</strong>
+                            </div>
+                        `}
+                        <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #4f46e5;border-bottom:2px solid #4f46e5;margin:6px 0;font-size:15px;font-weight:900;color:#0f172a;">
+                            <span>Total Payable Amount:</span>
+                            <span style="color:#4f46e5;">${formatCurrency(pdf.grandTotal)}</span>
+                        </div>
+                        <div style="padding:6px 8px;background:#eef2ff;border-radius:6px;font-size:11px;color:#3730a3;font-weight:600;margin-bottom:6px;">
+                            <strong>Words:</strong> ${numberToIndianWords(pdf.grandTotal)}
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#059669;font-weight:700;">
+                            <span>Paid Amount:</span>
+                            <span>${formatCurrency(pdf.paidAmount)}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#d97706;font-weight:800;font-size:13.5px;border-top:1px dashed #cbd5e1;margin-top:3px;padding-top:4px;">
+                            <span>Balance Due:</span>
+                            <span>${formatCurrency(pdf.remainingAmount)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Receipts -->
+                ${paymentRows ? `
+                    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:1.5rem;">
+                        <div style="font-size:11.5px;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:6px;">Payment History &amp; Receipts:</div>
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:left;color:#64748b;">
+                                    <th style="padding:6px 10px;">Payment #</th>
+                                    <th style="padding:6px 10px;">Date</th>
+                                    <th style="padding:6px 10px;">Method</th>
+                                    <th style="padding:6px 10px;">Reference</th>
+                                    <th style="padding:6px 10px;text-align:right;">Amount (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody>${paymentRows}</tbody>
+                        </table>
+                    </div>
+                ` : ''}
+
+                <!-- Footer & Signature -->
+                <div style="border-top:1px solid #e2e8f0;padding-top:1.25rem;display:flex;justify-content:space-between;align-items:flex-end;gap:1.5rem;font-size:11px;color:#64748b;">
+                    <div style="line-height:1.4;">
+                        Thank you for your business.<br/>
+                        This is a computer-generated tax invoice issued under milestone completion approval.
+                    </div>
+                    <div style="text-align:right;min-width:200px;">
+                        <div style="font-weight:700;color:#334155;margin-bottom:2px;">For ${escapeHtml(pdf.companyName || 'Nimbus CRM Technologies Pvt. Ltd.')}</div>
+                        <div style="height:36px;border-bottom:1px solid #94a3b8;margin-bottom:4px;display:flex;align-items:flex-end;justify-content:center;font-family:'Brush Script MT',cursive;font-size:18px;color:#1e3a8a;">Antigravity Finance</div>
+                        <div style="font-weight:700;text-transform:uppercase;">Authorized Signatory</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        openModal('milestoneViewInvoiceModal');
+    } catch (err) {
+        showToast(err.message, true);
+    }
+}
+
+function printModalInvoice() {
+    const printContent = document.getElementById('modalInvoicePrintableArea')?.innerHTML || '';
+    const win = window.open('', '_blank', 'height=850,width=900');
+    win.document.write(`
+        <html>
+            <head>
+                <title>Invoice - ${escapeHtml(currentViewingInvoiceData?.invoiceNumber || '')}</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+                <style>
+                    body { font-family: 'Inter', sans-serif; margin: 30px; color: #1e293b; font-size: 13px; }
+                    @@media print {
+                        @@page { size: A4 portrait; margin: 12mm; }
+                        body { margin: 0; }
+                    }
+                </style>
+            </head>
+            <body onload="window.print();window.close();">
+                ${printContent}
+            </body>
+        </html>
+    `);
+    win.document.close();
+}
+
+function downloadModalInvoicePdf() {
+    showToast('Opening PDF Print Dialog...');
+    printModalInvoice();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Save Milestone (MilestoneApi.create / MilestoneApi.update)
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleSaveMilestone(e) {
+    e.preventDefault();
+    const id = parseInt(document.getElementById('gmsId').value, 10) || 0;
+    const isEdit = id > 0;
+    const projectId = parseInt(document.getElementById('gmsProjectId').value, 10);
+    const status = document.getElementById('gmsStatus').value;
+
+    const payload = {
+        Id: id,
+        ProjectId: projectId,
+        MilestoneName: document.getElementById('gmsName').value.trim(),
+        Amount: parseFloat(document.getElementById('gmsAmount').value) || 0,
+        CompletedAmount: parseFloat(document.getElementById('gmsCompleted').value) || 0,
+        StartDate: document.getElementById('gmsStart').value,
+        DueDate: document.getElementById('gmsDue').value,
+        Priority: document.getElementById('gmsPriority').value,
+        Status: status,
+        AssignedMembers: document.getElementById('gmsMembers').value.trim(),
+        Description: document.getElementById('gmsDesc').value.trim(),
+        Notes: document.getElementById('gmsNotes').value.trim()
+    };
+
+    const saveBtn = document.getElementById('saveMilestoneBtn');
+    if (saveBtn) saveBtn.disabled = true;
+
+    try {
+        if (isEdit) {
+            await MilestoneApi.update(id, payload);
+            showToast('Milestone updated successfully');
+        } else {
+            await MilestoneApi.create(payload);
+            showToast('Milestone created successfully');
+        }
+        closeModal('globalMilestoneModal');
+        await loadMilestonesData();
+    } catch (err) {
+        showToast(`Error saving milestone: ${err.message}`, true);
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delete Milestone (MilestoneApi.delete)
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleDeleteMilestone(id, name) {
+    if (!confirm(`Are you sure you want to delete milestone "${name}"?`)) {
+        return;
+    }
+
+    try {
+        await MilestoneApi.delete(id);
+        showToast('Milestone deleted successfully');
+        await loadMilestonesData();
+    } catch (err) {
+        showToast(`Error deleting milestone: ${err.message}`, true);
+    }
+}
+
+let currentSelectedProjectBudget = 0;
+
+function getGlobalSelectedProjectBudget() {
+    if (currentSelectedProjectBudget > 0) return currentSelectedProjectBudget;
+    const projId = parseInt(document.getElementById('gmsProjectId').value, 10);
+    if (!projId) return 0;
+    const p = projectsList.find(x => (x.Id !== undefined ? x.Id : x.id) === projId);
+    return p ? Number(p.Budget || p.budget || 0) : 0;
+}
+
+function calculateGlobalMilestoneAmount() {
+    const budget = getGlobalSelectedProjectBudget();
+    const pct = parseFloat(document.getElementById('gmsPercentage').value) || 0;
+    const amount = (budget * pct) / 100;
+    const hiddenInput = document.getElementById('gmsAmount');
+    const displayInput = document.getElementById('gmsAmountDisplay');
+    if (hiddenInput) hiddenInput.value = amount;
+    if (displayInput) {
+        displayInput.value = amount > 0 
+            ? '₹' + Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 0 }) 
+            : '₹0';
+    }
+}
+
+function openCreateMilestoneModal() {
+    document.getElementById('gmsId').value = 0;
+    setSelectValue('gmsProjectId', '');
+    document.getElementById('gmsName').value = '';
+    document.getElementById('gmsDesc').value = '';
+    document.getElementById('gmsStart').value = new Date().toISOString().split('T')[0];
+    document.getElementById('gmsDue').value = '';
+    setSelectValue('gmsPercentage', '');
+    document.getElementById('gmsAmount').value = 0;
+    document.getElementById('gmsCompleted').value = 0;
+    document.getElementById('gmsAmountDisplay').value = '₹0';
+    document.getElementById('gmsMembers').value = '';
+    setSelectValue('gmsPriority', 'Medium');
+    setSelectValue('gmsStatus', 'Pending');
+    document.getElementById('gmsNotes').value = '';
+    document.getElementById('globalMsTitle').textContent = 'Create Milestone';
+    document.getElementById('globalMsSub').textContent = 'Auto-generates complete Project Details & strict sequential Dependency Type';
+    
+    currentSelectedProjectBudget = 0;
+
+    // Reset auto-generated panel
+    const panel = document.getElementById('gmsProjectDetailsPanel');
+    if (panel) panel.style.display = 'none';
+    const badge = document.getElementById('gmsProjectBadge');
+    if (badge) badge.style.display = 'none';
+
+    // If there is only 1 project in list, auto-select it immediately
+    if (projectsList.length === 1) {
+        const pId = projectsList[0].Id !== undefined ? projectsList[0].Id : projectsList[0].id;
+        setSelectValue('gmsProjectId', pId.toString());
+        handleMilestoneProjectSelection(pId, false);
+    }
+
+    openModal('globalMilestoneModal');
+}
+
+async function openEditMilestoneById(id) {
+    const m = milestonesData.find(x => (x.Id !== undefined ? x.Id : x.id) === id);
+    if (!m) {
+        console.warn('Milestone not found with ID:', id);
+        return;
+    }
+
+    const projId = m.ProjectId !== undefined ? m.ProjectId : m.projectId;
+    const mAmount = m.Amount !== undefined ? m.Amount : (m.amount || 0);
+    const mCompleted = m.CompletedAmount !== undefined ? m.CompletedAmount : (m.completedAmount || 0);
+
+    document.getElementById('gmsId').value = id;
+    setSelectValue('gmsProjectId', projId.toString());
+    document.getElementById('gmsName').value = m.MilestoneName || m.milestoneName || '';
+    document.getElementById('gmsDesc').value = m.Description || m.description || '';
+    document.getElementById('gmsStart').value = m.StartDate || m.startDate || '';
+    document.getElementById('gmsDue').value = m.DueDate || m.dueDate || '';
+    document.getElementById('gmsAmount').value = mAmount;
+    document.getElementById('gmsCompleted').value = mCompleted;
+    document.getElementById('gmsAmountDisplay').value = mAmount > 0 ? '₹' + Number(mAmount).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '₹0';
+    document.getElementById('gmsMembers').value = m.AssignedMembers || m.assignedMembers || '';
+    setSelectValue('gmsPriority', m.Priority || m.priority || 'Medium');
+    setSelectValue('gmsStatus', m.Status || m.status || 'Pending');
+    document.getElementById('gmsNotes').value = m.Notes || m.notes || '';
+    document.getElementById('globalMsTitle').textContent = `Edit Milestone (${m.MilestoneCode || m.milestoneCode || ''})`;
+
+    // Trigger auto-generated project and dependency metadata
+    await handleMilestoneProjectSelection(projId, true, id);
+
+    const pBudget = getGlobalSelectedProjectBudget();
+    let matchedPct = '';
+    if (pBudget > 0 && mAmount > 0) {
+        const calculatedPct = Math.round((mAmount / pBudget) * 100);
+        if ([10, 20, 30, 40, 50, 60, 70, 80, 90].includes(calculatedPct)) {
+            matchedPct = calculatedPct.toString();
+        }
+    }
+    setSelectValue('gmsPercentage', matchedPct);
+    if (matchedPct) {
+        calculateGlobalMilestoneAmount();
+    }
+
+    openModal('globalMilestoneModal');
+}
+
+function setSelectValue(id, val) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === val) { sel.selectedIndex = i; return; }
+    }
+    if (sel.options.length > 0) sel.selectedIndex = 0;
+}
+
+function filterMilestonesTable() {
+    var query = (document.getElementById('milestoneSearchInput')?.value || '').toLowerCase();
+    var rows = document.querySelectorAll('#milestonesTable tbody tr');
+    rows.forEach(function(row) {
+        var text = row.textContent.toLowerCase();
+        row.style.display = text.indexOf(query) > -1 ? '' : 'none';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadMilestonesData();
+});
+</script>
+}

@@ -1,0 +1,884 @@
+@{
+    ViewData["Title"] = "Payments";
+    ViewData["ActivePage"] = "FinancePayment";
+}
+
+<div class="page-container" style="max-width:1440px;margin:0 auto;padding:1.5rem 1.75rem;">
+    <!-- Top Header & Action Buttons -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+        <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;">Finance</span>
+                <i class="bi bi-chevron-right" style="font-size:10px;color:var(--ink-400);"></i>
+                <span style="font-size:12px;font-weight:600;color:var(--brand-600);">Payments</span>
+            </div>
+            <h1 style="font-size:1.6rem;font-weight:800;color:var(--ink-900);margin:0;letter-spacing:-0.5px;">
+                <i class="bi bi-cash-stack" style="color:#059669;margin-right:8px;"></i>Payment Records
+            </h1>
+            <p style="font-size:13px;color:var(--ink-500);margin:3px 0 0 0;">Track, record, reconcile client receipts dynamically connected to milestone invoices.</p>
+        </div>
+
+        <!-- Header Actions -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary" type="button" onclick="openCreatePaymentModal()" id="btnRecordPayment"
+                    style="display:inline-flex;align-items:center;gap:6px;font-weight:600;background:#059669;border-color:#059669;box-shadow:0 2px 8px rgba(5,150,105,0.25);">
+                <i class="bi bi-plus-lg"></i> Record Payment
+            </button>
+
+            <div class="dropdown" style="position:relative;display:inline-block;">
+                <button class="btn btn-outline" type="button" onclick="togglePayExportMenu(event)" id="btnPayExport"
+                        style="display:inline-flex;align-items:center;gap:6px;font-weight:600;background:#fff;">
+                    <i class="bi bi-download"></i> Export <i class="bi bi-chevron-down" style="font-size:11px;"></i>
+                </button>
+                <div id="payExportDropdownMenu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);z-index:1000;min-width:160px;overflow:hidden;">
+                    <a href="javascript:void(0)" onclick="exportPayments('csv')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--ink-800);text-decoration:none;transition:background 0.2s;">
+                        <i class="bi bi-filetype-csv" style="color:#059669;font-size:16px;"></i> Export as CSV
+                    </a>
+                    <a href="javascript:void(0)" onclick="exportPayments('excel')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--ink-800);text-decoration:none;border-top:1px solid var(--line);transition:background 0.2s;">
+                        <i class="bi bi-file-earmark-excel" style="color:#10b981;font-size:16px;"></i> Export as Excel
+                    </a>
+                </div>
+            </div>
+
+            <button class="btn btn-outline" type="button" onclick="loadPayments()" title="Refresh payment records"
+                    style="display:inline-flex;align-items:center;gap:6px;font-weight:600;background:#fff;">
+                <i class="bi bi-arrow-clockwise" id="refreshIcon"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- 4 Payment Statistics Cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1rem;margin-bottom:1.5rem;">
+        <!-- 1. Total Received -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Total Received</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#059669;" id="statTotalReceived">₹0.00</div>
+                <div style="font-size:12px;color:var(--ink-500);margin-top:2px;" id="statTotalPaymentsCount">0 Transactions</div>
+            </div>
+            <div style="width:44px;height:44px;border-radius:10px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:20px;">
+                <i class="bi bi-cash-stack"></i>
+            </div>
+        </div>
+
+        <!-- 2. Bank Transfer & UPI -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Bank & UPI</div>
+                <div style="font-size:1.45rem;font-weight:800;color:var(--brand-600);" id="statBankUpiAmount">₹0.00</div>
+                <div style="font-size:12px;color:var(--brand-600);font-weight:600;margin-top:2px;" id="statBankUpiCount">0 Direct Transfers</div>
+            </div>
+            <div style="width:44px;height:44px;border-radius:10px;background:#eef2ff;color:var(--brand-600);display:flex;align-items:center;justify-content:center;font-size:20px;">
+                <i class="bi bi-bank"></i>
+            </div>
+        </div>
+
+        <!-- 3. Cash, Card & Cheque -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Cash, Card & Cheque</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#7c3aed;" id="statOtherMethodsAmount">₹0.00</div>
+                <div style="font-size:12px;color:#7c3aed;font-weight:600;margin-top:2px;" id="statOtherMethodsCount">0 Other Payments</div>
+            </div>
+            <div style="width:44px;height:44px;border-radius:10px;background:#f5f3ff;color:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:20px;">
+                <i class="bi bi-credit-card-2-front"></i>
+            </div>
+        </div>
+
+        <!-- 4. Reconciled Invoices -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Fully Paid Invoices</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#0284c7;" id="statPaidInvoicesCount">0 Paid</div>
+                <div style="font-size:12px;color:var(--ink-500);margin-top:2px;" id="statPartPaidInvoicesCount">0 Partial Due</div>
+            </div>
+            <div style="width:44px;height:44px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:20px;">
+                <i class="bi bi-check2-all"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex:1;">
+            <div style="position:relative;min-width:240px;flex:1;max-width:360px;">
+                <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-400);font-size:14px;"></i>
+                <input type="text" id="paySearchInput" placeholder="Search payment #, invoice #, client, project, ref..."
+                       style="width:100%;padding:7px 12px 7px 34px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none;"
+                       oninput="filterPayments()" />
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12.5px;font-weight:600;color:var(--ink-600);margin:0;">Method:</label>
+                <select id="payMethodFilter" onchange="filterPayments()" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none;background:#fff;">
+                    <option value="All">All Methods</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Card">Card</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12.5px;font-weight:600;color:var(--ink-600);margin:0;">Period:</label>
+                <select id="payDateFilter" onchange="filterPayments()" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none;background:#fff;">
+                    <option value="All">All Time</option>
+                    <option value="ThisMonth">This Month</option>
+                    <option value="ThisYear">This Year</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span id="payTableCount" style="font-size:12.5px;color:var(--ink-500);font-weight:600;">
+                0 payments
+            </span>
+        </div>
+    </div>
+
+    <!-- Payments Table -->
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <div style="overflow-x:auto;">
+            <table class="table-custom" style="width:100%;border-collapse:collapse;text-align:left;font-size:13px;">
+                <thead style="background:#f8fafc;border-bottom:1px solid var(--line);">
+                    <tr>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Payment #</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Date</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Invoice #</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Client</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Project</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Milestone</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:right;">Invoice Total</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:right;">Paid Amount</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Method</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Reference #</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:center;">Status</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:center;width:130px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="paymentTableBody">
+                    <tr>
+                        <td colspan="12" style="padding:3rem;text-align:center;color:var(--ink-500);">
+                            <div style="display:inline-block;animation:spin 1s linear infinite;font-size:24px;color:#059669;margin-bottom:8px;">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </div>
+                            <div style="font-weight:600;">Loading payment records...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 1. RECORD PAYMENT MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(3px);z-index:1050;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:600px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;">
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:8px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:18px;">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+                <div>
+                    <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Record Client Payment</h3>
+                    <p style="font-size:12px;color:var(--ink-500);margin:2px 0 0 0;">Synchronizes Paid Amount & Invoice Status in Database</p>
+                </div>
+            </div>
+            <button type="button" onclick="closePaymentModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:20px;cursor:pointer;">
+                &times;
+            </button>
+        </div>
+
+        <div style="padding:1.5rem;">
+            <form id="paymentForm" onsubmit="submitPayment(event)">
+                <!-- Invoice Dropdown (Dynamic from Invoices API) -->
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        Select Invoice <span style="color:#ef4444;">*</span>
+                    </label>
+                    <select id="payInvoiceSelect" required onchange="onInvoiceSelected()"
+                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:none;">
+                        <option value="">-- Select Pending / Partial Invoice --</option>
+                    </select>
+                </div>
+
+                <!-- Invoice Detail Live Box -->
+                <div id="invoiceInfoBox" style="display:none;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:1rem;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12.5px;">
+                        <div>
+                            <span style="color:var(--ink-500);">Client:</span> <strong id="invBoxClient" style="color:var(--ink-800);">—</strong>
+                        </div>
+                        <div>
+                            <span style="color:var(--ink-500);">Project:</span> <strong id="invBoxProject" style="color:var(--ink-800);">—</strong>
+                        </div>
+                        <div>
+                            <span style="color:var(--ink-500);">Invoice Total:</span> <strong id="invBoxTotal" style="color:var(--ink-800);">₹0.00</strong>
+                        </div>
+                        <div>
+                            <span style="color:var(--ink-500);">Remaining Due:</span> <strong id="invBoxRemaining" style="color:#d97706;font-size:13.5px;">₹0.00</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Amount & Date -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Payment Amount (₹) <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="number" id="payAmount" step="0.01" min="0.01" required
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700;color:#059669;" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Payment Date <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="date" id="payDate" required
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                </div>
+
+                <!-- Method & Ref -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Payment Method <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="payMethod" required
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="Bank Transfer" selected>Bank Transfer (NEFT/RTGS/IMPS)</option>
+                            <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Card">Credit / Debit Card</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Transaction / Ref #
+                        </label>
+                        <input type="text" id="payRef" placeholder="UTR / Txn ID / Cheque #"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div style="margin-bottom:0.5rem;">
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        Payment Notes / Remarks
+                    </label>
+                    <textarea id="payNotes" rows="2" placeholder="Deposit remarks, reference details..."
+                              style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;"></textarea>
+                </div>
+            </form>
+        </div>
+
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#f8fafc;">
+            <button type="button" class="btn btn-outline" onclick="closePaymentModal()" style="font-weight:600;">Cancel</button>
+            <button type="submit" form="paymentForm" id="btnSavePayment" class="btn btn-primary" style="font-weight:600;background:#059669;border-color:#059669;min-width:130px;">
+                <i class="bi bi-check-circle"></i> Save Payment
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 2. PAYMENT RECEIPT / VOUCHER MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="receiptModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);z-index:1060;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:720px;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;">
+        <!-- Modal Toolbar -->
+        <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <i class="bi bi-receipt-cutoff" style="color:#059669;font-size:20px;"></i>
+                <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Payment Receipt Voucher</h3>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="btn btn-primary" type="button" onclick="printReceiptContent()" style="font-weight:600;background:#059669;border-color:#059669;">
+                    <i class="bi bi-printer"></i> Print Receipt
+                </button>
+                <button type="button" onclick="closeReceiptModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:22px;cursor:pointer;padding:0 6px;">
+                    &times;
+                </button>
+            </div>
+        </div>
+
+        <!-- Printable Receipt Content Area -->
+        <div id="receiptPrintableArea" style="padding:2.25rem;overflow-y:auto;flex:1;background:#fff;font-family:'Inter',sans-serif;color:#1e293b;">
+            <!-- Rendered dynamically -->
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toastNotification" style="display:none;position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.2);z-index:9999;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:10px;transition:opacity 0.3s ease;">
+    <i class="bi bi-check-circle-fill" style="color:#10b981;font-size:18px;"></i>
+    <span id="toastMessage">Success</span>
+</div>
+
+@section Scripts {
+<script>
+    let rawPayments = [];
+    let activeInvoices = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPayments();
+        loadInvoicesForDropdown();
+
+        // Close export dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('payExportDropdownMenu');
+            const btn = document.getElementById('btnPayExport');
+            if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
+    });
+
+    function togglePayExportMenu(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('payExportDropdownMenu');
+        if (menu) {
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+    }
+
+    function showToast(msg, isError = false) {
+        const t = document.getElementById('toastNotification');
+        if (!t) return;
+        const icon = t.querySelector('i');
+        const msgSpan = document.getElementById('toastMessage');
+        if (msgSpan) msgSpan.textContent = msg;
+
+        if (isError) {
+            t.style.background = '#ef4444';
+            if (icon) {
+                icon.className = 'bi bi-exclamation-triangle-fill';
+                icon.style.color = '#fff';
+            }
+        } else {
+            t.style.background = '#1e293b';
+            if (icon) {
+                icon.className = 'bi bi-check-circle-fill';
+                icon.style.color = '#10b981';
+            }
+        }
+
+        t.style.display = 'flex';
+        t.style.opacity = '1';
+        setTimeout(() => {
+            t.style.opacity = '0';
+            setTimeout(() => t.style.display = 'none', 300);
+        }, 3500);
+    }
+
+    async function loadPayments() {
+        const icon = document.getElementById('refreshIcon');
+        if (icon) icon.classList.add('spin');
+
+        try {
+            const res = await fetch('/api/payments');
+            if (!res.ok) throw new Error('Failed to fetch payments');
+            rawPayments = await res.json();
+            calculatePaymentStats();
+            filterPayments();
+        } catch (err) {
+            console.error(err);
+            document.getElementById('paymentTableBody').innerHTML = `
+                <tr>
+                    <td colspan="12" style="padding:2.5rem;text-align:center;color:#ef4444;">
+                        <i class="bi bi-exclamation-circle" style="font-size:24px;"></i>
+                        <div style="margin-top:6px;font-weight:600;">Error loading payment records from database</div>
+                        <div style="font-size:12px;color:var(--ink-500);margin-top:4px;">${escapeHtml(err.message)}</div>
+                    </td>
+                </tr>
+            `;
+        } finally {
+            if (icon) icon.classList.remove('spin');
+        }
+    }
+
+    function calculatePaymentStats() {
+        let totalReceived = 0;
+        let bankUpiAmount = 0;
+        let bankUpiCount = 0;
+        let otherAmount = 0;
+        let otherCount = 0;
+
+        rawPayments.forEach(p => {
+            const amt = Number(p.amount || p.Amount || 0);
+            const method = p.paymentMethod || p.PaymentMethod || '';
+            totalReceived += amt;
+
+            if (method === 'Bank Transfer' || method === 'UPI') {
+                bankUpiAmount += amt;
+                bankUpiCount++;
+            } else {
+                otherAmount += amt;
+                otherCount++;
+            }
+        });
+
+        document.getElementById('statTotalReceived').textContent = '₹' + totalReceived.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('statTotalPaymentsCount').textContent = `${rawPayments.length} Payment${rawPayments.length === 1 ? '' : 's'} Recorded`;
+
+        document.getElementById('statBankUpiAmount').textContent = '₹' + bankUpiAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('statBankUpiCount').textContent = `${bankUpiCount} Transfer${bankUpiCount === 1 ? '' : 's'}`;
+
+        document.getElementById('statOtherMethodsAmount').textContent = '₹' + otherAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('statOtherMethodsCount').textContent = `${otherCount} Other Receipt${otherCount === 1 ? '' : 's'}`;
+    }
+
+    function filterPayments() {
+        const search = (document.getElementById('paySearchInput')?.value || '').trim().toLowerCase();
+        const method = document.getElementById('payMethodFilter')?.value || 'All';
+        const period = document.getElementById('payDateFilter')?.value || 'All';
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+
+        let filtered = rawPayments.filter(p => {
+            const pMethod = p.paymentMethod || p.PaymentMethod;
+            if (method !== 'All' && pMethod !== method) return false;
+
+            const pDateStr = p.paymentDate || p.PaymentDate || '';
+            if (period === 'ThisMonth' && pDateStr) {
+                const pDate = new Date(pDateStr);
+                if (pDate.getFullYear() !== currentYear || pDate.getMonth() !== currentMonth) return false;
+            } else if (period === 'ThisYear' && pDateStr) {
+                const pDate = new Date(pDateStr);
+                if (pDate.getFullYear() !== currentYear) return false;
+            }
+
+            if (search) {
+                const combined = `${p.paymentNumber || ''} ${p.invoiceNumber || ''} ${p.clientName || ''} ${p.clientCompany || ''} ${p.projectName || ''} ${p.milestoneName || ''} ${p.transactionReference || ''} ${p.notes || ''}`.toLowerCase();
+                if (!combined.includes(search)) return false;
+            }
+
+            return true;
+        });
+
+        renderPaymentTable(filtered);
+    }
+
+    function renderPaymentTable(payments) {
+        const tbody = document.getElementById('paymentTableBody');
+        const countSpan = document.getElementById('payTableCount');
+        countSpan.textContent = `Showing ${payments.length} of ${rawPayments.length} payments`;
+
+        if (!payments.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="12" style="padding:3.5rem;text-align:center;color:var(--ink-400);">
+                        <i class="bi bi-inbox" style="font-size:32px;color:var(--ink-300);"></i>
+                        <h4 style="margin-top:10px;font-weight:700;color:var(--ink-700);">No payments found</h4>
+                        <p style="font-size:12.5px;color:var(--ink-500);margin-bottom:1rem;">Record payments against active milestone invoices to track client receipts.</p>
+                        <button class="btn btn-primary" onclick="openCreatePaymentModal()" style="background:#059669;border-color:#059669;">
+                            <i class="bi bi-plus-lg"></i> Record Payment
+                        </button>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = payments.map(p => {
+            const id = p.id || p.Id;
+            const payNum = p.paymentNumber || p.PaymentNumber || `PAY-${id}`;
+            const payDate = p.paymentDate || p.PaymentDate || '—';
+            const invId = p.invoiceId || p.InvoiceId;
+            const invNum = p.invoiceNumber || p.InvoiceNumber || `INV-${invId}`;
+            const client = p.clientCompany || p.ClientCompany || p.clientName || p.ClientName || '—';
+            const clientPerson = p.clientName || p.ClientName || '';
+            const project = p.projectName || p.ProjectName || '—';
+            const milestone = p.milestoneName || p.MilestoneName || '—';
+            const invAmount = p.invoiceGrandTotal || p.InvoiceGrandTotal || 0;
+            const paid = p.amount || p.Amount || 0;
+            const remaining = p.invoiceRemainingAmount !== undefined ? p.invoiceRemainingAmount : (p.InvoiceRemainingAmount || 0);
+            const method = p.paymentMethod || p.PaymentMethod || 'Bank Transfer';
+            const ref = p.transactionReference || p.TransactionReference || '—';
+            const status = p.invoiceStatus || p.InvoiceStatus || 'Pending';
+
+            let statusBadge = '';
+            if (status === 'Paid') {
+                statusBadge = '<span class="badge" style="background:#ecfdf5;color:#059669;font-weight:700;">Paid</span>';
+            } else if (status === 'Partial Paid' || status === 'Partially Paid') {
+                statusBadge = '<span class="badge" style="background:#eff6ff;color:#2563eb;font-weight:700;">Partial Paid</span>';
+            } else {
+                statusBadge = '<span class="badge" style="background:#fffbeb;color:#d97706;font-weight:700;">Pending</span>';
+            }
+
+            let methodBadgeColor = '#f1f5f9';
+            let methodTextColor = 'var(--ink-700)';
+            let methodIcon = 'bi-credit-card';
+            if (method === 'UPI') {
+                methodBadgeColor = '#fdf4ff';
+                methodTextColor = '#a21caf';
+                methodIcon = 'bi-phone';
+            } else if (method === 'Bank Transfer') {
+                methodBadgeColor = '#eef2ff';
+                methodTextColor = 'var(--brand-600)';
+                methodIcon = 'bi-bank';
+            } else if (method === 'Cash') {
+                methodBadgeColor = '#ecfdf5';
+                methodTextColor = '#059669';
+                methodIcon = 'bi-cash';
+            }
+
+            return `
+                <tr style="border-bottom:1px solid var(--line);">
+                    <td style="padding:12px 14px;">
+                        <span class="badge" style="background:#ecfdf5;color:#059669;font-family:monospace;font-weight:800;font-size:12px;border:1px solid #a7f3d0;">
+                            ${escapeHtml(payNum)}
+                        </span>
+                    </td>
+                    <td style="padding:12px 14px;color:var(--ink-600);white-space:nowrap;">${escapeHtml(payDate)}</td>
+                    <td style="padding:12px 14px;">
+                        <a href="/Finance/InvoiceDetails/${invId}" class="badge badge-code" style="text-decoration:none;color:var(--brand-600);background:#eef2ff;font-weight:700;display:inline-flex;align-items:center;gap:4px;" title="View Invoice">
+                            <i class="bi bi-receipt"></i> ${escapeHtml(invNum)}
+                        </a>
+                    </td>
+                    <td style="padding:12px 14px;font-weight:600;color:var(--ink-800);">
+                        ${escapeHtml(client)}
+                        ${clientPerson && clientPerson !== client ? `<div style="font-size:11px;color:var(--ink-500);font-weight:normal;">${escapeHtml(clientPerson)}</div>` : ''}
+                    </td>
+                    <td style="padding:12px 14px;color:var(--ink-700);font-weight:600;">
+                        ${escapeHtml(project)}
+                    </td>
+                    <td style="padding:12px 14px;color:var(--ink-700);">
+                        <span class="badge badge-purple" style="font-size:11.5px;font-weight:600;">
+                            <i class="bi bi-flag" style="margin-right:2px;"></i> ${escapeHtml(milestone)}
+                        </span>
+                    </td>
+                    <td style="padding:12px 14px;text-align:right;font-weight:600;color:var(--ink-700);">
+                        ₹${Number(invAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style="padding:12px 14px;text-align:right;font-weight:800;color:#059669;font-size:14px;">
+                        ₹${Number(paid).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style="padding:12px 14px;">
+                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:${methodBadgeColor};font-size:11.5px;font-weight:700;color:${methodTextColor};">
+                            <i class="bi ${methodIcon}"></i> ${escapeHtml(method)}
+                        </span>
+                    </td>
+                    <td style="padding:12px 14px;font-family:monospace;font-size:12px;color:var(--ink-600);">${escapeHtml(ref)}</td>
+                    <td style="padding:12px 14px;text-align:center;">
+                        ${statusBadge}
+                    </td>
+                    <td style="padding:12px 14px;text-align:center;white-space:nowrap;">
+                        <div style="display:inline-flex;align-items:center;gap:6px;">
+                            <button type="button" class="btn-action" style="color:#059669;background:#ecfdf5;border-color:#a7f3d0;" onclick="openReceiptModal(${id})" title="Print Payment Receipt">
+                                <i class="bi bi-printer"></i>
+                            </button>
+                            <a href="/Finance/InvoiceDetails/${invId}" class="btn-action btn-view" title="View Related Invoice">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <button type="button" class="btn-action btn-delete" onclick="deletePayment(${id}, '${escapeHtml(payNum)}')" title="Delete Payment">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function loadInvoicesForDropdown() {
+        try {
+            const res = await fetch('/api/invoices');
+            if (!res.ok) return;
+            activeInvoices = await res.json();
+
+            const sel = document.getElementById('payInvoiceSelect');
+            sel.innerHTML = '<option value="">-- Select Pending / Partial Invoice --</option>';
+
+            let paidCount = 0;
+            let partialCount = 0;
+
+            activeInvoices.forEach(i => {
+                const id = i.id || i.Id;
+                const invNum = i.invoiceNumber || i.InvoiceNumber;
+                const rem = Number(i.remainingAmount !== undefined ? i.remainingAmount : (i.RemainingAmount || 0));
+                const client = i.clientCompany || i.ClientCompany || i.clientName || i.ClientName || 'Client';
+                const project = i.projectName || i.ProjectName || '';
+                const status = i.paymentStatus || i.PaymentStatus;
+
+                if (status === 'Paid') {
+                    paidCount++;
+                } else {
+                    partialCount++;
+                }
+
+                if (rem > 0 || status !== 'Paid') {
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = `${invNum} - ${client} (${project}) [Due: ₹${rem.toLocaleString('en-IN')}]`;
+                    sel.appendChild(opt);
+                }
+            });
+
+            document.getElementById('statPaidInvoicesCount').textContent = `${paidCount} Fully Paid`;
+            document.getElementById('statPartPaidInvoicesCount').textContent = `${partialCount} Pending Due`;
+        } catch (e) {
+            console.error('Error loading invoices for dropdown:', e);
+        }
+    }
+
+    function onInvoiceSelected() {
+        const invId = parseInt(document.getElementById('payInvoiceSelect').value, 10);
+        const box = document.getElementById('invoiceInfoBox');
+        if (!invId) {
+            box.style.display = 'none';
+            return;
+        }
+
+        const inv = activeInvoices.find(i => (i.id || i.Id) === invId);
+        if (!inv) return;
+
+        const rem = Number(inv.remainingAmount !== undefined ? inv.remainingAmount : (inv.RemainingAmount || 0));
+        const total = Number(inv.grandTotal !== undefined ? inv.grandTotal : (inv.GrandTotal || 0));
+
+        document.getElementById('invBoxClient').textContent = inv.clientCompany || inv.clientName || '—';
+        document.getElementById('invBoxProject').textContent = (inv.projectName || '') + (inv.milestoneName ? ` (${inv.milestoneName})` : '');
+        document.getElementById('invBoxTotal').textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        document.getElementById('invBoxRemaining').textContent = '₹' + rem.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+        document.getElementById('payAmount').value = rem > 0 ? rem : '';
+        document.getElementById('payAmount').max = rem > 0 ? rem : '';
+
+        box.style.display = 'block';
+    }
+
+    function openCreatePaymentModal() {
+        loadInvoicesForDropdown();
+        document.getElementById('payInvoiceSelect').value = '';
+        document.getElementById('invoiceInfoBox').style.display = 'none';
+        document.getElementById('payAmount').value = '';
+        document.getElementById('payDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('payMethod').value = 'Bank Transfer';
+        document.getElementById('payRef').value = '';
+        document.getElementById('payNotes').value = '';
+        document.getElementById('paymentModal').style.display = 'flex';
+    }
+
+    function closePaymentModal() {
+        document.getElementById('paymentModal').style.display = 'none';
+    }
+
+    async function submitPayment(e) {
+        e.preventDefault();
+        const invoiceId = parseInt(document.getElementById('payInvoiceSelect').value, 10);
+        const amount = parseFloat(document.getElementById('payAmount').value) || 0;
+
+        if (!invoiceId) {
+            showToast('Please select an invoice', true);
+            return;
+        }
+
+        if (amount <= 0) {
+            showToast('Please enter a valid payment amount', true);
+            return;
+        }
+
+        const payload = {
+            InvoiceId: invoiceId,
+            Amount: amount,
+            PaymentDate: document.getElementById('payDate').value,
+            PaymentMethod: document.getElementById('payMethod').value,
+            TransactionReference: document.getElementById('payRef').value.trim(),
+            Notes: document.getElementById('payNotes').value.trim()
+        };
+
+        const btn = document.getElementById('btnSavePayment');
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || 'Failed to record payment');
+            }
+
+            const payment = await res.json();
+            showToast(`Payment ${payment.paymentNumber || payment.PaymentNumber} recorded successfully!`);
+            closePaymentModal();
+            await loadPayments();
+            await loadInvoicesForDropdown();
+        } catch (err) {
+            showToast('Error: ' + err.message, true);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function deletePayment(id, payNum) {
+        if (!confirm(`Are you sure you want to delete payment "${payNum}"? Related invoice balance and status will be updated.`)) return;
+
+        try {
+            const res = await fetch(`/api/payments/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete payment');
+
+            showToast(`Payment ${payNum} deleted.`);
+            await loadPayments();
+            await loadInvoicesForDropdown();
+        } catch (err) {
+            showToast('Error deleting payment: ' + err.message, true);
+        }
+    }
+
+    function exportPayments(format) {
+        window.location.href = `/api/payments/export?format=${format}`;
+        const menu = document.getElementById('payExportDropdownMenu');
+        if (menu) menu.style.display = 'none';
+    }
+
+    // Official Receipt Modal Renderer
+    function openReceiptModal(paymentId) {
+        const p = rawPayments.find(x => (x.id || x.Id) === paymentId);
+        if (!p) return;
+
+        const payNum = p.paymentNumber || p.PaymentNumber || `PAY-${paymentId}`;
+        const payDate = p.paymentDate || p.PaymentDate || '—';
+        const invNum = p.invoiceNumber || p.InvoiceNumber || 'INV';
+        const client = p.clientCompany || p.ClientCompany || p.clientName || p.ClientName || 'Client';
+        const clientName = p.clientName || p.ClientName || '';
+        const project = p.projectName || p.ProjectName || 'Project';
+        const milestone = p.milestoneName || p.MilestoneName || 'Milestone';
+        const invTotal = Number(p.invoiceGrandTotal || p.InvoiceGrandTotal || 0);
+        const paidAmount = Number(p.amount || p.Amount || 0);
+        const remaining = Number(p.invoiceRemainingAmount !== undefined ? p.invoiceRemainingAmount : (p.InvoiceRemainingAmount || 0));
+        const method = p.paymentMethod || p.PaymentMethod || 'Bank Transfer';
+        const ref = p.transactionReference || p.TransactionReference || '—';
+        const notes = p.notes || p.Notes || 'Payment received and acknowledged with thanks.';
+
+        const container = document.getElementById('receiptPrintableArea');
+        container.innerHTML = `
+            <div style="border:2px solid #059669;border-radius:12px;padding:24px;position:relative;background:#fff;">
+                <!-- Header -->
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #e2e8f0;padding-bottom:18px;margin-bottom:20px;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="width:34px;height:34px;border-radius:8px;background:#059669;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;">
+                                CRM
+                            </div>
+                            <span style="font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;">CRM LEAD & WORK SUITE</span>
+                        </div>
+                        <div style="font-size:12px;color:#64748b;margin-top:4px;">Official Payment Acknowledgment & Receipt Voucher</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="display:inline-block;padding:4px 10px;border-radius:6px;background:#ecfdf5;color:#059669;font-weight:800;font-size:14px;border:1px solid #a7f3d0;">
+                            RECEIPT VOUCHER
+                        </span>
+                        <div style="font-size:13px;font-weight:700;color:#0f172a;margin-top:4px;">${escapeHtml(payNum)}</div>
+                        <div style="font-size:12px;color:#64748b;">Date: <strong>${escapeHtml(payDate)}</strong></div>
+                    </div>
+                </div>
+
+                <!-- Info Grid -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:20px;background:#f8fafc;padding:16px;border-radius:10px;border:1px solid #e2e8f0;">
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Received From (Client)</div>
+                        <div style="font-size:14.5px;font-weight:800;color:#0f172a;">${escapeHtml(client)}</div>
+                        ${clientName && clientName !== client ? `<div style="font-size:12px;color:#475569;">Attn: ${escapeHtml(clientName)}</div>` : ''}
+                    </div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Project & Milestone</div>
+                        <div style="font-size:13.5px;font-weight:700;color:#0f172a;">${escapeHtml(project)}</div>
+                        <div style="font-size:12px;color:#64748b;"><i class="bi bi-flag"></i> ${escapeHtml(milestone)}</div>
+                    </div>
+                </div>
+
+                <!-- Payment Details Table -->
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;">
+                    <thead>
+                        <tr style="background:#f1f5f9;border-bottom:1px solid #cbd5e1;">
+                            <th style="padding:10px 12px;text-align:left;font-weight:700;color:#334155;">Invoice Reference</th>
+                            <th style="padding:10px 12px;text-align:left;font-weight:700;color:#334155;">Payment Method</th>
+                            <th style="padding:10px 12px;text-align:left;font-weight:700;color:#334155;">Transaction / Ref #</th>
+                            <th style="padding:10px 12px;text-align:right;font-weight:700;color:#334155;">Amount Paid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid #e2e8f0;">
+                            <td style="padding:12px;font-weight:700;color:#4f46e5;">#${escapeHtml(invNum)}</td>
+                            <td style="padding:12px;font-weight:600;color:#334155;">${escapeHtml(method)}</td>
+                            <td style="padding:12px;font-family:monospace;color:#64748b;">${escapeHtml(ref)}</td>
+                            <td style="padding:12px;text-align:right;font-weight:800;color:#059669;font-size:15px;">₹${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Total Box -->
+                <div style="display:flex;justify-content:space-between;align-items:center;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:14px 18px;margin-bottom:20px;">
+                    <div>
+                        <div style="font-size:12px;font-weight:700;color:#065f46;text-transform:uppercase;">Amount Received (in INR)</div>
+                        <div style="font-size:11.5px;color:#047857;">Invoice Grand Total: ₹${invTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })} &bull; Remaining Due: ₹${remaining.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    </div>
+                    <div style="font-size:22px;font-weight:900;color:#059669;">
+                        ₹${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                </div>
+
+                <!-- Notes / Remarks -->
+                <div style="font-size:12px;color:#64748b;margin-bottom:24px;">
+                    <strong>Remarks:</strong> ${escapeHtml(notes)}
+                </div>
+
+                <!-- Signature Section -->
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;border-top:1px dashed #cbd5e1;padding-top:18px;margin-top:12px;">
+                    <div style="font-size:11px;color:#94a3b8;">
+                        Generated automatically by CRM Finance Module.<br/>
+                        System Reference ID: ${escapeHtml(payNum)}
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-weight:700;font-size:13px;color:#0f172a;border-bottom:1px solid #0f172a;padding-bottom:4px;min-width:160px;">
+                            Authorized Signatory
+                        </div>
+                        <div style="font-size:11px;color:#64748b;margin-top:2px;">Finance & Accounts Department</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('receiptModal').style.display = 'flex';
+    }
+
+    function closeReceiptModal() {
+        document.getElementById('receiptModal').style.display = 'none';
+    }
+
+    function printReceiptContent() {
+        const printContent = document.getElementById('receiptPrintableArea').innerHTML;
+        const win = window.open('', '', 'height=700,width=900');
+        win.document.write('<html><head><title>Payment Receipt</title>');
+        win.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">');
+        win.document.write('<style>body{font-family:"Inter",sans-serif;margin:20px;padding:10px;} @@media print{button{display:none;}}</style>');
+        win.document.write('</head><body>');
+        win.document.write(printContent);
+        win.document.write('</body></html>');
+        win.document.close();
+        setTimeout(() => {
+            win.focus();
+            win.print();
+        }, 300);
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+</script>
+}

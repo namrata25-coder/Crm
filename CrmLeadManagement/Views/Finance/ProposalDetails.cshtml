@@ -1,0 +1,103 @@
+@model CrmLeadManagement.Models.ProposalEntry
+@{
+    var lead = (CrmLeadManagement.Models.Lead)ViewData["Lead"]!;
+}
+
+<div class="breadcrumb-row">
+    <a asp-controller="Home" asp-action="Index">Home</a><span class="sep">/</span>
+    <a asp-controller="Finance" asp-action="ProposalList">Proposal List</a><span class="sep">/</span>
+    <span class="current">@Model.Number</span>
+</div>
+<div class="page-head">
+    <div>
+        <h1>Proposal @Model.Number</h1>
+        <p>Full proposal details and history for @lead.LeadName.</p>
+    </div>
+    <div class="action-toolbar">
+        <a asp-controller="Lead" asp-action="Details" asp-route-id="@lead.LeadId" asp-route-tab="finance" asp-route-subtab="proposal" class="btn btn-outline">
+            <i class="bi bi-person-lines-fill"></i> Open Lead
+        </a>
+        <a asp-controller="Finance" asp-action="ProposalList" class="btn btn-outline"><i class="bi bi-arrow-left"></i> Back to List</a>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom:20px;">
+    <div class="panel-header">
+        <div><h2>Lead Information</h2></div>
+        @Html.Raw(FinanceHelpers.StatusBadge(Model.Status))
+    </div>
+    <div class="form-grid" style="padding:20px 22px;">
+        <div class="form-field"><label>Lead Name</label><div class="cell-primary">@lead.LeadName</div></div>
+        <div class="form-field"><label>Contact Number</label><div>@lead.MobileNumber</div></div>
+        <div class="form-field"><label>Email</label><div>@lead.Email</div></div>
+        <div class="form-field"><label>Company Name</label><div>@lead.CompanyName</div></div>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom:20px;">
+    <div class="panel-header"><div><h2>Proposal Information</h2></div></div>
+    <div class="form-grid" style="padding:20px 22px;">
+        <div class="form-field"><label>Proposal Number</label><div class="cell-primary">@Model.Number</div></div>
+        <div class="form-field"><label>Date</label><div>@Model.Date</div></div>
+        <div class="form-field full"><label>Project / Requirement</label><div>@(string.IsNullOrWhiteSpace(Model.ProjectRequirement) ? "—" : Model.ProjectRequirement)</div></div>
+        <div class="form-field full"><label>Proposal Title</label><div class="cell-primary">@(string.IsNullOrWhiteSpace(Model.Title) ? "—" : Model.Title)</div></div>
+        <div class="form-field full"><label>Scope of Work</label><div>@(string.IsNullOrWhiteSpace(Model.ScopeOfWork) ? "—" : Model.ScopeOfWork)</div></div>
+        <div class="form-field full"><label>Description</label><div>@(string.IsNullOrWhiteSpace(Model.Description) ? "—" : Model.Description)</div></div>
+        <div class="form-field full"><label>Deliverables</label><div>@(string.IsNullOrWhiteSpace(Model.Deliverables) ? "—" : Model.Deliverables)</div></div>
+        <div class="form-field"><label>Timeline</label><div>@(string.IsNullOrWhiteSpace(Model.Timeline) ? "—" : Model.Timeline)</div></div>
+        <div class="form-field"><label>Budget</label><div>@FinanceHelpers.Money(Model.Budget)</div></div>
+        <div class="form-field"><label>Status</label><div>@Html.Raw(FinanceHelpers.StatusBadge(Model.Status))</div></div>
+        <div class="form-field full"><label>Terms &amp; Conditions</label><div>@(string.IsNullOrWhiteSpace(Model.TermsConditions) ? "—" : Model.TermsConditions)</div></div>
+        <div class="form-field full"><label>Notes</label><div>@(string.IsNullOrWhiteSpace(Model.Notes) ? "—" : Model.Notes)</div></div>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom:20px;">
+    <div class="panel-header"><div><h2>Attachments</h2></div></div>
+    <div style="padding:20px 22px;">
+        @if (!string.IsNullOrWhiteSpace(Model.AttachmentPath))
+        {
+            <div class="fin-attach-current">
+                <i class="bi bi-paperclip"></i>
+                <a href="@Model.AttachmentPath" target="_blank" rel="noopener">@Model.AttachmentFileName</a>
+                <a href="@Model.AttachmentPath" download class="btn btn-soft btn-sm" style="margin-left:8px;"><i class="bi bi-download"></i> View / Download</a>
+            </div>
+        }
+        else
+        {
+            <div style="font-size:13px;color:var(--ink-500);">No attachment</div>
+        }
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Proposal History</h2>
+            <div class="hint">All proposals raised for @lead.LeadName</div>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Proposal Number</th><th>Date</th><th>Budget</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var h in lead.Proposals.AsEnumerable().Reverse())
+                {
+                    <tr style="@(h.Number == Model.Number ? "background:#f6f9ff;" : "")">
+                        <td class="cell-primary">@h.Number @(h.Number == Model.Number ? "(current)" : "")</td>
+                        <td>@h.Date</td>
+                        <td>@FinanceHelpers.Money(h.Budget)</td>
+                        <td>@Html.Raw(FinanceHelpers.StatusBadge(h.Status))</td>
+                        <td>
+                            <a asp-controller="Finance" asp-action="ProposalDetails" asp-route-leadId="@lead.LeadId" asp-route-number="@h.Number" class="btn btn-soft btn-sm">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

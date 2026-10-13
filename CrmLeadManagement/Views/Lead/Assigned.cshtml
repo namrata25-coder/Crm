@@ -1,0 +1,164 @@
+@model List<CrmLeadManagement.Models.Lead>
+
+<div class="breadcrumb-row">
+    <a asp-controller="Home" asp-action="Index">Home</a><span class="sep">/</span><span class="current">Assigned Leads</span>
+</div>
+<div class="page-head">
+    <div>
+        <h1>Assigned Leads</h1>
+        <p>Track ownership, priority and follow-up dates across your team.</p>
+    </div>
+    <div class="action-toolbar">
+        <button class="btn btn-outline"><i class="bi bi-download"></i> Export</button>
+        <button type="button" class="btn btn-primary" onclick="openAddLeadModal()"><i class="bi bi-plus-lg"></i> Add Lead</button>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>All Assigned Leads</h2>
+            <div class="hint">@Model.Count leads currently assigned</div>
+        </div>
+    </div>
+
+    <div class="panel-body" style="padding-bottom:0;border-bottom:1px solid var(--line);">
+        <div class="filter-bar" style="margin-bottom:18px;">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" id="searchInput" onkeyup="filterAssignedTable()" placeholder="Search by name, company..." />
+            </div>
+            <select id="statusFilter" onchange="filterAssignedTable()">
+                <option value="">All Status</option>
+                @foreach (var s in LookupData.Statuses)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+            <select id="employeeFilter" onchange="filterAssignedTable()">
+                <option value="">All Employees</option>
+                @foreach (var e in LookupData.Employees)
+                {
+                    <option value="@e">@e</option>
+                }
+            </select>
+            <input type="date" id="dateFilter" onchange="filterAssignedTable()" />
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('searchInput').value='';document.getElementById('statusFilter').value='';document.getElementById('employeeFilter').value='';document.getElementById('dateFilter').value='';filterAssignedTable()">
+                <i class="bi bi-x-circle"></i> Clear
+            </button>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table" id="assignedTable">
+            <thead>
+                <tr>
+                    <th>Lead Name</th>
+                    <th>Company</th>
+                    <th>Status</th>
+                    <th>Assigned To</th>
+                    <th>Assigned Date</th>
+                    <th>Follow-up Date</th>
+                    <th>Priority</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var lead in Model)
+                {
+                    <tr data-status="@lead.LeadStatus" data-employee="@lead.AssignedTo" data-date="@lead.FollowUpDate">
+                        <td>
+                            <div class="cell-primary">@lead.LeadName</div>
+                            <div class="cell-sub">@lead.LeadId</div>
+                        </td>
+                        <td>@lead.CompanyName</td>
+                        <td>@Html.Raw(StatusBadge(lead.LeadStatus))</td>
+                        <td>
+                            <div class="avatar-chip">
+                                <div class="initials">@Initials(lead.AssignedTo)</div>
+                                <span>@lead.AssignedTo</span>
+                            </div>
+                        </td>
+                        <td>@lead.AssignedDate</td>
+                        <td>@lead.FollowUpDate</td>
+                        <td><span class="badge-priority pr-@lead.Priority.ToLower()">@lead.Priority</span></td>
+                        <td>
+                            <div style="display:flex;gap:6px;">
+                                <a asp-controller="Lead" asp-action="Details" asp-route-id="@lead.LeadId" class="btn btn-soft btn-sm"><i class="bi bi-eye"></i> View</a>
+                                <button type="button" class="icon-btn" title="Edit / Reassign"
+                                        onclick="openEditLeadModal(@Html.Raw(LeadJson(lead)))">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form method="post" asp-controller="Lead" asp-action="Delete" style="display:inline;"
+                                      onsubmit="return confirmDeleteLead('@lead.LeadName')">
+                                    <input type="hidden" name="id" value="@lead.LeadId" />
+                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+                                    <button type="submit" class="icon-btn" title="Delete" style="color:#c81e1e;border-color:#fda29b;">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination-bar">
+        <div class="info">Showing 1–@Model.Count of @Model.Count assigned leads</div>
+        <div class="pg-btns">
+            <div class="pg-btn"><i class="bi bi-chevron-left"></i></div>
+            <div class="pg-btn active">1</div>
+            <div class="pg-btn"><i class="bi bi-chevron-right"></i></div>
+        </div>
+    </div>
+</div>
+
+@await Html.PartialAsync("_LeadFormModal")
+
+@functions {
+    string StatusBadge(string? status)
+    {
+        var s = status ?? "New";
+        var cls = s.ToLower().Replace(" ", "") switch
+        {
+            "new" => "st-new",
+            "contacted" => "st-contacted",
+            "qualified" => "st-qualified",
+            "proposalsent" => "st-proposalsent",
+            "negotiation" => "st-negotiation",
+            "won" => "st-won",
+            "lost" => "st-lost",
+            _ => "st-new"
+        };
+        return $"<span class='badge-status {cls}'>{s}</span>";
+    }
+
+    string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "—";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}" : name.Substring(0, Math.Min(2, name.Length));
+    }
+
+    string LeadJson(CrmLeadManagement.Models.Lead l)
+    {
+        string Esc(string? s) => (s ?? "").Replace("\\", "\\\\").Replace("'", "\\'").Replace("\"", "&quot;").Replace("\n", " ").Replace("\r", "");
+        return "{" +
+            $"leadId:'{Esc(l.LeadId)}'," +
+            $"leadName:'{Esc(l.LeadName)}'," +
+            $"companyName:'{Esc(l.CompanyName)}'," +
+            $"mobileNumber:'{Esc(l.MobileNumber)}'," +
+            $"email:'{Esc(l.Email)}'," +
+            $"designation:'{Esc(l.Designation)}'," +
+            $"location:'{Esc(l.Location)}'," +
+            $"source:'{Esc(l.Source)}'," +
+            $"leadStatus:'{Esc(l.LeadStatus)}'," +
+            $"assignedTo:'{Esc(l.AssignedTo)}'," +
+            $"priority:'{Esc(l.Priority)}'," +
+            $"followUpDate:'{Esc(l.FollowUpDate)}'," +
+            $"remarks:'{Esc(l.Remarks)}'" +
+        "}";
+    }
+}

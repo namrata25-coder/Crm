@@ -1,0 +1,236 @@
+@model List<CrmLeadManagement.Models.UserRoleEntry>
+@{
+    ViewData["Title"] = "Team Members";
+    var allRoles = ViewBag.AllRoles as List<string> ?? new List<string>();
+    var search = ViewBag.Search as string ?? "";
+    var selectedRole = ViewBag.Role as string ?? "";
+    var selectedStatus = ViewBag.Status as string ?? "";
+}
+
+<div class="breadcrumb-row">
+    <a asp-controller="Home" asp-action="Index">Home</a>
+    <span class="sep">/</span>
+    <span class="current">Team</span>
+</div>
+
+<div class="page-head" style="margin-bottom:18px;">
+    <div>
+        <h1 style="margin:0;font-size:24px;font-weight:800;color:var(--ink-900);display:flex;align-items:center;gap:10px;">
+            <i class="bi bi-people" style="color:var(--brand-600);"></i> Team
+        </h1>
+        <p style="margin:4px 0 0;color:var(--ink-500);font-size:13.5px;">
+            Manage team members, roles, assigned responsibilities, and access privileges.
+        </p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+        <a asp-controller="Team" asp-action="Roles" class="btn btn-secondary">
+            <i class="bi bi-shield-lock-fill" style="color:var(--brand-600);"></i> Roles &amp; Permissions
+        </a>
+        <button type="button" class="btn btn-primary" onclick="openAddMemberModal()">
+            <i class="bi bi-person-plus-fill"></i> Add Member
+        </button>
+    </div>
+</div>
+
+<!-- Navigation Tabs -->
+<div class="team-nav-tabs">
+    <a asp-controller="Team" asp-action="Index" class="team-tab-btn active">
+        <i class="bi bi-people-fill"></i> Team Members
+    </a>
+    <a asp-controller="Team" asp-action="Roles" class="team-tab-btn">
+        <i class="bi bi-shield-lock"></i> Roles &amp; Permissions
+    </a>
+</div>
+
+<!-- Team Members Table Panel -->
+<div class="panel" style="margin-top:16px;">
+    <!-- Filter bar -->
+    <div class="panel-header" style="flex-wrap:wrap;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);">
+        <form method="get" asp-controller="Team" asp-action="Index" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1;">
+            <div class="search-box" style="width:260px;background:var(--ink-100);border:1px solid var(--ink-300);border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:8px;">
+                <i class="bi bi-search" style="color:var(--ink-500);"></i>
+                <input type="text" name="search" value="@search" placeholder="Search by name, email..." style="border:none;background:transparent;outline:none;width:100%;font-size:13px;" />
+            </div>
+
+            <select name="role" class="form-control" style="width:auto;min-width:160px;padding:6px 12px;border-radius:8px;font-size:13px;border:1px solid var(--ink-300);" onchange="this.form.submit()">
+                <option value="">All Roles</option>
+                @foreach (var r in allRoles)
+                {
+                    <!option value="@r" @(r == selectedRole ? "selected" : "")>@r</!option>
+                }
+            </select>
+
+            <select name="status" class="form-control" style="width:auto;min-width:130px;padding:6px 12px;border-radius:8px;font-size:13px;border:1px solid var(--ink-300);" onchange="this.form.submit()">
+                <option value="">All Statuses</option>
+                <!option value="Active" @(selectedStatus == "Active" ? "selected" : "")>Active</!option>
+                <!option value="Inactive" @(selectedStatus == "Inactive" ? "selected" : "")>Inactive</!option>
+            </select>
+
+            @if (!string.IsNullOrWhiteSpace(search) || !string.IsNullOrWhiteSpace(selectedRole) || !string.IsNullOrWhiteSpace(selectedStatus))
+            {
+                <a asp-controller="Team" asp-action="Index" class="btn btn-secondary btn-sm" title="Clear Filters">
+                    <i class="bi bi-x-lg"></i> Clear
+                </a>
+            }
+        </form>
+
+        <div style="font-size:13px;color:var(--ink-500);font-weight:600;">
+            Showing @Model.Count member(s)
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Member</th>
+                    <th>Email Address</th>
+                    <th>Assigned Role</th>
+                    <th>Permissions</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="6" style="text-align:center;padding:40px;color:var(--ink-500);">
+                            <i class="bi bi-people" style="font-size:28px;display:block;margin-bottom:8px;color:var(--ink-300);"></i>
+                            No team members found matching your search.
+                        </td>
+                    </tr>
+                }
+                @foreach (var u in Model)
+                {
+                    <tr>
+                        <td>
+                            <div class="avatar-chip">
+                                <div class="initials">@GetInitials(u.Name)</div>
+                                <div>
+                                    <div class="cell-primary" style="font-weight:600;">@u.Name</div>
+                                    <div style="font-size:11.5px;color:var(--ink-500);">ID #@u.Id</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <a href="mailto:@u.Email" style="color:var(--brand-600);font-weight:500;">@u.Email</a>
+                        </td>
+                        <td>
+                            <span class="badge-role-tag">@u.Role</span>
+                        </td>
+                        <td>
+                            <a asp-controller="Team" asp-action="Roles" asp-route-role="@u.Role" class="btn-text-action" title="View permissions for @u.Role">
+                                <i class="bi bi-shield-check"></i> View Role Matrix
+                            </a>
+                        </td>
+                        <td>
+                            @if (u.Status == "Active")
+                            {
+                                <span class="badge-status st-qualified">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge-status st-lost">Inactive</span>
+                            }
+                        </td>
+                        <td style="text-align:right;">
+                            <div style="display:inline-flex;gap:6px;">
+                                <button type="button" class="icon-btn" title="Edit Member" onclick="openEditMemberModal(@u.Id, '@u.Name', '@u.Email', '@u.Role', '@u.Status')">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form method="post" asp-controller="Settings" asp-action="RemoveUser" onsubmit="return confirm('Remove @u.Name from the team?');" style="display:inline;">
+                                    <input type="hidden" name="email" value="@u.Email" />
+                                    <button type="submit" class="icon-btn" title="Remove" style="color:#dc2626;">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ADD/EDIT MEMBER MODAL -->
+<div class="modal-backdrop-custom" id="modalMember" style="display:none;">
+    <div class="modal-dialog-custom">
+        <div class="modal-header-custom">
+            <div class="modal-title-custom" id="memberModalTitle">
+                <i class="bi bi-person-plus-fill text-primary"></i> Add Team Member
+            </div>
+            <button type="button" class="btn-close-modal" onclick="closeModal('modalMember')">&times;</button>
+        </div>
+        <form method="post" asp-controller="Work" asp-action="SaveMember">
+            <input type="hidden" id="memberId" name="id" value="0" />
+            <div class="modal-body-custom">
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Full Name <span class="text-danger">*</span></label>
+                    <input type="text" id="memberName" name="name" class="form-input-custom" placeholder="e.g. Rahul Sharma" required />
+                </div>
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Email Address <span class="text-danger">*</span></label>
+                    <input type="email" id="memberEmail" name="email" class="form-input-custom" placeholder="rahul@company.com" required />
+                </div>
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Role / Designation <span class="text-danger">*</span></label>
+                    <select id="memberRole" name="role" class="form-input-custom" required>
+                        @foreach (var r in allRoles)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Account Status</label>
+                    <select id="memberStatus" name="status" class="form-input-custom">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalMember')">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Save Member</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@functions {
+    string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "U";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0].Substring(0, Math.Min(2, parts[0].Length)).ToUpper();
+        return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+    }
+}
+
+<script>
+function openAddMemberModal() {
+    document.getElementById("memberModalTitle").innerHTML = `<i class="bi bi-person-plus-fill text-primary"></i> Add Team Member`;
+    document.getElementById("memberId").value = "0";
+    document.getElementById("memberName").value = "";
+    document.getElementById("memberEmail").value = "";
+    document.getElementById("memberStatus").value = "Active";
+    document.getElementById("modalMember").style.display = "flex";
+}
+
+function openEditMemberModal(id, name, email, role, status) {
+    document.getElementById("memberModalTitle").innerHTML = `<i class="bi bi-pencil-square text-primary"></i> Edit Team Member`;
+    document.getElementById("memberId").value = id;
+    document.getElementById("memberName").value = name;
+    document.getElementById("memberEmail").value = email;
+    document.getElementById("memberRole").value = role;
+    document.getElementById("memberStatus").value = status;
+    document.getElementById("modalMember").style.display = "flex";
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+}
+</script>

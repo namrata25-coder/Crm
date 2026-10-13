@@ -1,0 +1,1544 @@
+@model CrmLeadManagement.Models.RolesAndPermissionsViewModel
+@{
+    ViewData["Title"] = "Roles & Permissions";
+    var selected = Model.SelectedRole;
+}
+
+<div class="breadcrumb-row">
+    <a asp-controller="Home" asp-action="Index">Home</a>
+    <span class="sep">/</span>
+    <a asp-controller="Team" asp-action="Index">Team</a>
+    <span class="sep">/</span>
+    <span class="current">Roles &amp; Permissions</span>
+</div>
+
+<!-- Header with navigation tabs -->
+<div class="page-head" style="margin-bottom:18px;">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <h1 style="margin:0;font-size:24px;font-weight:800;color:var(--ink-900);">Team &gt; Roles &amp; Permissions</h1>
+            <span class="badge-role-tag" id="currentRoleBadge">@selected.RoleName</span>
+        </div>
+        <p style="margin:4px 0 0;color:var(--ink-500);font-size:13.5px;">
+            Configure module-level visibility, CRUD permissions, workflow triggers, and record access scopes.
+        </p>
+    </div>
+</div>
+
+<!-- Navigation Tabs -->
+<div class="team-nav-tabs">
+    <a asp-controller="Team" asp-action="Index" class="team-tab-btn">
+        <i class="bi bi-people"></i> Team Members
+    </a>
+    <a asp-controller="Team" asp-action="Roles" class="team-tab-btn active">
+        <i class="bi bi-shield-lock-fill"></i> Roles &amp; Permissions
+    </a>
+</div>
+
+<!-- Main Permissions Card -->
+<div class="panel roles-panel" style="margin-top:16px;">
+    <!-- Top Action Toolbar -->
+    <div class="roles-toolbar">
+        <div class="roles-toolbar-left">
+            <label for="roleSelector" class="role-selector-label">Role:</label>
+            <div class="role-select-wrapper">
+                <select id="roleSelector" class="role-select-dropdown" onchange="onRoleChange(this.value)">
+                    @foreach (var r in Model.AllRoles)
+                    {
+                        <!option value="@r.RoleName" @(r.RoleName == selected.RoleName ? "selected" : "")>
+                            @r.RoleName @(r.IsSystem ? "(System)" : "")
+                        </!option>
+                    }
+                </select>
+                <i class="bi bi-chevron-down role-caret"></i>
+            </div>
+
+            <div class="role-stats-chip" id="roleStatsChip">
+                <i class="bi bi-person-badge"></i>
+                <span id="roleUsersCountText">@Model.AssignedUsersCount @(Model.AssignedUsersCount == 1 ? "Member" : "Members")</span>
+            </div>
+
+            <span id="systemRoleTag" class="badge-system" style="@(selected.IsSystem ? "" : "display:none;")">System Role</span>
+        </div>
+
+        <div class="roles-toolbar-right">
+            <button type="button" class="btn btn-primary btn-sm" onclick="openNewRoleModal()">
+                <i class="bi bi-plus-lg"></i> + New Role
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openRenameRoleModal()">
+                <i class="bi bi-pencil"></i> Rename
+            </button>
+            <button type="button" class="btn btn-danger-outline btn-sm" id="btnDeleteRole" onclick="openDeleteRoleModal()" style="@(selected.IsSystem ? "display:none;" : "")">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick filter & bulk toggle bar -->
+    <div class="roles-filter-bar">
+        <div class="matrix-search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="moduleSearchInput" placeholder="Filter modules (e.g., Invoice, Leads, Tasks)..." onkeyup="filterMatrixTable()" />
+        </div>
+        <div class="matrix-bulk-actions">
+            <button type="button" class="btn-text-action" onclick="bulkSetAll(true)">
+                <i class="bi bi-check-all"></i> Grant All
+            </button>
+            <span class="sep-dot">•</span>
+            <button type="button" class="btn-text-action" onclick="bulkSetAll(false)">
+                <i class="bi bi-x"></i> Clear All
+            </button>
+        </div>
+    </div>
+
+    <!-- Permissions Matrix Table -->
+    <div class="table-wrap matrix-table-wrap">
+        <table class="data-table matrix-table" id="permissionsTable">
+            <thead>
+                <tr>
+                    <th class="col-module">Module</th>
+                    <th class="col-perm text-center">
+                        <div class="col-head-toggle" onclick="toggleColumnPerm('view')">
+                            <span>View</span>
+                            <i class="bi bi-check2-all" title="Toggle all View"></i>
+                        </div>
+                    </th>
+                    <th class="col-perm text-center">
+                        <div class="col-head-toggle" onclick="toggleColumnPerm('create')">
+                            <span>Create</span>
+                            <i class="bi bi-check2-all" title="Toggle all Create"></i>
+                        </div>
+                    </th>
+                    <th class="col-perm text-center">
+                        <div class="col-head-toggle" onclick="toggleColumnPerm('edit')">
+                            <span>Edit</span>
+                            <i class="bi bi-check2-all" title="Toggle all Edit"></i>
+                        </div>
+                    </th>
+                    <th class="col-perm text-center">
+                        <div class="col-head-toggle" onclick="toggleColumnPerm('delete')">
+                            <span>Delete</span>
+                            <i class="bi bi-check2-all" title="Toggle all Delete"></i>
+                        </div>
+                    </th>
+                    <th class="col-extra text-center">Extra</th>
+                    <th class="col-all text-center">All</th>
+                </tr>
+            </thead>
+            <tbody id="matrixTableBody">
+                @{
+                    string currentSec = "";
+                    int rowIndex = 0;
+                }
+                @foreach (var p in Model.Permissions)
+                {
+                    if (p.Section != currentSec)
+                    {
+                        currentSec = p.Section;
+                        <tr class="section-header-row" data-section="@currentSec">
+                            <td colspan="7">
+                                <div class="section-title-wrap">
+                                    <i class="bi @GetSectionIcon(currentSec) section-icon"></i>
+                                    <span class="section-name">@currentSec</span>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+
+                    <tr class="module-row" data-section="@p.Section" data-module="@p.Module" data-index="@rowIndex">
+                        <!-- Module Title -->
+                        <td class="cell-module">
+                            <div class="module-title-box">
+                                <span class="module-bullet"></span>
+                                <span class="module-name-text">@p.Module</span>
+                            </div>
+                        </td>
+
+                        <!-- View -->
+                        <td class="cell-check text-center">
+                            @if (p.HasView)
+                            {
+                                <label class="custom-checkbox-wrap">
+                                    <input type="checkbox" class="perm-check perm-view" data-type="view" @(p.View ? "checked" : "") onchange="onPermCheckChange(this)" />
+                                    <span class="custom-check-box"></span>
+                                </label>
+                            }
+                            else
+                            {
+                                <span class="dash-na">–</span>
+                            }
+                        </td>
+
+                        <!-- Create -->
+                        <td class="cell-check text-center">
+                            @if (p.HasCreate)
+                            {
+                                <label class="custom-checkbox-wrap">
+                                    <input type="checkbox" class="perm-check perm-create" data-type="create" @(p.Create ? "checked" : "") onchange="onPermCheckChange(this)" />
+                                    <span class="custom-check-box"></span>
+                                </label>
+                            }
+                            else
+                            {
+                                <span class="dash-na">–</span>
+                            }
+                        </td>
+
+                        <!-- Edit -->
+                        <td class="cell-check text-center">
+                            @if (p.HasEdit)
+                            {
+                                <label class="custom-checkbox-wrap">
+                                    <input type="checkbox" class="perm-check perm-edit" data-type="edit" @(p.Edit ? "checked" : "") onchange="onPermCheckChange(this)" />
+                                    <span class="custom-check-box"></span>
+                                </label>
+                            }
+                            else
+                            {
+                                <span class="dash-na">–</span>
+                            }
+                        </td>
+
+                        <!-- Delete -->
+                        <td class="cell-check text-center">
+                            @if (p.HasDelete)
+                            {
+                                <label class="custom-checkbox-wrap">
+                                    <input type="checkbox" class="perm-check perm-delete" data-type="delete" @(p.Delete ? "checked" : "") onchange="onPermCheckChange(this)" />
+                                    <span class="custom-check-box"></span>
+                                </label>
+                            }
+                            else
+                            {
+                                <span class="dash-na">–</span>
+                            }
+                        </td>
+
+                        <!-- Extra Action -->
+                        <td class="cell-extra text-center">
+                            @if (!string.IsNullOrWhiteSpace(p.ExtraName))
+                            {
+                                <label class="extra-action-chip @(p.Extra ? "active" : "")">
+                                    <input type="checkbox" class="perm-check perm-extra" data-type="extra" data-extra-name="@p.ExtraName" @(p.Extra ? "checked" : "") onchange="onExtraCheckChange(this)" />
+                                    <span class="custom-check-box"></span>
+                                    <span class="extra-label-text">@p.ExtraName</span>
+                                </label>
+                            }
+                            else
+                            {
+                                <span class="dash-na">–</span>
+                            }
+                        </td>
+
+                        <!-- All Row Toggle -->
+                        <td class="cell-all text-center">
+                            <label class="custom-checkbox-wrap">
+                                <input type="checkbox" class="row-all-check" @(p.IsAllChecked ? "checked" : "") onchange="toggleRowAll(this)" />
+                                <span class="custom-check-box all-box"></span>
+                            </label>
+                        </td>
+                    </tr>
+                    rowIndex++;
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Data Access & Action Footer -->
+    <div class="roles-footer-bar">
+        <div class="data-access-group">
+            <div class="data-access-title">
+                <i class="bi bi-database-lock"></i> Data access:
+            </div>
+            <div class="data-access-options">
+                <label class="radio-card @(selected.DataAccess == "All" ? "selected" : "")">
+                    <input type="radio" name="dataAccessScope" value="All" @(selected.DataAccess == "All" ? "checked" : "") onchange="onDataAccessChange(this)" />
+                    <span class="radio-indicator"></span>
+                    <div class="radio-meta">
+                        <span class="radio-title">All records</span>
+                        <span class="radio-desc">Can view and manage records across all team members and departments</span>
+                    </div>
+                </label>
+
+                <label class="radio-card @(selected.DataAccess != "All" ? "selected" : "")">
+                    <input type="radio" name="dataAccessScope" value="OnlyAssigned" @(selected.DataAccess != "All" ? "checked" : "") onchange="onDataAccessChange(this)" />
+                    <span class="radio-indicator"></span>
+                    <div class="radio-meta">
+                        <span class="radio-title">Only my assigned records</span>
+                        <span class="radio-desc">Restricted to viewing and interacting with records assigned to the user</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <div class="roles-footer-actions">
+            <span id="unsavedChangesBadge" class="badge-unsaved" style="display:none;">
+                <i class="bi bi-record-fill"></i> Unsaved changes
+            </span>
+            <button type="button" class="btn btn-secondary" id="btnReset" onclick="resetPermissions()">
+                <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </button>
+            <button type="button" class="btn btn-primary btn-save-large" id="btnSave" onclick="savePermissions()">
+                <i class="bi bi-check-circle-fill"></i> Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- 1. NEW ROLE MODAL -->
+<div class="modal-backdrop-custom" id="modalNewRole" style="display:none;">
+    <div class="modal-dialog-custom">
+        <div class="modal-header-custom">
+            <div class="modal-title-custom">
+                <i class="bi bi-plus-circle-fill text-primary"></i> Create New Role
+            </div>
+            <button type="button" class="btn-close-modal" onclick="closeModal('modalNewRole')">&times;</button>
+        </div>
+        <form id="formNewRole" onsubmit="submitNewRole(event)">
+            <div class="modal-body-custom">
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Role Name <span class="text-danger">*</span></label>
+                    <input type="text" id="newRoleName" class="form-input-custom" placeholder="e.g. Project Manager, Finance Officer" required />
+                </div>
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Description (Optional)</label>
+                    <textarea id="newRoleDesc" class="form-input-custom" rows="2" placeholder="Briefly describe responsibilities and module scope..."></textarea>
+                </div>
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Copy Permissions From</label>
+                    <select id="newRoleCopyFrom" class="form-input-custom">
+                        <option value="">Start from standard default template</option>
+                        @foreach (var r in Model.AllRoles)
+                        {
+                            <option value="@r.RoleName">Copy permissions from: @r.RoleName</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Default Data Access Scope</label>
+                    <select id="newRoleDataAccess" class="form-input-custom">
+                        <option value="OnlyAssigned">Only my assigned records</option>
+                        <option value="All">All records</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalNewRole')">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitNewRole">Create Role</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. RENAME ROLE MODAL -->
+<div class="modal-backdrop-custom" id="modalRenameRole" style="display:none;">
+    <div class="modal-dialog-custom">
+        <div class="modal-header-custom">
+            <div class="modal-title-custom">
+                <i class="bi bi-pencil-square text-primary"></i> Rename Role
+            </div>
+            <button type="button" class="btn-close-modal" onclick="closeModal('modalRenameRole')">&times;</button>
+        </div>
+        <form id="formRenameRole" onsubmit="submitRenameRole(event)">
+            <div class="modal-body-custom">
+                <div class="form-group-custom">
+                    <label class="form-label-custom">Current Role Name</label>
+                    <input type="text" id="renameRoleCurrent" class="form-input-custom" readonly style="background:var(--ink-100);" />
+                </div>
+                <div class="form-group-custom">
+                    <label class="form-label-custom">New Role Name <span class="text-danger">*</span></label>
+                    <input type="text" id="renameRoleNew" class="form-input-custom" placeholder="Enter updated role title..." required />
+                </div>
+                <div class="alert-info-box">
+                    <i class="bi bi-info-circle"></i>
+                    <span>Renaming will automatically update all team members currently assigned to this role.</span>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalRenameRole')">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Save Name</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. DELETE ROLE MODAL -->
+<div class="modal-backdrop-custom" id="modalDeleteRole" style="display:none;">
+    <div class="modal-dialog-custom">
+        <div class="modal-header-custom">
+            <div class="modal-title-custom text-danger">
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i> Delete Role
+            </div>
+            <button type="button" class="btn-close-modal" onclick="closeModal('modalDeleteRole')">&times;</button>
+        </div>
+        <form id="formDeleteRole" onsubmit="submitDeleteRole(event)">
+            <div class="modal-body-custom">
+                <p style="font-size:14px;color:var(--ink-700);margin-bottom:12px;">
+                    Are you sure you want to delete role <strong id="deleteRoleNamePrompt"></strong>?
+                </p>
+                <div id="deleteReassignSection" style="display:none;margin-top:12px;padding:12px;background:#fff8f0;border:1px solid #ffd8a8;border-radius:8px;">
+                    <div style="font-size:13px;font-weight:600;color:#c96a3c;margin-bottom:6px;">
+                        <i class="bi bi-people-fill"></i> <span id="deleteAssignedCountText">0</span> team member(s) currently have this role!
+                    </div>
+                    <label class="form-label-custom" style="font-size:12px;">Reassign these members to:</label>
+                    <select id="deleteReassignToRole" class="form-input-custom">
+                        @foreach (var r in Model.AllRoles)
+                        {
+                            <option value="@r.RoleName">@r.RoleName</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalDeleteRole')">Cancel</button>
+                <button type="submit" class="btn btn-danger btn-sm" id="btnConfirmDeleteRole">Confirm Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Toast Feedback Container -->
+<div id="toastContainer" class="toast-container-custom"></div>
+
+@functions {
+    string GetSectionIcon(string section) => section switch
+    {
+        "LEADS" => "bi-funnel-fill",
+        "FINANCE" => "bi-cash-coin",
+        "PROJECTS" => "bi-folder2-open",
+        "REPORTS" => "bi-bar-chart-line-fill",
+        "SETTINGS" => "bi-gear-fill",
+        _ => "bi-folder-fill"
+    };
+}
+
+<style>
+/* ================= ROLES & PERMISSIONS MODERN STYLES ================= */
+.team-nav-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 2px solid var(--line);
+    padding-bottom: 0;
+    margin-bottom: 12px;
+}
+.team-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink-500);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all .15s ease;
+    border-radius: 6px 6px 0 0;
+}
+.team-tab-btn:hover {
+    color: var(--brand-600);
+    background: rgba(37,99,168,.04);
+}
+.team-tab-btn.active {
+    color: var(--brand-600);
+    border-bottom: 2px solid var(--brand-600);
+    background: #fff;
+}
+
+.badge-role-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.roles-panel {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1);
+    overflow: hidden;
+}
+
+/* Toolbar */
+.roles-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 16px 20px;
+    background: #fafbfc;
+    border-bottom: 1px solid var(--line);
+}
+.roles-toolbar-left {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.role-selector-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-900);
+}
+.role-select-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.role-select-dropdown {
+    appearance: none;
+    background: #fff;
+    border: 1.5px solid var(--ink-300);
+    border-radius: 8px;
+    padding: 8px 36px 8px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-900);
+    cursor: pointer;
+    min-width: 200px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    transition: all .15s ease;
+}
+.role-select-dropdown:hover, .role-select-dropdown:focus {
+    border-color: var(--brand-600);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37,99,168,.12);
+}
+.role-caret {
+    position: absolute;
+    right: 12px;
+    pointer-events: none;
+    font-size: 11px;
+    color: var(--ink-500);
+}
+
+.role-stats-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--ink-100);
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-700);
+}
+
+.badge-system {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 9px;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+
+.roles-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.btn-danger-outline {
+    background: #fff;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all .15s ease;
+}
+.btn-danger-outline:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+/* Filter bar */
+.roles-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 20px;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+}
+.matrix-search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--ink-100);
+    border: 1px solid var(--ink-300);
+    border-radius: 7px;
+    padding: 6px 12px;
+    width: 320px;
+}
+.matrix-search-box input {
+    border: none;
+    background: transparent;
+    outline: none;
+    width: 100%;
+    font-size: 13px;
+    color: var(--ink-900);
+}
+.matrix-bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.btn-text-action {
+    background: transparent;
+    border: none;
+    color: var(--brand-600);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: all .15s ease;
+}
+.btn-text-action:hover {
+    background: var(--brand-100);
+}
+.sep-dot {
+    color: var(--ink-300);
+}
+
+/* Matrix Table */
+.matrix-table-wrap {
+    overflow-x: auto;
+}
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.matrix-table thead th {
+    background: #f8fafc;
+    color: var(--ink-700);
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 11px 16px;
+    border-bottom: 2px solid var(--line);
+    white-space: nowrap;
+}
+.col-module { width: 34%; text-align: left; }
+.col-perm { width: 10%; }
+.col-extra { width: 16%; }
+.col-all { width: 10%; }
+
+.col-head-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background .15s ease;
+}
+.col-head-toggle:hover {
+    background: rgba(37,99,168,.1);
+    color: var(--brand-700);
+}
+
+/* Section Header */
+.section-header-row td {
+    background: #f1f5f9 !important;
+    padding: 8px 18px !important;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+.section-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.section-icon {
+    font-size: 13px;
+    color: var(--brand-600);
+}
+.section-name {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .6px;
+    color: var(--ink-700);
+}
+
+/* Module Rows */
+.module-row {
+    transition: background .12s ease;
+    border-bottom: 1px solid var(--line);
+}
+.module-row:hover {
+    background: #f8fbff;
+}
+.cell-module {
+    padding: 10px 18px 10px 30px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink-900);
+}
+.module-title-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.module-bullet {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #94a3b8;
+}
+.module-row:hover .module-bullet {
+    background: var(--brand-600);
+}
+
+.dash-na {
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 600;
+    user-select: none;
+}
+
+/* Custom Checkbox Design */
+.custom-checkbox-wrap {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+}
+.custom-checkbox-wrap input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    width: 0;
+    height: 0;
+}
+.custom-check-box {
+    width: 19px;
+    height: 19px;
+    border: 1.8px solid #cbd5e1;
+    border-radius: 5px;
+    background: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s ease;
+}
+.custom-checkbox-wrap input:checked ~ .custom-check-box {
+    background: var(--brand-600);
+    border-color: var(--brand-600);
+}
+.custom-checkbox-wrap input:checked ~ .custom-check-box::after {
+    content: "";
+    width: 5px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2.2px 2.2px 0;
+    transform: rotate(45deg);
+    margin-bottom: 2px;
+}
+.custom-checkbox-wrap input:focus ~ .custom-check-box {
+    box-shadow: 0 0 0 3px rgba(37,99,168,.18);
+}
+.custom-check-box.all-box {
+    border-radius: 5px;
+    border-color: #94a3b8;
+}
+.custom-checkbox-wrap input:checked ~ .custom-check-box.all-box {
+    background: var(--brand-700);
+    border-color: var(--brand-700);
+}
+
+/* Extra action chip */
+.extra-action-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #f8fafc;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-700);
+    cursor: pointer;
+    transition: all .15s ease;
+    user-select: none;
+    position: relative;
+}
+.extra-action-chip input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    width: 0;
+    height: 0;
+}
+.extra-action-chip .custom-check-box {
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+}
+.extra-action-chip input:checked ~ .custom-check-box::after {
+    width: 4px;
+    height: 8px;
+    border-width: 0 1.8px 1.8px 0;
+}
+.extra-action-chip.active {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+}
+
+/* Footer / Data Access Bar */
+.roles-footer-bar {
+    padding: 20px;
+    background: #fafbfc;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 18px;
+}
+.data-access-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.data-access-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--ink-900);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.data-access-options {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.radio-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #fff;
+    border: 1.5px solid var(--ink-300);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .15s ease;
+    user-select: none;
+    max-width: 380px;
+}
+.radio-card:hover {
+    border-color: var(--brand-500);
+    background: #fcfdfe;
+}
+.radio-card.selected {
+    border-color: var(--brand-600);
+    background: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(37,99,168,.12);
+}
+.radio-card input {
+    position: absolute;
+    opacity: 0;
+}
+.radio-indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #cbd5e1;
+    background: #fff;
+    flex-shrink: 0;
+    position: relative;
+    transition: all .15s ease;
+}
+.radio-card.selected .radio-indicator {
+    border-color: var(--brand-600);
+}
+.radio-card.selected .radio-indicator::after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--brand-600);
+    position: absolute;
+    top: 3px;
+    left: 3px;
+}
+.radio-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.radio-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--ink-900);
+}
+.radio-desc {
+    font-size: 11.5px;
+    color: var(--ink-500);
+    line-height: 1.3;
+}
+
+.roles-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.badge-unsaved {
+    font-size: 12px;
+    font-weight: 600;
+    color: #b45309;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    animation: pulse 1.8s infinite;
+}
+@@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .6; }
+}
+.btn-save-large {
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(37,99,168,.25);
+}
+
+/* Modals */
+.modal-backdrop-custom {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(16,24,40,.5);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+}
+.modal-dialog-custom {
+    background: #fff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
+    animation: modalIn .15s ease-out;
+}
+@@keyframes modalIn {
+    from { opacity: 0; transform: scale(.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+.modal-header-custom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+    background: #f8fafc;
+}
+.modal-title-custom {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink-900);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.btn-close-modal {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    color: var(--ink-500);
+    cursor: pointer;
+    line-height: 1;
+}
+.btn-close-modal:hover { color: var(--ink-900); }
+.modal-body-custom {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.modal-footer-custom {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+    background: #fafbfc;
+}
+.form-group-custom {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.form-label-custom {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-700);
+}
+.form-input-custom {
+    width: 100%;
+    border: 1px solid var(--ink-300);
+    border-radius: 7px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    color: var(--ink-900);
+    outline: none;
+    transition: border-color .15s ease;
+}
+.form-input-custom:focus {
+    border-color: var(--brand-600);
+    box-shadow: 0 0 0 3px rgba(37,99,168,.12);
+}
+.alert-info-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    color: #166534;
+    font-size: 12.5px;
+    line-height: 1.4;
+}
+
+/* Toast Container */
+.toast-container-custom {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.toast-item {
+    min-width: 300px;
+    max-width: 420px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+    border-left: 4px solid var(--brand-600);
+    animation: toastIn .2s ease-out;
+    transition: opacity .3s ease;
+}
+.toast-item.success { border-left-color: #10b981; }
+.toast-item.error { border-left-color: #ef4444; }
+@@keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+
+<script>
+// State management
+let currentRole = "@Html.Raw(selected.RoleName)";
+let isSystemRole = @(selected.IsSystem ? "true" : "false");
+let originalState = null;
+let hasUnsavedChanges = false;
+
+document.addEventListener("DOMContentLoaded", function() {
+    captureOriginalState();
+    updateAllRowChecks();
+});
+
+function captureOriginalState() {
+    const permissions = collectCurrentPermissions();
+    const dataAccess = document.querySelector('input[name="dataAccessScope"]:checked')?.value || "OnlyAssigned";
+    originalState = JSON.stringify({ permissions, dataAccess });
+    setUnsavedFlag(false);
+}
+
+function setUnsavedFlag(hasChanges) {
+    hasUnsavedChanges = hasChanges;
+    const badge = document.getElementById("unsavedChangesBadge");
+    if (badge) badge.style.display = hasChanges ? "inline-flex" : "none";
+}
+
+function onPermCheckChange(elem) {
+    const row = elem.closest("tr.module-row");
+    updateRowAllState(row);
+    setUnsavedFlag(true);
+}
+
+function onExtraCheckChange(elem) {
+    const chip = elem.closest(".extra-action-chip");
+    if (chip) {
+        if (elem.checked) chip.classList.add("active");
+        else chip.classList.remove("active");
+    }
+    const row = elem.closest("tr.module-row");
+    updateRowAllState(row);
+    setUnsavedFlag(true);
+}
+
+function toggleRowAll(allElem) {
+    const row = allElem.closest("tr.module-row");
+    const isChecked = allElem.checked;
+
+    row.querySelectorAll(".perm-check").forEach(cb => {
+        cb.checked = isChecked;
+        if (cb.classList.contains("perm-extra")) {
+            const chip = cb.closest(".extra-action-chip");
+            if (chip) {
+                if (isChecked) chip.classList.add("active");
+                else chip.classList.remove("active");
+            }
+        }
+    });
+
+    setUnsavedFlag(true);
+}
+
+function updateRowAllState(row) {
+    const allCheck = row.querySelector(".row-all-check");
+    if (!allCheck) return;
+
+    const checks = row.querySelectorAll(".perm-check");
+    if (checks.length === 0) return;
+
+    const allChecked = Array.from(checks).every(c => c.checked);
+    allCheck.checked = allChecked;
+}
+
+function updateAllRowChecks() {
+    document.querySelectorAll("tr.module-row").forEach(row => updateRowAllState(row));
+}
+
+function toggleColumnPerm(type) {
+    const checks = document.querySelectorAll(`.perm-check.perm-${type}`);
+    if (checks.length === 0) return;
+
+    const anyUnchecked = Array.from(checks).some(c => !c.checked);
+    checks.forEach(c => {
+        c.checked = anyUnchecked;
+    });
+
+    updateAllRowChecks();
+    setUnsavedFlag(true);
+    showToast(`Toggled all '${type}' permissions.`, "info");
+}
+
+function bulkSetAll(checked) {
+    document.querySelectorAll(".perm-check").forEach(cb => {
+        cb.checked = checked;
+        if (cb.classList.contains("perm-extra")) {
+            const chip = cb.closest(".extra-action-chip");
+            if (chip) {
+                if (checked) chip.classList.add("active");
+                else chip.classList.remove("active");
+            }
+        }
+    });
+    updateAllRowChecks();
+    setUnsavedFlag(true);
+    showToast(checked ? "Granted all permissions." : "Cleared all permissions.", "info");
+}
+
+function onDataAccessChange(elem) {
+    document.querySelectorAll(".radio-card").forEach(c => c.classList.remove("selected"));
+    elem.closest(".radio-card").classList.add("selected");
+    setUnsavedFlag(true);
+}
+
+function filterMatrixTable() {
+    const term = document.getElementById("moduleSearchInput").value.toLowerCase().trim();
+    const rows = document.querySelectorAll("tr.module-row");
+    const sections = document.querySelectorAll("tr.section-header-row");
+
+    const sectionVisibleMap = {};
+
+    rows.forEach(r => {
+        const mod = (r.getAttribute("data-module") || "").toLowerCase();
+        const sec = r.getAttribute("data-section");
+        const visible = term === "" || mod.includes(term) || sec.toLowerCase().includes(term);
+
+        r.style.display = visible ? "" : "none";
+        if (visible) {
+            sectionVisibleMap[sec] = true;
+        }
+    });
+
+    sections.forEach(s => {
+        const secName = s.getAttribute("data-section");
+        s.style.display = sectionVisibleMap[secName] ? "" : "none";
+    });
+}
+
+function collectCurrentPermissions() {
+    const items = [];
+    document.querySelectorAll("tr.module-row").forEach(row => {
+        const section = row.getAttribute("data-section");
+        const module = row.getAttribute("data-module");
+
+        const viewCb = row.querySelector(".perm-view");
+        const createCb = row.querySelector(".perm-create");
+        const editCb = row.querySelector(".perm-edit");
+        const deleteCb = row.querySelector(".perm-delete");
+        const extraCb = row.querySelector(".perm-extra");
+
+        items.push({
+            Section: section,
+            Module: module,
+            HasView: viewCb !== null,
+            View: viewCb ? viewCb.checked : false,
+            HasCreate: createCb !== null,
+            Create: createCb ? createCb.checked : false,
+            HasEdit: editCb !== null,
+            Edit: editCb ? editCb.checked : false,
+            HasDelete: deleteCb !== null,
+            Delete: deleteCb ? deleteCb.checked : false,
+            ExtraName: extraCb ? extraCb.getAttribute("data-extra-name") : null,
+            Extra: extraCb ? extraCb.checked : false
+        });
+    });
+    return items;
+}
+
+// Switching roles
+async function onRoleChange(roleName) {
+    if (hasUnsavedChanges) {
+        if (!confirm(`You have unsaved changes on '${currentRole}'. Discard and switch to '${roleName}'?`)) {
+            document.getElementById("roleSelector").value = currentRole;
+            return;
+        }
+    }
+
+    try {
+        const res = await fetch(`/Team/GetRoleData?roleName=${encodeURIComponent(roleName)}`);
+        const data = await res.json();
+        if (!data.success) {
+            showToast(data.message || "Could not load role.", "error");
+            return;
+        }
+
+        currentRole = data.roleName;
+        isSystemRole = data.isSystem;
+
+        document.getElementById("currentRoleBadge").textContent = data.roleName;
+        document.getElementById("roleUsersCountText").textContent = `${data.assignedUsersCount} ${data.assignedUsersCount === 1 ? "Member" : "Members"}`;
+
+        const sysTag = document.getElementById("systemRoleTag");
+        if (sysTag) sysTag.style.display = data.isSystem ? "inline-flex" : "none";
+
+        const btnDel = document.getElementById("btnDeleteRole");
+        if (btnDel) btnDel.style.display = data.isSystem ? "none" : "inline-flex";
+
+        // Update data access radio
+        const targetRadio = document.querySelector(`input[name="dataAccessScope"][value="${data.dataAccess}"]`);
+        if (targetRadio) {
+            targetRadio.checked = true;
+            document.querySelectorAll(".radio-card").forEach(c => c.classList.remove("selected"));
+            targetRadio.closest(".radio-card").classList.add("selected");
+        }
+
+        // Apply permissions to matrix rows
+        const permDict = {};
+        (data.permissions || []).forEach(p => { permDict[p.Module] = p; });
+
+        document.querySelectorAll("tr.module-row").forEach(row => {
+            const modName = row.getAttribute("data-module");
+            const p = permDict[modName];
+            if (!p) return;
+
+            const v = row.querySelector(".perm-view"); if (v) v.checked = p.View;
+            const c = row.querySelector(".perm-create"); if (c) c.checked = p.Create;
+            const e = row.querySelector(".perm-edit"); if (e) e.checked = p.Edit;
+            const d = row.querySelector(".perm-delete"); if (d) d.checked = p.Delete;
+            const ex = row.querySelector(".perm-extra");
+            if (ex) {
+                ex.checked = p.Extra;
+                const chip = ex.closest(".extra-action-chip");
+                if (chip) {
+                    if (p.Extra) chip.classList.add("active");
+                    else chip.classList.remove("active");
+                }
+            }
+        });
+
+        updateAllRowChecks();
+        captureOriginalState();
+
+        // Update browser URL without reload
+        const newUrl = `${window.location.pathname}?role=${encodeURIComponent(currentRole)}`;
+        window.history.replaceState({ role: currentRole }, "", newUrl);
+
+        showToast(`Loaded permissions for '${currentRole}'.`, "success");
+    } catch (err) {
+        showToast("Error switching role.", "error");
+    }
+}
+
+// Save permissions
+async function savePermissions() {
+    const btn = document.getElementById("btnSave");
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status"></span> Saving...`;
+    btn.disabled = true;
+
+    const permissions = collectCurrentPermissions();
+    const dataAccess = document.querySelector('input[name="dataAccessScope"]:checked')?.value || "OnlyAssigned";
+
+    const payload = {
+        RoleName: currentRole,
+        DataAccess: dataAccess,
+        Permissions: permissions
+    };
+
+    try {
+        const res = await fetch("/Team/SavePermissions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            captureOriginalState();
+            showToast(data.message || "Permissions saved successfully!", "success");
+        } else {
+            showToast(data.message || "Failed to save permissions.", "error");
+        }
+    } catch (err) {
+        showToast("Error saving permissions to server.", "error");
+    } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    }
+}
+
+// Reset permissions
+async function resetPermissions() {
+    if (!confirm(`Reset all permissions for '${currentRole}' to original saved defaults?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/Team/ResetRole?roleName=${encodeURIComponent(currentRole)}`, {
+            method: "POST"
+        });
+        const data = await res.json();
+        if (data.success) {
+            await onRoleChange(currentRole);
+            showToast(data.message || "Permissions reset.", "success");
+        } else {
+            showToast(data.message || "Reset failed.", "error");
+        }
+    } catch (err) {
+        showToast("Error resetting permissions.", "error");
+    }
+}
+
+// Modal handling
+function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "flex";
+}
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+}
+
+function openNewRoleModal() {
+    document.getElementById("newRoleName").value = "";
+    document.getElementById("newRoleDesc").value = "";
+    document.getElementById("newRoleCopyFrom").value = currentRole;
+    openModal("modalNewRole");
+}
+
+async function submitNewRole(e) {
+    e.preventDefault();
+    const roleName = document.getElementById("newRoleName").value.trim();
+    const description = document.getElementById("newRoleDesc").value.trim();
+    const copyFrom = document.getElementById("newRoleCopyFrom").value;
+    const dataAccess = document.getElementById("newRoleDataAccess").value;
+
+    if (!roleName) return;
+
+    try {
+        const res = await fetch("/Team/CreateRole", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ RoleName: roleName, Description: description, CopyFromRole: copyFrom, DataAccess: dataAccess })
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeModal("modalNewRole");
+            showToast(data.message, "success");
+
+            // Add new role to dropdown
+            const sel = document.getElementById("roleSelector");
+            const opt = document.createElement("option");
+            opt.value = roleName;
+            opt.textContent = roleName;
+            sel.appendChild(opt);
+            sel.value = roleName;
+
+            onRoleChange(roleName);
+        } else {
+            alert(data.message || "Could not create role.");
+        }
+    } catch (err) {
+        alert("Error creating role.");
+    }
+}
+
+function openRenameRoleModal() {
+    document.getElementById("renameRoleCurrent").value = currentRole;
+    document.getElementById("renameRoleNew").value = currentRole;
+    openModal("modalRenameRole");
+}
+
+async function submitRenameRole(e) {
+    e.preventDefault();
+    const newName = document.getElementById("renameRoleNew").value.trim();
+    if (!newName || newName === currentRole) return;
+
+    try {
+        const res = await fetch("/Team/RenameRole", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ OldRoleName: currentRole, NewRoleName: newName })
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeModal("modalRenameRole");
+            showToast(data.message, "success");
+
+            // Update dropdown option
+            const sel = document.getElementById("roleSelector");
+            for (let opt of sel.options) {
+                if (opt.value === currentRole) {
+                    opt.value = newName;
+                    opt.textContent = newName;
+                    break;
+                }
+            }
+            currentRole = newName;
+            document.getElementById("currentRoleBadge").textContent = newName;
+            const newUrl = `${window.location.pathname}?role=${encodeURIComponent(newName)}`;
+            window.history.replaceState({ role: newName }, "", newUrl);
+        } else {
+            alert(data.message || "Rename failed.");
+        }
+    } catch (err) {
+        alert("Error renaming role.");
+    }
+}
+
+async function openDeleteRoleModal() {
+    if (isSystemRole || currentRole.toLowerCase() === "admin") {
+        alert("System roles cannot be deleted.");
+        return;
+    }
+
+    document.getElementById("deleteRoleNamePrompt").textContent = currentRole;
+
+    try {
+        const res = await fetch(`/Team/GetRoleData?roleName=${encodeURIComponent(currentRole)}`);
+        const data = await res.json();
+        const assignedCount = data.assignedUsersCount || 0;
+
+        const reassignSec = document.getElementById("deleteReassignSection");
+        const countTxt = document.getElementById("deleteAssignedCountText");
+        const reassignSel = document.getElementById("deleteReassignToRole");
+
+        // Filter out current role from target
+        Array.from(reassignSel.options).forEach(opt => {
+            opt.style.display = opt.value === currentRole ? "none" : "";
+        });
+
+        if (assignedCount > 0) {
+            countTxt.textContent = assignedCount;
+            reassignSec.style.display = "block";
+        } else {
+            reassignSec.style.display = "none";
+        }
+
+        openModal("modalDeleteRole");
+    } catch (err) {
+        openModal("modalDeleteRole");
+    }
+}
+
+async function submitDeleteRole(e) {
+    e.preventDefault();
+    const reassignTo = document.getElementById("deleteReassignToRole")?.value || "";
+
+    try {
+        const res = await fetch("/Team/DeleteRole", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ RoleName: currentRole, ReassignToRole: reassignTo })
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeModal("modalDeleteRole");
+            showToast(data.message, "success");
+
+            // Reload page on default role
+            window.location.href = "/Team/Roles";
+        } else {
+            alert(data.message || "Failed to delete role.");
+        }
+    } catch (err) {
+        alert("Error deleting role.");
+    }
+}
+
+function showToast(message, type = "success") {
+    const container = document.getElementById("toastContainer");
+    if (!container) return;
+
+    const toast = document.createElement("div");
+    toast.className = `toast-item ${type}`;
+
+    let icon = "bi-check-circle-fill text-success";
+    if (type === "error") icon = "bi-x-circle-fill text-danger";
+    if (type === "info") icon = "bi-info-circle-fill text-primary";
+
+    toast.innerHTML = `<i class="bi ${icon}" style="font-size:18px;"></i> <span>${message}</span>`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+</script>

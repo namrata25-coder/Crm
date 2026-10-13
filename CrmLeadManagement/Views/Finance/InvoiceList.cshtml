@@ -1,0 +1,2205 @@
+@{
+    ViewData["Title"] = "Invoices";
+    ViewData["ActivePage"] = "FinanceInvoice";
+}
+
+<div class="page-container" style="max-width:1440px;margin:0 auto;padding:1.5rem 1.75rem;">
+    <!-- Top Header & Action Buttons -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+        <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;">Finance</span>
+                <i class="bi bi-chevron-right" style="font-size:10px;color:var(--ink-400);"></i>
+                <span style="font-size:12px;font-weight:600;color:var(--brand-600);">Invoice</span>
+            </div>
+            <h1 style="font-size:1.6rem;font-weight:800;color:var(--ink-900);margin:0;letter-spacing:-0.5px;">
+                <i class="bi bi-receipt" style="color:var(--brand-600);margin-right:8px;"></i>Invoices
+            </h1>
+        </div>
+
+        <!-- 4 Action Buttons -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary" type="button" onclick="openCreateInvoiceModal()" id="btnAddInvoice"
+                    style="display:inline-flex;align-items:center;gap:6px;font-weight:600;box-shadow:0 2px 8px rgba(79,70,229,0.25);">
+                <i class="bi bi-plus-lg"></i> Add Invoice
+            </button>
+
+            <button class="btn btn-outline" type="button" onclick="openCreateRecurringModal()" id="btnAddRecurring"
+                    style="display:inline-flex;align-items:center;gap:6px;font-weight:600;background:#fff;">
+                <i class="bi bi-arrow-repeat" style="color:var(--brand-600);"></i> Add Recurring Invoice
+            </button>
+
+            <div class="dropdown" style="position:relative;display:inline-block;">
+                <button class="btn btn-outline" type="button" onclick="toggleExportMenu(event)" id="btnExport"
+                        style="display:inline-flex;align-items:center;gap:6px;font-weight:600;background:#fff;">
+                    <i class="bi bi-download"></i> Export <i class="bi bi-chevron-down" style="font-size:11px;"></i>
+                </button>
+                <div id="exportDropdownMenu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);z-index:1000;min-width:160px;overflow:hidden;">
+                    <a href="javascript:void(0)" onclick="exportInvoices('csv')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--ink-800);text-decoration:none;transition:background 0.2s;">
+                        <i class="bi bi-filetype-csv" style="color:#059669;font-size:16px;"></i> Export as CSV
+                    </a>
+                    <a href="javascript:void(0)" onclick="exportInvoices('excel')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--ink-800);text-decoration:none;border-top:1px solid var(--line);transition:background 0.2s;">
+                        <i class="bi bi-file-earmark-excel" style="color:#10b981;font-size:16px;"></i> Export as Excel
+                    </a>
+                </div>
+            </div>
+
+            <button class="btn btn-outline" type="button" onclick="openPdfFormModal()" id="btnPdfForm"
+                    style="display:inline-flex;align-items:center;gap:6px;font-weight:600;background:#fff;">
+                <i class="bi bi-file-earmark-pdf" style="color:#dc2626;"></i> PDF Form
+            </button>
+        </div>
+    </div>
+
+    <!-- Invoice Statistics Cards (Calculated strictly from real saved invoices) -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1rem;margin-bottom:1.5rem;">
+        <!-- 1. Total Invoices -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Total Invoices</div>
+                <div style="font-size:1.45rem;font-weight:800;color:var(--ink-900);" id="statTotalCount">0</div>
+                <div style="font-size:12px;color:var(--ink-500);margin-top:2px;" id="statTotalSubtext">₹0.00 Invoiced</div>
+            </div>
+            <div style="width:44px;height:44px;border-radius:10px;background:#eef2ff;color:var(--brand-600);display:flex;align-items:center;justify-content:center;font-size:20px;">
+                <i class="bi bi-receipt"></i>
+            </div>
+        </div>
+
+        <!-- 2. Paid Invoices -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Paid Invoices</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#059669;" id="statPaidAmount">₹0.00</div>
+                <div style="font-size:12px;color:#059669;font-weight:600;margin-top:2px;" id="statPaidCount">0 Paid</div>
+            </div>
+            <div style="width:44px;height:44px;border-radius:10px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:20px;">
+                <i class="bi bi-check2-circle"></i>
+            </div>
+        </div>
+
+        <!-- 3. Pending / Outstanding -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Pending Amount</div>
+                <div style="font-size:1.45rem;font-weight:800;color:#d97706;" id="statPendingAmount">₹0.00</div>
+                <div style="font-size:12px;color:#d97706;font-weight:600;margin-top:2px;" id="statPendingCount">0 Pending</div>
+            </div>
+            <div style="width:44px;height:44px;border-radius:10px;background:#fffbeb;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:20px;">
+                <i class="bi bi-clock-history"></i>
+            </div>
+        </div>
+
+        <!-- 4. Total Revenue -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.15rem 1.25rem;box-shadow:0 1px 3px rgba(0,0,0,0.02);display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--ink-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Total Revenue</div>
+                <div style="font-size:1.45rem;font-weight:800;color:var(--brand-600);" id="statRevenueAmount">₹0.00</div>
+                <div style="font-size:12px;color:var(--ink-500);margin-top:2px;">Cumulative Grand Total</div>
+            </div>
+            <div style="width:44px;height:44px;border-radius:10px;background:#f5f3ff;color:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:20px;">
+                <i class="bi bi-cash-stack"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex:1;">
+            <div style="position:relative;min-width:240px;flex:1;max-width:360px;">
+                <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-400);font-size:14px;"></i>
+                <input type="text" id="invoiceSearchInput" placeholder="Search by invoice #, client, project, milestone..."
+                       style="width:100%;padding:7px 12px 7px 34px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none;"
+                       oninput="filterInvoiceTable()" />
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12.5px;font-weight:600;color:var(--ink-600);margin:0;">Status:</label>
+                <select id="invoiceStatusFilter" onchange="filterInvoiceTable()" style="padding:6px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none;background:#fff;">
+                    <option value="All">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Partial Paid">Partial Paid</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Overdue">Overdue</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;">
+            <button class="btn btn-outline" type="button" onclick="loadInvoicesFromServer()" title="Refresh" style="padding:6px 10px;font-size:12.5px;">
+                <i class="bi bi-arrow-clockwise" id="refreshIcon"></i> Refresh
+            </button>
+            <span id="invoiceCountBadge" style="font-size:12.5px;color:var(--ink-500);font-weight:600;">
+                0 invoices
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Invoice Table -->
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <div style="overflow-x:auto;">
+            <table class="table-custom" style="width:100%;border-collapse:collapse;text-align:left;font-size:13px;">
+                <thead style="background:#f8fafc;border-bottom:1px solid var(--line);">
+                    <tr>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Invoice Number</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Date</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Project</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Milestone</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;">Client</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:right;">Amount</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:right;">Tax</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:right;">Total</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:center;">Status</th>
+                        <th style="padding:12px 14px;font-weight:700;color:var(--ink-600);font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;text-align:center;width:150px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="invoiceTableBody">
+                    <tr>
+                        <td colspan="10" style="padding:3rem;text-align:center;color:var(--ink-500);">
+                            <div style="display:inline-block;animation:spin 1s linear infinite;font-size:24px;color:var(--brand-600);margin-bottom:8px;">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </div>
+                            <div style="font-weight:600;">Loading invoices...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 1. ADD / EDIT INVOICE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="invoiceModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(3px);z-index:1050;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:700px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;">
+        <!-- Modal Header -->
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:8px;background:#eef2ff;color:var(--brand-600);display:flex;align-items:center;justify-content:center;font-size:18px;">
+                    <i class="bi bi-receipt"></i>
+                </div>
+                <div>
+                    <h3 id="invModalTitle" style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Create Milestone Invoice</h3>
+                    <p style="font-size:12px;color:var(--ink-500);margin:2px 0 0 0;">1 Milestone = 1 Invoice &bull; Connected directly to Database API</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeInvoiceModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px;">
+                &times;
+            </button>
+        </div>
+
+        <!-- Modal Body Form -->
+        <div style="padding:1.5rem;overflow-y:auto;flex:1;">
+            <form id="invoiceForm" onsubmit="submitInvoiceForm(event)">
+                <input type="hidden" id="modalInvId" value="0" />
+
+                <!-- Invoice Number -->
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        Invoice Number <span style="color:#ef4444;">*</span>
+                    </label>
+                    <input type="text" id="modalInvNumber" required readonly
+                           style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700;background:#f1f5f9;color:var(--ink-800);" />
+                </div>
+
+                <!-- Step 1: Project Selection -->
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        1. Project <span style="color:#ef4444;">*</span>
+                    </label>
+                    <select id="modalProjectSelect" required onchange="onProjectSelected()"
+                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:none;">
+                        <option value="">-- Select Project --</option>
+                    </select>
+                </div>
+
+                <!-- Step 2: Client Selection -->
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        2. Client <span style="color:#ef4444;">*</span>
+                    </label>
+                    <select id="modalClientSelect" required onchange="onClientSelected()"
+                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:none;">
+                        <option value="">-- Select Client --</option>
+                    </select>
+                </div>
+
+                <!-- Step 3: Milestone Selection (Displayed directly in the Create Invoice form) -->
+                <div style="margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                        <label style="font-size:12.5px;font-weight:600;color:var(--ink-700);margin:0;">
+                            3. Milestone <span style="color:#ef4444;">*</span> <small style="color:var(--brand-600);font-weight:600;">(1 Milestone = 1 Invoice)</small>
+                        </label>
+                        <span id="modalMilestoneCountBadge" style="font-size:11px;color:var(--ink-500);font-weight:600;"></span>
+                    </div>
+                    <input type="hidden" id="modalMilestoneId" name="milestoneId" required />
+                    <div id="modalMilestonesContainer" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:8px;max-height:220px;overflow-y:auto;padding:2px;">
+                        <div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);">
+                            Select a project to display its milestones.
+                        </div>
+                    </div>
+                    <div id="milestoneWarning" style="display:none;font-size:11.5px;color:#dc2626;font-weight:600;margin-top:4px;">
+                        <i class="bi bi-exclamation-triangle"></i> This milestone already has an invoice. Duplicate milestone invoices are not allowed.
+                    </div>
+                </div>
+
+                <!-- Dates: Invoice Date & Due Date -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Invoice Date <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="date" id="modalInvDate" required onchange="validateDates()"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Due Date <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="date" id="modalDueDate" required onchange="validateDates()"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                </div>
+
+                <!-- Financial Calculations Section -->
+                <div style="background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:1rem;margin-bottom:1rem;">
+                    <div style="font-size:12px;font-weight:700;color:var(--ink-600);text-transform:uppercase;margin-bottom:10px;letter-spacing:0.5px;">
+                        Amount & Tax Calculation
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
+                                Subtotal (₹) <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="number" id="modalAmount" step="0.01" min="0" required oninput="calculateTotals()"
+                                   style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;" />
+                            <span id="milestoneAutoHint" style="font-size:10.5px;color:var(--brand-600);font-weight:600;display:none;">From milestone database</span>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
+                                Discount (₹)
+                            </label>
+                            <input type="number" id="modalDiscount" step="0.01" min="0" value="0" oninput="calculateTotals()"
+                                   style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
+                                Tax Master
+                            </label>
+                            <select id="modalTaxRate" onchange="calculateTotals()"
+                                    style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                                @foreach (var t in LookupData.Taxes)
+                                {
+                                    <option value="@t.TaxRate" data-type="@t.TaxType" data-name="@t.TaxName" selected="@(t.TaxRate == 18 && t.TaxType == "GST")">
+                                        @t.TaxName (@t.TaxRate.ToString("0.##")%) [@t.TaxType]
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Live Breakdown: Taxable Amount, Tax Amount, Grand Total -->
+                    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);">
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                            <div style="font-size:12px;color:var(--ink-600);">
+                                Taxable Amount: <strong id="calcTaxableAmount" style="color:var(--ink-800);">₹0.00</strong>
+                            </div>
+                            <div style="font-size:12px;color:var(--ink-600);">
+                                Tax Amount: <strong id="calcTaxAmount" style="color:var(--ink-800);">₹0.00</strong>
+                            </div>
+                            <div style="font-size:13px;color:var(--ink-900);font-weight:700;">
+                                Grand Total: <span id="calcGrandTotal" style="color:var(--brand-600);font-size:15px;">₹0.00</span>
+                            </div>
+                        </div>
+                        <div id="calcTaxBreakdown" style="font-size:11.5px;color:var(--brand-600);margin-top:4px;font-weight:500;"></div>
+                    </div>
+                </div>
+
+                <!-- Notes & Instructions -->
+                <div>
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        Notes / Instructions
+                    </label>
+                    <textarea id="modalNotes" rows="2" placeholder="Payment terms, bank details, deliverables..."
+                              style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;"></textarea>
+                </div>
+            </form>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#f8fafc;">
+            <button type="button" class="btn btn-outline" onclick="closeInvoiceModal()" style="font-weight:600;">Cancel</button>
+            <button type="submit" form="invoiceForm" id="btnSaveInvoice" class="btn btn-primary" style="font-weight:600;min-width:120px;">
+                <i class="bi bi-check-lg"></i> Save Invoice
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 2. ADD RECURRING INVOICE MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="recurringModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(3px);z-index:1050;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;">
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:8px;background:#f5f3ff;color:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:18px;">
+                    <i class="bi bi-arrow-repeat"></i>
+                </div>
+                <div>
+                    <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Add Recurring Invoice</h3>
+                    <p style="font-size:12px;color:var(--ink-500);margin:2px 0 0 0;">Weekly, Monthly, Quarterly, or Yearly Billing</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeRecurringModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:20px;cursor:pointer;">
+                &times;
+            </button>
+        </div>
+
+        <div style="padding:1.5rem;overflow-y:auto;flex:1;">
+            <form id="recurringForm" onsubmit="submitRecurringForm(event)">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Client <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="recClientSelect" required onchange="onRecClientSelected()"
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="">-- Select Client --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Project <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="recProjectSelect" required
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="">-- Select Client First --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        Description / Title <span style="color:#ef4444;">*</span>
+                    </label>
+                    <input type="text" id="recDescription" required placeholder="e.g. Monthly Maintenance / Retainer"
+                           style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Amount (₹) <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="number" id="recAmount" step="0.01" min="0" required oninput="calculateRecTotals()"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Tax Master
+                        </label>
+                        <select id="recTaxRate" onchange="calculateRecTotals()"
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            @foreach (var t in LookupData.Taxes)
+                            {
+                                <option value="@t.TaxRate" data-type="@t.TaxType" data-name="@t.TaxName" selected="@(t.TaxRate == 18 && t.TaxType == "GST")">
+                                    @t.TaxName (@t.TaxRate.ToString("0.##")%) [@t.TaxType]
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Frequency <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="recFrequency" required
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly" selected>Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Yearly">Yearly</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:1rem;display:flex;justify-content:space-between;font-size:13px;">
+                    <span>Tax Amount: <strong id="recTaxAmountText">₹0.00</strong></span>
+                    <span>Grand Total: <strong id="recGrandTotalText" style="color:var(--brand-600);font-size:14px;">₹0.00</strong></span>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Start Date <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="date" id="recStartDate" required
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            End Date (Optional)
+                        </label>
+                        <input type="date" id="recEndDate"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Status <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="recStatus" required
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="Active" selected>Active</option>
+                            <option value="Paused">Paused</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#f8fafc;">
+            <button type="button" class="btn btn-outline" onclick="closeRecurringModal()" style="font-weight:600;">Cancel</button>
+            <button type="submit" form="recurringForm" id="btnSaveRecurring" class="btn btn-primary" style="font-weight:600;background:#7c3aed;border-color:#7c3aed;min-width:140px;">
+                <i class="bi bi-check-circle"></i> Save Profile
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 3. RECORD PAYMENT MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(3px);z-index:1050;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:540px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;">
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:8px;background:#ecfdf5;color:#059669;display:flex;align-items:center;justify-content:center;font-size:18px;">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+                <div>
+                    <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Record Payment</h3>
+                    <p style="font-size:12px;color:var(--ink-500);margin:2px 0 0 0;">Synchronizes Paid Amount & Dynamic Invoice Status in Database</p>
+                </div>
+            </div>
+            <button type="button" onclick="closePaymentModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:20px;cursor:pointer;">
+                &times;
+            </button>
+        </div>
+
+        <div style="padding:1.5rem;">
+            <form id="paymentForm" onsubmit="submitPaymentForm(event)">
+                <input type="hidden" id="payInvoiceId" value="0" />
+
+                <!-- Invoice Summary Banner -->
+                <div style="background:#f1f5f9;border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                        <span style="font-size:12px;color:var(--ink-600);font-weight:600;">Invoice:</span>
+                        <span id="payInvNumberBadge" style="font-size:12px;font-weight:700;color:var(--brand-600);">INV-0000</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                        <span style="font-size:12px;color:var(--ink-600);">Client / Project:</span>
+                        <span id="payClientProjectText" style="font-size:12px;font-weight:600;color:var(--ink-800);">—</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;border-top:1px dashed #cbd5e1;padding-top:4px;margin-top:4px;">
+                        <span style="font-size:12px;color:var(--ink-600);">Grand Total / Remaining:</span>
+                        <span style="font-size:12.5px;font-weight:700;color:var(--ink-900);">
+                            <span id="payGrandTotal">₹0</span> / <span id="payRemaining" style="color:#d97706;">₹0</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Payment Amount (₹) <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="number" id="payAmount" step="0.01" min="0.01" required
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700;color:#059669;" />
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Payment Date <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="date" id="payDate" required
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Payment Method <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="payMethod" required
+                                style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cash">Cash</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Card">Card</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Transaction / Ref #
+                        </label>
+                        <input type="text" id="payRef" placeholder="UTR / Txn ID / Cheque #"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;" />
+                    </div>
+                </div>
+
+                <div style="margin-bottom:0.5rem;">
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        Notes
+                    </label>
+                    <textarea id="payNotes" rows="2" placeholder="Deposit remarks, reference..."
+                              style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;"></textarea>
+                </div>
+            </form>
+        </div>
+
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:10px;background:#f8fafc;">
+            <button type="button" class="btn btn-outline" onclick="closePaymentModal()" style="font-weight:600;">Cancel</button>
+            <button type="submit" form="paymentForm" id="btnSavePayment" class="btn btn-primary" style="font-weight:600;background:#059669;border-color:#059669;min-width:130px;">
+                <i class="bi bi-check-circle"></i> Save Payment
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 4. PDF FORM PREVIEW / PRINT MODAL -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="pdfPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);z-index:1060;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:840px;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;">
+        <!-- Modal Toolbar -->
+        <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <i class="bi bi-file-earmark-pdf" style="color:#dc2626;font-size:20px;"></i>
+                <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Invoice PDF Form</h3>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="btn btn-primary" type="button" onclick="printPdfContent()" style="font-weight:600;background:#4f46e5;">
+                    <i class="bi bi-printer"></i> Print / Save as PDF
+                </button>
+                <button type="button" onclick="closePdfPreviewModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:22px;cursor:pointer;padding:0 6px;">
+                    &times;
+                </button>
+            </div>
+        </div>
+
+        <!-- Printable Document Body -->
+        <div id="pdfPrintableArea" style="padding:2.5rem;overflow-y:auto;flex:1;background:#fff;font-family:'Inter',sans-serif;color:#1e293b;">
+            <!-- Rendered dynamically -->
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 5. SELECT INVOICE FOR PDF FORM MODAL (When clicking top 'PDF Form' button) -->
+<!-- ========================================================================= -->
+<div class="modal-backdrop-custom" id="selectPdfModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(3px);z-index:1050;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);overflow:hidden;">
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <i class="bi bi-file-earmark-pdf" style="color:#dc2626;font-size:20px;"></i>
+                <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Generate PDF Form</h3>
+            </div>
+            <button type="button" onclick="closeSelectPdfModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:20px;cursor:pointer;">
+                &times;
+            </button>
+        </div>
+        <div style="padding:1.5rem;">
+            <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:6px;">
+                Select Invoice to Generate / Print PDF:
+            </label>
+            <select id="selectPdfInvoiceId" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;">
+                <!-- Populated dynamically -->
+            </select>
+        </div>
+        <div style="padding:1rem 1.5rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px;background:#f8fafc;">
+            <button type="button" class="btn btn-outline" onclick="closeSelectPdfModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="proceedToPdfFromSelect()" style="background:#dc2626;border-color:#dc2626;">
+                <i class="bi bi-file-earmark-pdf"></i> Open PDF Form
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastNotification" style="display:none;position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.2);z-index:9999;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:10px;transition:opacity 0.3s ease;">
+    <i class="bi bi-check-circle-fill" style="color:#10b981;font-size:18px;"></i>
+    <span id="toastMessage">Success</span>
+</div>
+
+@section Scripts {
+<script>
+    // Real invoice and project state storage (Synchronised with backend database / API)
+    let rawInvoices = [];
+    let allClients = [];
+    let allProjects = [];
+    let currentProjectMilestones = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadInvoicesFromServer();
+        loadClientsFromServer();
+        loadProjectsFromServer();
+
+        // Close export dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('exportDropdownMenu');
+            const btn = document.getElementById('btnExport');
+            if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
+    });
+
+    function toggleExportMenu(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('exportDropdownMenu');
+        if (menu) {
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+    }
+
+    function showToast(msg, isError = false) {
+        const t = document.getElementById('toastNotification');
+        if (!t) return;
+        const icon = t.querySelector('i');
+        const msgSpan = document.getElementById('toastMessage');
+        if (msgSpan) msgSpan.textContent = msg;
+
+        if (isError) {
+            t.style.background = '#ef4444';
+            if (icon) {
+                icon.className = 'bi bi-exclamation-triangle-fill';
+                icon.style.color = '#fff';
+            }
+        } else {
+            t.style.background = '#1e293b';
+            if (icon) {
+                icon.className = 'bi bi-check-circle-fill';
+                icon.style.color = '#10b981';
+            }
+        }
+
+        t.style.display = 'flex';
+        t.style.opacity = '1';
+        setTimeout(() => {
+            t.style.opacity = '0';
+            setTimeout(() => t.style.display = 'none', 300);
+        }, 3500);
+    }
+
+    function formatCurrency(num) {
+        const val = Number(num) || 0;
+        return '₹' + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // ── Update Statistics From Real Invoices Only ─────────────────────────────
+    function updateInvoiceStats(invoices) {
+        const totalCount = invoices.length;
+        let totalRevenue = 0;
+        let totalPaid = 0;
+        let totalPending = 0;
+        let paidCount = 0;
+        let pendingCount = 0;
+
+        invoices.forEach(inv => {
+            const grandTotal = inv.grandTotal || 0;
+            const paid = inv.paidAmount || 0;
+            const remaining = inv.remainingAmount !== undefined ? inv.remainingAmount : Math.max(0, grandTotal - paid);
+            const status = (inv.paymentStatus || 'Pending').toLowerCase();
+
+            totalRevenue += grandTotal;
+            totalPaid += paid;
+            totalPending += remaining;
+
+            if (status === 'paid') {
+                paidCount++;
+            } else {
+                pendingCount++;
+            }
+        });
+
+        const elTotalCount = document.getElementById('statTotalCount');
+        const elTotalSubtext = document.getElementById('statTotalSubtext');
+        const elPaidAmount = document.getElementById('statPaidAmount');
+        const elPaidCount = document.getElementById('statPaidCount');
+        const elPendingAmount = document.getElementById('statPendingAmount');
+        const elPendingCount = document.getElementById('statPendingCount');
+        const elRevenueAmount = document.getElementById('statRevenueAmount');
+
+        if (elTotalCount) elTotalCount.textContent = totalCount;
+        if (elTotalSubtext) elTotalSubtext.textContent = `${formatCurrency(totalRevenue)} Invoiced`;
+        if (elPaidAmount) elPaidAmount.textContent = formatCurrency(totalPaid);
+        if (elPaidCount) elPaidCount.textContent = `${paidCount} Paid`;
+        if (elPendingAmount) elPendingAmount.textContent = formatCurrency(totalPending);
+        if (elPendingCount) elPendingCount.textContent = `${pendingCount} Pending`;
+        if (elRevenueAmount) elRevenueAmount.textContent = formatCurrency(totalRevenue);
+    }
+
+    // ── API: Load Invoices from Database ───────────────────────────────────────
+    async function loadInvoicesFromServer() {
+        const icon = document.getElementById('refreshIcon');
+        if (icon) icon.classList.add('spin');
+
+        const tbody = document.getElementById('invoiceTableBody');
+        if (tbody && rawInvoices.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" style="padding:3rem;text-align:center;color:var(--ink-500);">
+                        <div style="display:inline-block;animation:spin 1s linear infinite;font-size:24px;color:var(--brand-600);margin-bottom:8px;">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </div>
+                        <div style="font-weight:600;">Loading invoices...</div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        try {
+            const res = await fetch('/api/invoices');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.message || `Server returned ${res.status}: Failed to fetch invoices`);
+            }
+            rawInvoices = await res.json();
+            updateInvoiceStats(rawInvoices);
+            filterInvoiceTable();
+        } catch (err) {
+            console.error(err);
+            if (tbody) {
+                tbody.innerHTML = '';
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 10;
+                td.style.padding = '2.5rem';
+                td.style.textAlign = 'center';
+                td.style.color = '#ef4444';
+
+                const iconEl = document.createElement('i');
+                iconEl.className = 'bi bi-exclamation-circle';
+                iconEl.style.fontSize = '28px';
+
+                const titleEl = document.createElement('div');
+                titleEl.style.marginTop = '6px';
+                titleEl.style.fontWeight = '700';
+                titleEl.style.fontSize = '14px';
+                titleEl.textContent = 'Failed to load invoices';
+
+                const msgEl = document.createElement('div');
+                msgEl.style.fontSize = '12.5px';
+                msgEl.style.color = 'var(--ink-600)';
+                msgEl.style.marginTop = '4px';
+                msgEl.textContent = err.message || 'An error occurred while communicating with the database.';
+
+                const retryBtn = document.createElement('button');
+                retryBtn.className = 'btn btn-outline';
+                retryBtn.type = 'button';
+                retryBtn.onclick = () => loadInvoicesFromServer();
+                retryBtn.style.marginTop = '12px';
+                retryBtn.style.fontSize = '12px';
+                retryBtn.style.padding = '5px 12px';
+                retryBtn.style.fontWeight = '600';
+                retryBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Try Again';
+
+                td.appendChild(iconEl);
+                td.appendChild(titleEl);
+                td.appendChild(msgEl);
+                td.appendChild(retryBtn);
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+            }
+            updateInvoiceStats([]);
+        } finally {
+            if (icon) icon.classList.remove('spin');
+        }
+    }
+
+    // ── API: Load Clients ──────────────────────────────────────────────────────
+    async function loadClientsFromServer() {
+        try {
+            const res = await fetch('/api/clients');
+            if (res.ok) {
+                allClients = await res.json();
+                populateClientDropdowns(allClients);
+            }
+        } catch (e) {
+            console.warn('Clients lookup error:', e);
+        }
+    }
+
+    function populateClientDropdowns(clients) {
+        const invSelect = document.getElementById('modalClientSelect');
+        const recSelect = document.getElementById('recClientSelect');
+
+        if (invSelect) {
+            invSelect.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '-- Select Client --';
+            invSelect.appendChild(defaultOpt);
+
+            clients.forEach(c => {
+                const name = c.companyName || c.clientName || 'Client';
+                const extra = c.clientName && c.companyName !== c.clientName ? ` (${c.clientName})` : '';
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name + extra;
+                invSelect.appendChild(opt);
+            });
+        }
+
+        if (recSelect) {
+            recSelect.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = '-- Select Client --';
+            recSelect.appendChild(defaultOpt);
+
+            clients.forEach(c => {
+                const name = c.companyName || c.clientName || 'Client';
+                const extra = c.clientName && c.companyName !== c.clientName ? ` (${c.clientName})` : '';
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name + extra;
+                recSelect.appendChild(opt);
+            });
+        }
+    }
+
+    // ── API: Load Projects ─────────────────────────────────────────────────────
+    async function loadProjectsFromServer() {
+        try {
+            const res = await fetch('/api/projects');
+            if (res.ok) {
+                allProjects = await res.json();
+                populateProjectDropdown(allProjects);
+            }
+        } catch (e) {
+            console.warn('Projects lookup error:', e);
+        }
+    }
+
+    function populateProjectDropdown(projects, selectedProjectId = null) {
+        const select = document.getElementById('modalProjectSelect');
+        if (!select) return;
+
+        select.innerHTML = '';
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = projects.length > 0 ? '-- Select Project --' : 'No projects available';
+        select.appendChild(defaultOpt);
+
+        projects.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            const codePrefix = p.projectCode ? p.projectCode + ' - ' : '';
+            const clientLabel = p.clientCompany || p.clientName;
+            opt.textContent = `${codePrefix}${p.projectName}${clientLabel ? ' (' + clientLabel + ')' : ''}`;
+            select.appendChild(opt);
+        });
+
+        if (selectedProjectId) {
+            select.value = String(selectedProjectId);
+        }
+    }
+
+    // ── Filter & Render Invoice Table ──────────────────────────────────────────
+    function filterInvoiceTable() {
+        const query = (document.getElementById('invoiceSearchInput')?.value || '').trim().toLowerCase();
+        const status = document.getElementById('invoiceStatusFilter')?.value || 'All';
+
+        let filtered = rawInvoices.slice();
+
+        if (query) {
+            filtered = filtered.filter(i =>
+                (i.invoiceNumber && i.invoiceNumber.toLowerCase().includes(query)) ||
+                (i.clientName && i.clientName.toLowerCase().includes(query)) ||
+                (i.clientCompany && i.clientCompany.toLowerCase().includes(query)) ||
+                (i.projectName && i.projectName.toLowerCase().includes(query)) ||
+                (i.milestoneName && i.milestoneName.toLowerCase().includes(query)));
+        }
+
+        if (status !== 'All') {
+            filtered = filtered.filter(i => {
+                const s = i.paymentStatus || 'Pending';
+                if (status === 'Pending') return s === 'Pending' || s === 'Unpaid';
+                if (status === 'Partial Paid') return s === 'Partial Paid' || s === 'Partially Paid';
+                return s.toLowerCase() === status.toLowerCase();
+            });
+        }
+
+        renderInvoiceTable(filtered);
+    }
+
+    function renderInvoiceTable(invoices) {
+        const tbody = document.getElementById('invoiceTableBody');
+        const badge = document.getElementById('invoiceCountBadge');
+
+        if (badge) badge.textContent = `${invoices.length} invoice${invoices.length === 1 ? '' : 's'}`;
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        if (!invoices.length) {
+            const emptyRow = document.createElement('tr');
+            emptyRow.innerHTML = `
+                <td colspan="10" style="padding:3.5rem;text-align:center;color:var(--ink-400);">
+                    <i class="bi bi-receipt" style="font-size:32px;color:var(--ink-300);"></i>
+                    <div style="font-weight:700;font-size:15px;color:var(--ink-700);margin-top:8px;">No invoices found.</div>
+                    <div style="font-size:12.5px;color:var(--ink-500);margin-top:2px;">Click <strong>+ Add Invoice</strong> to create a new milestone invoice.</div>
+                </td>
+            `;
+            tbody.appendChild(emptyRow);
+            return;
+        }
+
+        invoices.forEach(inv => {
+            const id = inv.id;
+            const invNum = inv.invoiceNumber || `INV-${id}`;
+            const client = inv.clientCompany || inv.clientName || '—';
+            const proj = inv.projectName || '—';
+            const milestone = inv.milestoneName || '—';
+            const invDate = inv.invoiceDate || '—';
+            const subtotal = inv.amount || 0;
+            const taxRate = inv.taxRate || 0;
+            const taxAmount = inv.tax || 0;
+            const grandTotal = inv.grandTotal || 0;
+            const paid = inv.paidAmount || 0;
+            const remaining = inv.remainingAmount !== undefined ? inv.remainingAmount : Math.max(0, grandTotal - paid);
+            const status = inv.paymentStatus || 'Pending';
+
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid var(--line)';
+
+            // 1. Invoice Number
+            const tdNum = document.createElement('td');
+            tdNum.style.padding = '12px 14px';
+            const linkNum = document.createElement('a');
+            linkNum.href = `/Finance/InvoiceDetails/${id}`;
+            linkNum.style.fontWeight = '700';
+            linkNum.style.color = 'var(--brand-600)';
+            linkNum.style.textDecoration = 'none';
+            linkNum.style.fontFamily = 'monospace';
+            linkNum.style.fontSize = '13.5px';
+            linkNum.textContent = invNum;
+            tdNum.appendChild(linkNum);
+            tr.appendChild(tdNum);
+
+            // 2. Date
+            const tdDate = document.createElement('td');
+            tdDate.style.padding = '12px 14px';
+            tdDate.style.color = 'var(--ink-600)';
+            tdDate.textContent = invDate;
+            tr.appendChild(tdDate);
+
+            // 3. Project
+            const tdProj = document.createElement('td');
+            tdProj.style.padding = '12px 14px';
+            tdProj.style.color = 'var(--ink-700)';
+            if (inv.projectId) {
+                const linkProj = document.createElement('a');
+                linkProj.href = `/Work/ProjectDetails?id=${inv.projectId}&tab=invoice`;
+                linkProj.style.color = 'var(--ink-800)';
+                linkProj.style.textDecoration = 'none';
+                linkProj.style.fontWeight = '600';
+                linkProj.textContent = proj;
+                tdProj.appendChild(linkProj);
+            } else {
+                tdProj.textContent = proj;
+            }
+            tr.appendChild(tdProj);
+
+            // 4. Milestone
+            const tdMs = document.createElement('td');
+            tdMs.style.padding = '12px 14px';
+            const msSpan = document.createElement('span');
+            msSpan.style.display = 'inline-flex';
+            msSpan.style.alignItems = 'center';
+            msSpan.style.gap = '4px';
+            msSpan.style.color = 'var(--ink-700)';
+            msSpan.style.fontWeight = '600';
+            msSpan.style.fontSize = '12.5px';
+            msSpan.innerHTML = '<i class="bi bi-flag" style="color:var(--brand-600);font-size:11px;"></i> ';
+            const msNameNode = document.createTextNode(milestone);
+            msSpan.appendChild(msNameNode);
+            tdMs.appendChild(msSpan);
+            tr.appendChild(tdMs);
+
+            // 5. Client
+            const tdClient = document.createElement('td');
+            tdClient.style.padding = '12px 14px';
+            tdClient.style.fontWeight = '600';
+            tdClient.style.color = 'var(--ink-800)';
+            tdClient.textContent = client;
+            tr.appendChild(tdClient);
+
+            // 6. Subtotal Amount
+            const tdAmount = document.createElement('td');
+            tdAmount.style.padding = '12px 14px';
+            tdAmount.style.textAlign = 'right';
+            tdAmount.style.fontWeight = '600';
+            tdAmount.style.color = 'var(--ink-800)';
+            tdAmount.textContent = formatCurrency(subtotal);
+            tr.appendChild(tdAmount);
+
+            // 7. Tax
+            const tdTax = document.createElement('td');
+            tdTax.style.padding = '12px 14px';
+            tdTax.style.textAlign = 'right';
+            tdTax.style.color = 'var(--ink-600)';
+            tdTax.style.fontSize = '12px';
+            tdTax.innerHTML = `${formatCurrency(taxAmount)} <span style="font-size:10.5px;color:var(--ink-400);">(${taxRate}%)</span>`;
+            tr.appendChild(tdTax);
+
+            // 8. Grand Total
+            const tdTotal = document.createElement('td');
+            tdTotal.style.padding = '12px 14px';
+            tdTotal.style.textAlign = 'right';
+            tdTotal.style.fontWeight = '700';
+            tdTotal.style.color = 'var(--ink-900)';
+            tdTotal.style.fontSize = '13.5px';
+            tdTotal.textContent = formatCurrency(grandTotal);
+            tr.appendChild(tdTotal);
+
+            // 9. Status Badge
+            const tdStatus = document.createElement('td');
+            tdStatus.style.padding = '12px 14px';
+            tdStatus.style.textAlign = 'center';
+            let badgeHtml = '';
+            if (status === 'Paid') {
+                badgeHtml = '<span class="badge" style="background:#ecfdf5;color:#059669;font-weight:700;border:1px solid #a7f3d0;"><i class="bi bi-check2-circle"></i> Paid</span>';
+            } else if (status === 'Partial Paid' || status === 'Partially Paid') {
+                badgeHtml = '<span class="badge" style="background:#eff6ff;color:#2563eb;font-weight:700;border:1px solid #bfdbfe;"><i class="bi bi-hourglass-split"></i> Partial Paid</span>';
+            } else if (status === 'Overdue') {
+                badgeHtml = '<span class="badge" style="background:#fef2f2;color:#dc2626;font-weight:700;border:1px solid #fecaca;"><i class="bi bi-exclamation-circle"></i> Overdue</span>';
+            } else {
+                badgeHtml = '<span class="badge" style="background:#fffbeb;color:#d97706;font-weight:700;border:1px solid #fde68a;"><i class="bi bi-clock"></i> Pending</span>';
+            }
+            tdStatus.innerHTML = badgeHtml;
+            tr.appendChild(tdStatus);
+
+            // 10. Action Buttons
+            const tdActions = document.createElement('td');
+            tdActions.style.padding = '12px 14px';
+            tdActions.style.textAlign = 'center';
+
+            const actionsWrap = document.createElement('div');
+            actionsWrap.style.display = 'inline-flex';
+            actionsWrap.style.alignItems = 'center';
+            actionsWrap.style.gap = '4px';
+
+            // View
+            const btnView = document.createElement('a');
+            btnView.href = `/Finance/InvoiceDetails/${id}`;
+            btnView.className = 'btn-action btn-view';
+            btnView.title = 'View Details';
+            btnView.innerHTML = '<i class="bi bi-eye"></i>';
+            actionsWrap.appendChild(btnView);
+
+            // Edit
+            const btnEdit = document.createElement('button');
+            btnEdit.type = 'button';
+            btnEdit.className = 'btn-action btn-edit';
+            btnEdit.title = 'Edit Invoice';
+            btnEdit.innerHTML = '<i class="bi bi-pencil"></i>';
+            btnEdit.onclick = () => openEditInvoiceModal(id);
+            actionsWrap.appendChild(btnEdit);
+
+            // PDF Form
+            const btnPdf = document.createElement('button');
+            btnPdf.type = 'button';
+            btnPdf.className = 'btn-action btn-view';
+            btnPdf.title = 'PDF Form';
+            btnPdf.style.color = '#dc2626';
+            btnPdf.innerHTML = '<i class="bi bi-file-earmark-pdf"></i>';
+            btnPdf.onclick = () => generatePdfForInvoice(id);
+            actionsWrap.appendChild(btnPdf);
+
+            // Payment if remaining
+            if (remaining > 0) {
+                const btnPay = document.createElement('button');
+                btnPay.type = 'button';
+                btnPay.className = 'btn-action';
+                btnPay.title = 'Record Payment';
+                btnPay.style.color = '#059669';
+                btnPay.style.background = '#ecfdf5';
+                btnPay.innerHTML = '<i class="bi bi-cash-stack"></i>';
+                btnPay.onclick = () => openPaymentModalForInvoice(id);
+                actionsWrap.appendChild(btnPay);
+            }
+
+            // Delete
+            const btnDel = document.createElement('button');
+            btnDel.type = 'button';
+            btnDel.className = 'btn-action btn-delete';
+            btnDel.title = 'Delete Invoice';
+            btnDel.innerHTML = '<i class="bi bi-trash"></i>';
+            btnDel.onclick = () => deleteInvoice(id, invNum);
+            actionsWrap.appendChild(btnDel);
+
+            tdActions.appendChild(actionsWrap);
+            tr.appendChild(tdActions);
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    // ── Create / Edit Invoice Modal Logic ──────────────────────────────────────
+    async function openCreateInvoiceModal() {
+        document.getElementById('modalInvId').value = '0';
+        document.getElementById('invModalTitle').textContent = 'Create Milestone Invoice';
+        document.getElementById('modalAmount').value = '';
+        document.getElementById('modalDiscount').value = '0';
+        document.getElementById('modalTaxRate').value = '18';
+        document.getElementById('modalNotes').value = '';
+        document.getElementById('milestoneWarning').style.display = 'none';
+        document.getElementById('milestoneAutoHint').style.display = 'none';
+
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('modalInvDate').value = today;
+        const due = new Date();
+        due.setDate(due.getDate() + 15);
+        document.getElementById('modalDueDate').value = due.toISOString().split('T')[0];
+
+        try {
+            const res = await fetch('/api/invoices/next-code');
+            const data = await res.json();
+            document.getElementById('modalInvNumber').value = data.invoiceNumber || 'INV-0001';
+        } catch {
+            document.getElementById('modalInvNumber').value = 'INV-0001';
+        }
+
+        document.getElementById('modalClientSelect').value = '';
+        populateProjectDropdown(allProjects);
+
+        document.getElementById('modalMilestoneId').value = '';
+        const msContainer = document.getElementById('modalMilestonesContainer');
+        if (msContainer) {
+            msContainer.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);">Select a project to display its milestones.</div>';
+        }
+        const countBadge = document.getElementById('modalMilestoneCountBadge');
+        if (countBadge) countBadge.textContent = '';
+
+        calculateTotals();
+        document.getElementById('invoiceModal').style.display = 'flex';
+    }
+
+    async function openEditInvoiceModal(id) {
+        const inv = rawInvoices.find(i => i.id === id);
+        if (!inv) return;
+
+        document.getElementById('modalInvId').value = inv.id;
+        document.getElementById('invModalTitle').textContent = `Edit Invoice (${inv.invoiceNumber})`;
+        document.getElementById('modalInvNumber').value = inv.invoiceNumber;
+        document.getElementById('modalInvDate').value = inv.invoiceDate || '';
+        document.getElementById('modalDueDate').value = inv.dueDate || '';
+        document.getElementById('modalAmount').value = inv.amount || 0;
+        document.getElementById('modalDiscount').value = inv.discount || 0;
+
+        const taxSel = document.getElementById('modalTaxRate');
+        if (taxSel && inv.taxRate !== undefined) {
+            let matched = false;
+            for (let i = 0; i < taxSel.options.length; i++) {
+                const optRate = parseFloat(taxSel.options[i].value);
+                const optType = taxSel.options[i].getAttribute('data-type') || '';
+                if (Math.abs(optRate - inv.taxRate) < 0.001 && (!inv.taxType || optType.toLowerCase() === (inv.taxType || '').toLowerCase())) {
+                    taxSel.selectedIndex = i;
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                for (let i = 0; i < taxSel.options.length; i++) {
+                    if (Math.abs(parseFloat(taxSel.options[i].value) - inv.taxRate) < 0.001) {
+                        taxSel.selectedIndex = i;
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            if (!matched) {
+                const customOpt = document.createElement('option');
+                customOpt.value = inv.taxRate;
+                customOpt.setAttribute('data-type', inv.taxType || 'GST');
+                customOpt.setAttribute('data-name', inv.taxName || `Tax ${inv.taxRate}%`);
+                customOpt.textContent = `${inv.taxName || 'Tax'} (${inv.taxRate}%)`;
+                customOpt.selected = true;
+                taxSel.appendChild(customOpt);
+            }
+        }
+
+        document.getElementById('modalNotes').value = inv.notes || '';
+        document.getElementById('milestoneWarning').style.display = 'none';
+        document.getElementById('milestoneAutoHint').style.display = 'none';
+
+        const clientName = inv.clientCompany || inv.clientName || '';
+        document.getElementById('modalClientSelect').value = clientName;
+
+        populateProjectDropdown(allProjects, inv.projectId);
+        if (inv.projectId) {
+            await loadMilestonesForProject(inv.projectId, inv.milestoneId);
+        }
+
+        calculateTotals();
+        document.getElementById('invoiceModal').style.display = 'flex';
+    }
+
+    function closeInvoiceModal() {
+        document.getElementById('invoiceModal').style.display = 'none';
+    }
+
+    function onClientSelected() {
+        const client = document.getElementById('modalClientSelect').value;
+        const projectSelect = document.getElementById('modalProjectSelect');
+        const container = document.getElementById('modalMilestonesContainer');
+        const hiddenMilestoneId = document.getElementById('modalMilestoneId');
+
+        if (hiddenMilestoneId) hiddenMilestoneId.value = '';
+        if (container) {
+            container.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);">Select a project to display its milestones.</div>';
+        }
+
+        if (!client) {
+            populateProjectDropdown(allProjects);
+            return;
+        }
+
+        const filtered = allProjects.filter(p =>
+            (p.clientCompany && p.clientCompany.toLowerCase() === client.toLowerCase()) ||
+            (p.clientName && p.clientName.toLowerCase() === client.toLowerCase()));
+
+        populateProjectDropdown(filtered);
+    }
+
+    async function onProjectSelected() {
+        const projectId = document.getElementById('modalProjectSelect').value;
+        const container = document.getElementById('modalMilestonesContainer');
+        const hiddenMilestoneId = document.getElementById('modalMilestoneId');
+
+        if (hiddenMilestoneId) hiddenMilestoneId.value = '';
+        if (container) container.innerHTML = '';
+
+        if (!projectId) {
+            if (container) {
+                container.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);">Select a project to display its milestones.</div>';
+            }
+            selectMilestoneForInvoiceModal(null);
+            return;
+        }
+
+        // Auto-select client matching the selected project
+        const project = allProjects.find(p => p.id === Number(projectId));
+        if (project) {
+            const clientSelect = document.getElementById('modalClientSelect');
+            const targetClient = project.clientCompany || project.clientName;
+            if (clientSelect && targetClient) {
+                clientSelect.value = targetClient;
+            }
+        }
+
+        await loadMilestonesForProject(projectId);
+    }
+
+    async function loadMilestonesForProject(projectId, selectedMilestoneId = null) {
+        const container = document.getElementById('modalMilestonesContainer');
+        const hiddenInput = document.getElementById('modalMilestoneId');
+        const countBadge = document.getElementById('modalMilestoneCountBadge');
+        if (!container) return;
+
+        container.innerHTML = ''; // Clean container during fetch
+
+        try {
+            const res = await fetch(`/api/milestones?projectId=${projectId}`);
+            currentProjectMilestones = res.ok ? await res.json() : [];
+            const currentInvId = parseInt(document.getElementById('modalInvId').value, 10) || 0;
+
+            if (countBadge) {
+                countBadge.textContent = `${currentProjectMilestones.length} Milestone${currentProjectMilestones.length === 1 ? '' : 's'}`;
+            }
+
+            if (!currentProjectMilestones.length) {
+                container.innerHTML = `
+                    <div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);text-align:center;">
+                        No milestones found for this project.
+                    </div>
+                `;
+                if (hiddenInput) hiddenInput.value = '';
+                selectMilestoneForInvoiceModal(null);
+                return;
+            }
+
+            let defaultSelectedId = null;
+
+            currentProjectMilestones.forEach(m => {
+                const amount = Number(m.amount > 0 ? m.amount : (m.effectiveAmount || 0));
+                const alreadyInvoiced = rawInvoices.some(i => i.milestoneId === m.id && i.id !== currentInvId);
+                const isSelected = selectedMilestoneId && Number(selectedMilestoneId) === m.id;
+                const status = m.status || 'Pending';
+                const msCode = m.milestoneCode || 'MLS';
+                const msName = m.milestoneName || 'Milestone';
+                const prog = Number(m.progressPercent) || 0;
+
+                if (!alreadyInvoiced && !defaultSelectedId) {
+                    defaultSelectedId = m.id;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'inv-modal-ms-card' + (alreadyInvoiced ? ' inv-modal-ms-disabled' : '');
+                card.id = `modal-ms-card-${m.id}`;
+                card.style.borderRadius = '8px';
+                card.style.padding = '9px 11px';
+                card.style.transition = 'all 0.15s ease';
+                card.style.display = 'flex';
+                card.style.flexDirection = 'column';
+                card.style.justifyContent = 'space-between';
+
+                if (alreadyInvoiced) {
+                    card.style.border = '1px solid #e2e8f0';
+                    card.style.background = '#f8fafc';
+                    card.style.opacity = '0.65';
+                    card.style.cursor = 'not-allowed';
+
+                    card.innerHTML = `
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
+                            <span class="badge" style="font-size:10px;background:#f1f5f9;color:var(--ink-600);border:1px solid #cbd5e1;"></span>
+                            <span class="badge" style="font-size:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-weight:700;">
+                                <i class="bi bi-lock-fill"></i> Invoiced
+                            </span>
+                        </div>
+                        <div class="ms-card-name" style="font-weight:700;font-size:12.5px;color:var(--ink-700);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                        <div style="font-size:11.5px;color:var(--ink-500);display:flex;justify-content:space-between;align-items:center;">
+                            <span class="ms-card-amount"></span>
+                            <span class="ms-card-due"></span>
+                        </div>
+                    `;
+                    card.querySelector('.badge').textContent = msCode;
+                    const nameEl = card.querySelector('.ms-card-name');
+                    nameEl.textContent = msName;
+                    nameEl.title = msName;
+                    card.querySelector('.ms-card-amount').textContent = formatCurrency(amount);
+                    if (m.dueDate) card.querySelector('.ms-card-due').textContent = 'Due: ' + m.dueDate;
+                } else {
+                    card.style.cursor = 'pointer';
+                    if (isSelected) {
+                        card.style.border = '2px solid var(--brand-600)';
+                        card.style.background = '#eff6ff';
+                        card.style.boxShadow = '0 2px 6px rgba(79,70,229,0.15)';
+                    } else {
+                        card.style.border = '1px solid var(--line)';
+                        card.style.background = '#fff';
+                    }
+
+                    const statusBadgeClass = status === 'Completed' ? 'badge-success' : status === 'In Progress' ? 'badge-info' : 'badge-secondary';
+                    card.innerHTML = `
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
+                            <span class="badge badge-code" style="font-weight:700;font-size:10px;"></span>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <span class="badge ${statusBadgeClass}" style="font-size:10px;"></span>
+                                <span class="modal-ms-check" id="modal-ms-check-${m.id}">
+                                    ${isSelected ? '<i class="bi bi-check-circle-fill" style="color:var(--brand-600);font-size:15px;"></i>' : '<i class="bi bi-circle" style="color:var(--ink-400);font-size:15px;"></i>'}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="ms-card-name" style="font-weight:700;font-size:13px;color:var(--ink-900);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;padding-top:3px;border-top:1px dashed #e2e8f0;margin-top:2px;">
+                            <strong class="ms-card-amount" style="color:var(--brand-600);font-size:12.5px;"></strong>
+                            <span class="ms-card-meta" style="color:var(--ink-500);font-size:11px;"></span>
+                        </div>
+                    `;
+
+                    card.querySelector('.badge-code').textContent = msCode;
+                    card.querySelector('.' + statusBadgeClass).textContent = status;
+                    const nameEl = card.querySelector('.ms-card-name');
+                    nameEl.textContent = msName;
+                    nameEl.title = msName;
+                    card.querySelector('.ms-card-amount').textContent = formatCurrency(amount);
+                    card.querySelector('.ms-card-meta').textContent = `${prog}% • ${m.dueDate || ''}`;
+
+                    card.onclick = () => selectMilestoneForInvoiceModal(m.id);
+                }
+
+                container.appendChild(card);
+            });
+
+            const targetId = selectedMilestoneId || defaultSelectedId;
+            if (targetId) {
+                selectMilestoneForInvoiceModal(targetId);
+            } else {
+                selectMilestoneForInvoiceModal(null);
+            }
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:#dc2626;padding:8px;">Failed to load milestones.</div>';
+        }
+    }
+
+    function selectMilestoneForInvoiceModal(selectedId) {
+        const hiddenInput = document.getElementById('modalMilestoneId');
+        const warning = document.getElementById('milestoneWarning');
+        const autoHint = document.getElementById('milestoneAutoHint');
+        const amountInput = document.getElementById('modalAmount');
+        const dueInput = document.getElementById('modalDueDate');
+        const notesInput = document.getElementById('modalNotes');
+
+        // Clear all active card styling
+        document.querySelectorAll('.inv-modal-ms-card').forEach(card => {
+            if (!card.classList.contains('inv-modal-ms-disabled')) {
+                card.classList.remove('active');
+                card.style.border = '1px solid var(--line)';
+                card.style.background = '#fff';
+                card.style.boxShadow = 'none';
+                const check = card.querySelector('.modal-ms-check');
+                if (check) check.innerHTML = '<i class="bi bi-circle" style="color:var(--ink-400);font-size:15px;"></i>';
+            }
+        });
+
+        if (!selectedId) {
+            if (hiddenInput) hiddenInput.value = '';
+            if (warning) warning.style.display = 'none';
+            if (autoHint) autoHint.style.display = 'none';
+            calculateTotals();
+            return;
+        }
+
+        const milestone = currentProjectMilestones ? currentProjectMilestones.find(m => m.id === Number(selectedId)) : null;
+        if (!milestone) return;
+
+        if (hiddenInput) hiddenInput.value = milestone.id;
+
+        // Highlight selected card
+        const card = document.getElementById(`modal-ms-card-${milestone.id}`);
+        if (card) {
+            card.classList.add('active');
+            card.style.border = '2px solid var(--brand-600)';
+            card.style.background = '#eff6ff';
+            card.style.boxShadow = '0 2px 6px rgba(79,70,229,0.15)';
+            const check = document.getElementById(`modal-ms-check-${milestone.id}`);
+            if (check) check.innerHTML = '<i class="bi bi-check-circle-fill" style="color:var(--brand-600);font-size:15px;"></i>';
+        }
+
+        const currentInvId = parseInt(document.getElementById('modalInvId').value, 10) || 0;
+        const alreadyInvoiced = rawInvoices.some(i => i.milestoneId === milestone.id && i.id !== currentInvId);
+        if (warning) warning.style.display = alreadyInvoiced ? 'block' : 'none';
+
+        // Auto-fill Amount / Price from dynamic milestone data
+        const amount = Number(milestone.amount > 0 ? milestone.amount : (milestone.effectiveAmount || 0));
+        if (amountInput) amountInput.value = amount;
+        if (autoHint) autoHint.style.display = amount > 0 ? 'inline' : 'none';
+
+        // Auto-fill Due Date if available
+        if (milestone.dueDate && dueInput) {
+            dueInput.value = milestone.dueDate;
+        }
+
+        // Auto-fill Notes / Description
+        if (notesInput && (!notesInput.value || notesInput.value.startsWith('Invoice for Milestone:'))) {
+            notesInput.value = `Invoice for Milestone: ${milestone.milestoneName}${milestone.description ? ' - ' + milestone.description : ''}`;
+        }
+
+        calculateTotals();
+    }
+
+    function calculateTotals() {
+        const subtotal = Math.max(0, parseFloat(document.getElementById('modalAmount')?.value) || 0);
+        let discount = Math.max(0, parseFloat(document.getElementById('modalDiscount')?.value) || 0);
+        if (discount > subtotal) discount = subtotal;
+
+        const taxableAmount = Math.max(0, subtotal - discount);
+        const taxSel = document.getElementById('modalTaxRate');
+        const selectedOpt = taxSel?.options[taxSel.selectedIndex];
+        const taxRate = parseFloat(taxSel?.value) || 0;
+        const taxType = selectedOpt ? (selectedOpt.getAttribute('data-type') || 'GST') : 'GST';
+        const taxAmount = Math.round(taxableAmount * (taxRate / 100) * 100) / 100;
+        const grandTotal = taxableAmount + taxAmount;
+
+        const elTaxable = document.getElementById('calcTaxableAmount');
+        const elTax = document.getElementById('calcTaxAmount');
+        const elGrand = document.getElementById('calcGrandTotal');
+        const elBreakdown = document.getElementById('calcTaxBreakdown');
+
+        if (elTaxable) elTaxable.textContent = formatCurrency(taxableAmount);
+        if (elTax) elTax.textContent = formatCurrency(taxAmount);
+        if (elGrand) elGrand.textContent = formatCurrency(grandTotal);
+
+        if (elBreakdown) {
+            if (taxRate === 0) {
+                elBreakdown.textContent = '(0% Zero Tax / Exempt)';
+            } else if (taxType === 'IGST') {
+                elBreakdown.textContent = `(Inter-state: IGST ${taxRate}% [${formatCurrency(taxAmount)}])`;
+            } else if (taxType === 'CGST') {
+                elBreakdown.textContent = `(CGST ${taxRate}%: ${formatCurrency(taxAmount)})`;
+            } else if (taxType === 'SGST') {
+                elBreakdown.textContent = `(SGST ${taxRate}%: ${formatCurrency(taxAmount)})`;
+            } else {
+                const halfRate = Math.round((taxRate / 2) * 100) / 100;
+                const halfAmount = Math.round((taxAmount / 2) * 100) / 100;
+                elBreakdown.textContent = `(Intra-state: CGST ${halfRate}% [${formatCurrency(halfAmount)}] + SGST ${halfRate}% [${formatCurrency(halfAmount)}])`;
+            }
+        }
+    }
+
+    function validateDates() {
+        const invDate = document.getElementById('modalInvDate')?.value;
+        const dueDate = document.getElementById('modalDueDate')?.value;
+
+        if (invDate && dueDate && new Date(dueDate) < new Date(invDate)) {
+            showToast('Due Date cannot be earlier than Invoice Date', true);
+            document.getElementById('modalDueDate').value = invDate;
+        }
+    }
+
+    async function submitInvoiceForm(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('modalInvId').value, 10) || 0;
+        const isEdit = id > 0;
+
+        const projectId = parseInt(document.getElementById('modalProjectSelect').value, 10);
+        const milestoneVal = document.getElementById('modalMilestoneId').value;
+        const milestoneId = milestoneVal ? parseInt(milestoneVal, 10) : null;
+        let clientName = document.getElementById('modalClientSelect').value;
+
+        if (!projectId) {
+            showToast('Please select a project', true);
+            return;
+        }
+
+        if (!milestoneId) {
+            showToast('Please select a milestone for this invoice', true);
+            return;
+        }
+
+        // Fallback client from selected project if not selected
+        if (!clientName) {
+            const proj = allProjects.find(p => p.id === projectId);
+            if (proj) {
+                clientName = proj.clientCompany || proj.clientName || 'Client';
+            }
+        }
+
+        const taxSel = document.getElementById('modalTaxRate');
+        const selectedTaxOpt = taxSel ? taxSel.options[taxSel.selectedIndex] : null;
+        const taxRate = parseFloat(taxSel?.value) || 0;
+        const taxType = selectedTaxOpt ? (selectedTaxOpt.getAttribute('data-type') || 'GST') : 'GST';
+        const taxName = selectedTaxOpt ? (selectedTaxOpt.getAttribute('data-name') || '') : '';
+
+        const payload = {
+            id: id,
+            projectId: projectId,
+            milestoneId: milestoneId,
+            invoiceNumber: document.getElementById('modalInvNumber').value.trim(),
+            clientName: clientName,
+            clientCompany: clientName,
+            invoiceDate: document.getElementById('modalInvDate').value,
+            dueDate: document.getElementById('modalDueDate').value,
+            amount: parseFloat(document.getElementById('modalAmount').value) || 0,
+            discount: parseFloat(document.getElementById('modalDiscount').value) || 0,
+            taxRate: taxRate,
+            taxName: taxName,
+            taxType: taxType,
+            notes: document.getElementById('modalNotes').value.trim()
+        };
+
+        const btn = document.getElementById('btnSaveInvoice');
+        if (btn) btn.disabled = true;
+
+        try {
+            const url = isEdit ? `/api/invoices/${id}` : '/api/invoices';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.message || 'Failed to save invoice');
+            }
+
+            showToast(isEdit ? 'Invoice updated successfully' : 'Invoice created successfully');
+            closeInvoiceModal();
+            await loadInvoicesFromServer();
+        } catch (err) {
+            showToast(err.message, true);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function deleteInvoice(id, invNum) {
+        if (!confirm(`Are you sure you want to delete invoice ${invNum}? This will also delete any recorded payments.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to delete invoice');
+            }
+            showToast('Invoice deleted successfully');
+            await loadInvoicesFromServer();
+        } catch (err) {
+            showToast(err.message, true);
+        }
+    }
+
+    // ── Recurring Invoice Logic ────────────────────────────────────────────────
+    function openCreateRecurringModal() {
+        document.getElementById('recDescription').value = '';
+        document.getElementById('recAmount').value = '';
+        document.getElementById('recTaxRate').value = '18';
+        document.getElementById('recFrequency').value = 'Monthly';
+        document.getElementById('recStatus').value = 'Active';
+
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('recStartDate').value = today;
+        document.getElementById('recEndDate').value = '';
+
+        document.getElementById('recClientSelect').value = '';
+        const recProj = document.getElementById('recProjectSelect');
+        if (recProj) {
+            recProj.innerHTML = '';
+            const def = document.createElement('option');
+            def.value = '';
+            def.textContent = '-- Select Client First --';
+            recProj.appendChild(def);
+        }
+
+        calculateRecTotals();
+        document.getElementById('recurringModal').style.display = 'flex';
+    }
+
+    function closeRecurringModal() {
+        document.getElementById('recurringModal').style.display = 'none';
+    }
+
+    async function onRecClientSelected() {
+        const client = document.getElementById('recClientSelect').value;
+        const projectSelect = document.getElementById('recProjectSelect');
+        if (!projectSelect) return;
+
+        projectSelect.innerHTML = '';
+
+        if (!client) {
+            const def = document.createElement('option');
+            def.value = '';
+            def.textContent = '-- Select Client First --';
+            projectSelect.appendChild(def);
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/clients/${encodeURIComponent(client)}/projects`);
+            const projects = res.ok ? await res.json() : [];
+            if (!projects.length) {
+                const def = document.createElement('option');
+                def.value = '';
+                def.textContent = 'No projects found';
+                projectSelect.appendChild(def);
+                return;
+            }
+
+            const def = document.createElement('option');
+            def.value = '';
+            def.textContent = '-- Select Project --';
+            projectSelect.appendChild(def);
+
+            projects.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.projectName;
+                projectSelect.appendChild(opt);
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function calculateRecTotals() {
+        const amount = Math.max(0, parseFloat(document.getElementById('recAmount')?.value) || 0);
+        const taxRate = parseFloat(document.getElementById('recTaxRate')?.value) || 0;
+        const taxAmount = Math.round(amount * (taxRate / 100) * 100) / 100;
+        const grandTotal = amount + taxAmount;
+
+        const elTax = document.getElementById('recTaxAmountText');
+        const elGrand = document.getElementById('recGrandTotalText');
+        if (elTax) elTax.textContent = formatCurrency(taxAmount);
+        if (elGrand) elGrand.textContent = formatCurrency(grandTotal);
+    }
+
+    async function submitRecurringForm(e) {
+        e.preventDefault();
+        const projectId = parseInt(document.getElementById('recProjectSelect').value, 10);
+        const clientName = document.getElementById('recClientSelect').value;
+
+        if (!projectId) {
+            showToast('Please select a project', true);
+            return;
+        }
+
+        const recTaxSel = document.getElementById('recTaxRate');
+        const selectedRecTaxOpt = recTaxSel ? recTaxSel.options[recTaxSel.selectedIndex] : null;
+        const recTaxRate = parseFloat(recTaxSel?.value) || 0;
+        const recTaxType = selectedRecTaxOpt ? (selectedRecTaxOpt.getAttribute('data-type') || 'GST') : 'GST';
+        const recTaxName = selectedRecTaxOpt ? (selectedRecTaxOpt.getAttribute('data-name') || '') : '';
+
+        const payload = {
+            projectId: projectId,
+            clientName: clientName,
+            clientCompany: clientName,
+            title: document.getElementById('recDescription').value.trim(),
+            description: document.getElementById('recDescription').value.trim(),
+            amount: parseFloat(document.getElementById('recAmount').value) || 0,
+            taxRate: recTaxRate,
+            taxName: recTaxName,
+            taxType: recTaxType,
+            frequency: document.getElementById('recFrequency').value,
+            startDate: document.getElementById('recStartDate').value,
+            endDate: document.getElementById('recEndDate').value || null,
+            status: document.getElementById('recStatus').value
+        };
+
+        const btn = document.getElementById('btnSaveRecurring');
+        if (btn) btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/invoices/recurring', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to save recurring invoice');
+            }
+
+            showToast('Recurring invoice profile created successfully');
+            closeRecurringModal();
+        } catch (err) {
+            showToast(err.message, true);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    // ── Payment Modal Logic ────────────────────────────────────────────────────
+    function openPaymentModalForInvoice(invId) {
+        const inv = rawInvoices.find(i => i.id === invId);
+        if (!inv) return;
+
+        document.getElementById('payInvoiceId').value = inv.id;
+        document.getElementById('payInvNumberBadge').textContent = inv.invoiceNumber;
+        document.getElementById('payClientProjectText').textContent = `${inv.clientCompany || inv.clientName} • ${inv.projectName}`;
+        document.getElementById('payGrandTotal').textContent = formatCurrency(inv.grandTotal);
+        document.getElementById('payRemaining').textContent = formatCurrency(inv.remainingAmount);
+
+        document.getElementById('payAmount').value = inv.remainingAmount > 0 ? inv.remainingAmount : 0;
+        document.getElementById('payAmount').max = inv.remainingAmount;
+        document.getElementById('payDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('payMethod').value = 'Bank Transfer';
+        document.getElementById('payRef').value = '';
+        document.getElementById('payNotes').value = '';
+
+        document.getElementById('paymentModal').style.display = 'flex';
+    }
+
+    function closePaymentModal() {
+        document.getElementById('paymentModal').style.display = 'none';
+    }
+
+    async function submitPaymentForm(e) {
+        e.preventDefault();
+        const invoiceId = parseInt(document.getElementById('payInvoiceId').value, 10);
+        const amount = parseFloat(document.getElementById('payAmount').value) || 0;
+
+        if (amount <= 0) {
+            showToast('Please enter a valid payment amount', true);
+            return;
+        }
+
+        const payload = {
+            invoiceId: invoiceId,
+            amount: amount,
+            paymentDate: document.getElementById('payDate').value,
+            paymentMethod: document.getElementById('payMethod').value,
+            transactionReference: document.getElementById('payRef').value.trim(),
+            notes: document.getElementById('payNotes').value.trim()
+        };
+
+        const btn = document.getElementById('btnSavePayment');
+        if (btn) btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to record payment');
+            }
+
+            showToast('Payment recorded successfully! Invoice status updated.');
+            closePaymentModal();
+            await loadInvoicesFromServer();
+        } catch (err) {
+            showToast(err.message, true);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    // ── Export Feature ─────────────────────────────────────────────────────────
+    function exportInvoices(format = 'csv') {
+        const menu = document.getElementById('exportDropdownMenu');
+        if (menu) menu.style.display = 'none';
+
+        if (format === 'csv') {
+            window.location.href = '/api/invoices/export?format=csv';
+            showToast('Exporting invoices as CSV...');
+        } else {
+            window.location.href = '/api/invoices/export?format=excel';
+            showToast('Exporting invoices as Excel...');
+        }
+    }
+
+    // ── PDF Form Feature ───────────────────────────────────────────────────────
+    function openPdfFormModal() {
+        if (!rawInvoices.length) {
+            showToast('No invoices available for PDF generation. Please add an invoice first.', true);
+            return;
+        }
+
+        const select = document.getElementById('selectPdfInvoiceId');
+        if (select) {
+            select.innerHTML = '';
+            rawInvoices.forEach(i => {
+                const opt = document.createElement('option');
+                opt.value = i.id;
+                const client = i.clientCompany || i.clientName || 'Client';
+                opt.textContent = `${i.invoiceNumber} - ${client} (${formatCurrency(i.grandTotal || 0)})`;
+                select.appendChild(opt);
+            });
+        }
+        document.getElementById('selectPdfModal').style.display = 'flex';
+    }
+
+    function closeSelectPdfModal() {
+        document.getElementById('selectPdfModal').style.display = 'none';
+    }
+
+    function proceedToPdfFromSelect() {
+        const id = parseInt(document.getElementById('selectPdfInvoiceId').value, 10);
+        closeSelectPdfModal();
+        if (id) generatePdfForInvoice(id);
+    }
+
+    async function generatePdfForInvoice(id) {
+        try {
+            showToast('Loading Invoice PDF...');
+            const res = await fetch(`/api/invoices/${id}/pdf`);
+            if (!res.ok) throw new Error('Failed to load PDF data');
+            const data = await res.json();
+            renderPdfDocument(data);
+            document.getElementById('pdfPreviewModal').style.display = 'flex';
+        } catch (err) {
+            showToast(err.message, true);
+        }
+    }
+
+    function closePdfPreviewModal() {
+        document.getElementById('pdfPreviewModal').style.display = 'none';
+    }
+
+    function numberToIndianWords(num) {
+        const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+        num = Math.round(Number(num) || 0);
+        if (num === 0) return 'Rupees Zero Only';
+
+        function inWords(n) {
+            if (n < 20) return a[n];
+            const digit = n % 10;
+            return b[Math.floor(n / 10)] + (digit ? ' ' + a[digit] : ' ');
+        }
+
+        let str = '';
+        const crore = Math.floor(num / 10000000);
+        num %= 10000000;
+        const lakh = Math.floor(num / 100000);
+        num %= 100000;
+        const thousand = Math.floor(num / 1000);
+        num %= 1000;
+        const hundred = Math.floor(num / 100);
+        const rem = num % 100;
+
+        if (crore > 0) str += inWords(crore) + 'Crore ';
+        if (lakh > 0) str += inWords(lakh) + 'Lakh ';
+        if (thousand > 0) str += inWords(thousand) + 'Thousand ';
+        if (hundred > 0) str += inWords(hundred) + 'Hundred ';
+        if (rem > 0) {
+            if (str !== '') str += 'and ';
+            str += inWords(rem);
+        }
+
+        return 'Rupees ' + str.trim() + ' Only';
+    }
+
+    function renderPdfDocument(pdf) {
+        const area = document.getElementById('pdfPrintableArea');
+        if (!area) return;
+
+        const isPaid = pdf.paymentStatus === 'Paid';
+        const isOverdue = pdf.paymentStatus === 'Overdue';
+        const statusColor = isPaid ? '#15803d' : isOverdue ? '#b91c1c' : '#b45309';
+        const statusBg = isPaid ? '#dcfce7' : isOverdue ? '#fee2e2' : '#fffbeb';
+        const statusBorder = isPaid ? '#86efac' : isOverdue ? '#fca5a5' : '#fde68a';
+
+        const paymentRows = (pdf.paymentHistory || []).map(p => `
+            <tr style="border-bottom:1px solid #f1f5f9;font-size:12px;">
+                <td style="padding:7px 10px;font-family:monospace;font-weight:700;color:#4f46e5;">${escapeHtml(p.paymentNumber)}</td>
+                <td style="padding:7px 10px;color:#334155;">${escapeHtml(p.paymentDate || '—')}</td>
+                <td style="padding:7px 10px;font-weight:600;color:#0f172a;">${escapeHtml(p.paymentMethod || 'Bank Transfer')}</td>
+                <td style="padding:7px 10px;color:#64748b;font-family:monospace;">${escapeHtml(p.transactionReference || '—')}</td>
+                <td style="padding:7px 10px;text-align:right;font-weight:800;color:#059669;">${formatCurrency(p.amount)}</td>
+            </tr>
+        `).join('');
+
+        const subtotal = Number(pdf.subtotal || 0);
+        const discount = Number(pdf.discount || 0);
+        const taxable = Math.max(0, subtotal - discount);
+        const taxRate = Number(pdf.taxRate || 0);
+        const taxAmount = Number(pdf.taxAmount || 0);
+        const halfRate = (taxRate / 2).toFixed(1).replace('.0', '');
+        const halfTax = (taxAmount / 2);
+
+        area.innerHTML = `
+            <div style="max-width:780px;margin:0 auto;background:#fff;color:#1e293b;font-family:'Inter',sans-serif;">
+                <!-- Header Banner -->
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #4f46e5;padding-bottom:1.5rem;margin-bottom:1.5rem;gap:1rem;">
+                    <div style="display:flex;align-items:flex-start;gap:12px;">
+                        <div style="width:42px;height:42px;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;">N</div>
+                        <div>
+                            <h2 style="margin:0;font-size:1.35rem;font-weight:800;color:#0f172a;">${escapeHtml(pdf.companyName || 'Nimbus CRM Technologies Pvt. Ltd.')}</h2>
+                            <div style="font-size:12px;color:#64748b;margin-top:4px;line-height:1.4;">
+                                ${escapeHtml(pdf.companyAddress || 'Level 5, Tower B, Cyber City, Bangalore - 560103, Karnataka, India')}<br/>
+                                <strong>GSTIN:</strong> ${escapeHtml(pdf.companyGstin || '29AABCN1234F1Z5')} &bull; <strong>PAN:</strong> ${escapeHtml(pdf.companyPan || 'AABCN1234F')}<br/>
+                                <strong>Email:</strong> ${escapeHtml(pdf.companyEmail || 'billing@nimbuscrm.com')} &bull; <strong>Phone:</strong> ${escapeHtml(pdf.companyPhone || '+91 80 4123 4567')}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:1.8rem;font-weight:900;color:#4f46e5;letter-spacing:1px;line-height:1;">TAX INVOICE</div>
+                        <div style="font-size:15px;font-weight:800;font-family:monospace;color:#0f172a;margin-top:4px;"># ${escapeHtml(pdf.invoiceNumber)}</div>
+                        <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">Original for Recipient</div>
+                        <div style="display:inline-block;padding:3px 12px;border-radius:16px;font-size:11px;font-weight:800;text-transform:uppercase;background:${statusBg};color:${statusColor};border:1px solid ${statusBorder};margin-top:6px;">
+                            ${escapeHtml(pdf.paymentStatus || 'Pending')}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Grid -->
+                <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+                    <!-- Billed To -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem 1.25rem;">
+                        <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px;">BILLED TO / CLIENT DETAILS:</div>
+                        <div style="font-size:14.5px;font-weight:800;color:#0f172a;">${escapeHtml(pdf.clientCompany || pdf.clientName || 'Valued Client')}</div>
+                        ${pdf.clientCompany && pdf.clientName ? `<div style="font-size:13px;color:#334155;font-weight:600;">Attn: ${escapeHtml(pdf.clientName)}</div>` : ''}
+                        ${pdf.clientEmail ? `<div style="font-size:12px;color:#64748b;margin-top:3px;"><i class="bi bi-envelope"></i> ${escapeHtml(pdf.clientEmail)}</div>` : ''}
+                        ${pdf.clientMobile ? `<div style="font-size:12px;color:#64748b;"><i class="bi bi-telephone"></i> ${escapeHtml(pdf.clientMobile)}</div>` : ''}
+                    </div>
+
+                    <!-- Invoice & Project Meta -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem 1.25rem;font-size:12.5px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="color:#64748b;">Invoice Date:</span>
+                            <strong style="color:#0f172a;">${escapeHtml(pdf.invoiceDate)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="color:#64748b;">Due Date:</span>
+                            <strong style="color:#b91c1c;">${escapeHtml(pdf.dueDate)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="color:#64748b;">Project:</span>
+                            <strong style="color:#0f172a;">${escapeHtml(pdf.projectName)} (${escapeHtml(pdf.projectCode)})</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;">
+                            <span style="color:#64748b;">Milestone:</span>
+                            <strong style="color:#4f46e5;">${escapeHtml(pdf.milestoneName)} (${escapeHtml(pdf.milestoneCode || 'MLS')})</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scope / Milestone Description Table -->
+                <div style="margin-bottom:1.5rem;">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                        <thead>
+                            <tr style="background:#f1f5f9;border-top:1px solid #cbd5e1;border-bottom:2px solid #cbd5e1;font-size:11.5px;text-align:left;color:#475569;">
+                                <th style="padding:8px 10px;">#</th>
+                                <th style="padding:8px 10px;">Milestone Scope &amp; Deliverables Description</th>
+                                <th style="padding:8px 10px;text-align:center;">Milestone Code</th>
+                                <th style="padding:8px 10px;text-align:right;">Amount (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #e2e8f0;">
+                                <td style="padding:12px 10px;color:#64748b;font-weight:700;">1</td>
+                                <td style="padding:12px 10px;">
+                                    <strong style="color:#0f172a;font-size:13.5px;">${escapeHtml(pdf.milestoneName)}</strong>
+                                    <div style="font-size:12px;color:#64748b;margin-top:3px;line-height:1.4;">
+                                        ${escapeHtml(pdf.milestoneDescription || pdf.notes || 'Full milestone scope and deliverables executed under agreement.')}
+                                    </div>
+                                    <div style="font-size:11.5px;color:#4f46e5;font-weight:600;margin-top:3px;">
+                                        Progress Completion: ${pdf.milestoneProgressPercent || 100}%
+                                    </div>
+                                </td>
+                                <td style="padding:12px 10px;text-align:center;font-family:monospace;font-weight:700;color:#4f46e5;">${escapeHtml(pdf.milestoneCode || 'MLS')}</td>
+                                <td style="padding:12px 10px;text-align:right;font-weight:800;font-size:14px;color:#0f172a;">${formatCurrency(pdf.subtotal)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Financial Calculation Breakdown & Bank Details -->
+                <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+                    <div>
+                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;font-size:12px;line-height:1.5;color:#334155;">
+                            <div style="font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:6px;">Bank Details &amp; Wire Transfer:</div>
+                            <div><strong>Bank:</strong> ${escapeHtml(pdf.bankName || 'HDFC Bank Ltd.')}</div>
+                            <div><strong>A/C Name:</strong> ${escapeHtml(pdf.bankAccountName || 'Nimbus CRM Technologies Pvt. Ltd.')}</div>
+                            <div><strong>A/C No:</strong> <span style="font-family:monospace;font-weight:700;">${escapeHtml(pdf.bankAccountNumber || '50200012345678')}</span></div>
+                            <div><strong>IFSC:</strong> <span style="font-family:monospace;font-weight:700;">${escapeHtml(pdf.bankIfsc || 'HDFC0000123')}</span> &bull; <strong>Branch:</strong> Koramangala, Bangalore</div>
+                            <div><strong>UPI ID:</strong> <span style="font-family:monospace;font-weight:700;color:#059669;">${escapeHtml(pdf.upiId || 'nimbuscrm@hdfcbank')}</span></div>
+                        </div>
+
+                        ${pdf.notes ? `
+                            <div style="margin-top:10px;font-size:11.5px;color:#64748b;line-height:1.4;">
+                                <strong>Notes / Instructions:</strong> ${escapeHtml(pdf.notes)}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:1rem 1.25rem;font-size:13px;">
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569;">
+                            <span>Subtotal:</span>
+                            <strong>${formatCurrency(pdf.subtotal)}</strong>
+                        </div>
+                        ${pdf.discount > 0 ? `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;color:#059669;">
+                                <span>Discount:</span>
+                                <strong>-${formatCurrency(pdf.discount)}</strong>
+                            </div>
+                        ` : ''}
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#475569;">
+                            <span>Taxable Amount:</span>
+                            <strong>${formatCurrency(pdf.taxableAmount || taxable)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                            <span>CGST (${pdf.cgstRate || halfRate}%):</span>
+                            <strong>${formatCurrency(pdf.cgstAmount || halfTax)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                            <span>SGST (${pdf.sgstRate || halfRate}%):</span>
+                            <strong>${formatCurrency(pdf.sgstAmount || halfTax)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #4f46e5;border-bottom:2px solid #4f46e5;margin:6px 0;font-size:15px;font-weight:900;color:#0f172a;">
+                            <span>Total Payable Amount:</span>
+                            <span style="color:#4f46e5;">${formatCurrency(pdf.grandTotal)}</span>
+                        </div>
+                        <div style="padding:6px 8px;background:#eef2ff;border-radius:6px;font-size:11px;color:#3730a3;font-weight:600;margin-bottom:6px;">
+                            <strong>Words:</strong> ${numberToIndianWords(pdf.grandTotal)}
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#059669;font-weight:700;">
+                            <span>Paid Amount:</span>
+                            <span>${formatCurrency(pdf.paidAmount)}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;color:#d97706;font-weight:800;font-size:13.5px;border-top:1px dashed #cbd5e1;margin-top:3px;padding-top:4px;">
+                            <span>Balance Due:</span>
+                            <span>${formatCurrency(pdf.remainingAmount)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment History Table -->
+                ${paymentRows ? `
+                    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:1.5rem;">
+                        <div style="font-size:11.5px;font-weight:800;color:#475569;text-transform:uppercase;margin-bottom:6px;">Payment History &amp; Receipts:</div>
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:11px;text-align:left;color:#64748b;">
+                                    <th style="padding:6px 10px;">Payment #</th>
+                                    <th style="padding:6px 10px;">Date</th>
+                                    <th style="padding:6px 10px;">Method</th>
+                                    <th style="padding:6px 10px;">Reference</th>
+                                    <th style="padding:6px 10px;text-align:right;">Amount (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody>${paymentRows}</tbody>
+                        </table>
+                    </div>
+                ` : ''}
+
+                <!-- Footer & Signature -->
+                <div style="border-top:1px solid #e2e8f0;padding-top:1.25rem;display:flex;justify-content:space-between;align-items:flex-end;gap:1.5rem;font-size:11px;color:#64748b;">
+                    <div style="line-height:1.4;">
+                        Thank you for your business.<br/>
+                        This is a computer-generated tax invoice issued under milestone completion approval.
+                    </div>
+                    <div style="text-align:right;min-width:200px;">
+                        <div style="font-weight:700;color:#334155;margin-bottom:2px;">For ${escapeHtml(pdf.companyName || 'Nimbus CRM Technologies Pvt. Ltd.')}</div>
+                        <div style="height:36px;border-bottom:1px solid #94a3b8;margin-bottom:4px;display:flex;align-items:flex-end;justify-content:center;font-family:'Brush Script MT',cursive;font-size:18px;color:#1e3a8a;">Antigravity Finance</div>
+                        <div style="font-weight:700;text-transform:uppercase;">Authorized Signatory</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function printPdfContent() {
+        const printContent = document.getElementById('pdfPrintableArea')?.innerHTML || '';
+        const win = window.open('', '_blank', 'height=800,width=900');
+        win.document.write(`
+            <html>
+                <head>
+                    <title>Invoice PDF</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+                    <style>
+                        body { font-family: 'Inter', sans-serif; margin: 20px; color: #1e293b; }
+                        @@media print {
+                            @@page { margin: 15mm; }
+                            body { margin: 0; }
+                        }
+                    </style>
+                </head>
+                <body onload="window.print();window.close();">
+                    ${printContent}
+                </body>
+            </html>
+        `);
+        win.document.close();
+    }
+</script>
+}

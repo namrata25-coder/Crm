@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: crm-lead-management
+    runtime: docker
+    # NOTE: Confirm current Render plan names for the web service and PostgreSQL.
+    # A persistent disk requires a paid web service plan (e.g. starter or higher; not available on free).
+    plan: starter # Placeholder plan: confirm current web service plan name in Render dashboard
+    region: oregon # Confirm desired region in Render (oregon, frankfurt, ohio, singapore)
+    healthCheckPath: /health
+    disk:
+      name: uploads-data
+      mountPath: /var/data/uploads
+      sizeGB: 1 # Adjust storage size based on needs (requires paid web service plan on Render)
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: crm-postgres-db
+          property: connectionString
+      - key: Storage__UploadsPath
+        value: /var/data/uploads
+      - key: Swagger__Enabled
+        value: "false"
+      - key: Cors__AllowedOrigins__0
+        value: https://your-frontend-domain.com # Placeholder: set your frontend domain in the Render dashboard
+      - key: Seed__AdminEmail
+        value: admin@nimbuscrm.com # Set your admin email address
+      - key: Seed__AdminPassword
+        sync: false # Set manually in the Render dashboard (never commit production passwords)
+
+databases:
+  - name: crm-postgres-db
+    databaseName: crm
+    user: crm_user
+    # NOTE: Confirm current PostgreSQL plan name in Render dashboard (free/starter/standard/pro)
+    plan: starter # Placeholder plan: confirm current PostgreSQL plan name in Render dashboard
+    region: oregon

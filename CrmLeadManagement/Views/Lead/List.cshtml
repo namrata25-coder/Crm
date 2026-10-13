@@ -1,0 +1,232 @@
+@model List<CrmLeadManagement.Models.Lead>
+
+<div class="breadcrumb-row">
+    <a asp-controller="Home" asp-action="Index">Home</a><span class="sep">/</span><span class="current">Lead List</span>
+</div>
+<div class="page-head">
+    <div>
+        <h1>Lead List</h1>
+        <p>All incoming leads across every source, in one place.</p>
+    </div>
+    <div class="action-toolbar">
+        <button class="btn btn-outline"><i class="bi bi-download"></i> Export</button>
+        <button type="button" class="btn btn-primary" onclick="openAddLeadModal()"><i class="bi bi-plus-lg"></i> Add Lead</button>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="top">
+            <div class="icon" style="background:var(--brand-100);color:var(--brand-700);"><i class="bi bi-person-lines-fill"></i></div>
+        </div>
+        <div class="val">@Model.Count</div>
+        <div class="lbl">Total Leads</div>
+    </div>
+    <div class="stat-card">
+        <div class="top">
+            <div class="icon" style="background:#eafaf0;color:#127a45;"><i class="bi bi-patch-check"></i></div>
+        </div>
+        <div class="val">@Model.Count(l => l.LeadStatus == "Qualified")</div>
+        <div class="lbl">Qualified</div>
+    </div>
+    <div class="stat-card">
+        <div class="top">
+            <div class="icon" style="background:#fef6e7;color:#b25e09;"><i class="bi bi-hourglass-split"></i></div>
+        </div>
+        <div class="val">@Model.Count(l => l.LeadStatus == "Negotiation" || l.LeadStatus == "Proposal Sent")</div>
+        <div class="lbl">In Progress</div>
+    </div>
+    <div class="stat-card">
+        <div class="top">
+            <div class="icon" style="background:#e6f6ec;color:#0a7c3f;"><i class="bi bi-trophy"></i></div>
+        </div>
+        <div class="val">@Model.Count(l => l.LeadStatus == "Won")</div>
+        <div class="lbl">Won</div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>All Leads</h2>
+            <div class="hint" id="leadCountHint">@Model.Count leads found</div>
+        </div>
+        <div class="filter-bar">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" id="leadListSearch" onkeyup="filterLeadListTable()" placeholder="Search by name, company, email, ID..." />
+            </div>
+            <select id="leadStatusFilter" onchange="filterLeadListTable()">
+                <option value="">All Status</option>
+                @foreach (var s in LookupData.Statuses)
+                {
+                    <option value="@s">@s</option>
+                }
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="clearLeadListFilters()">
+                <i class="bi bi-x-circle"></i> Clear
+            </button>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table" id="leadTable">
+            <thead>
+                <tr>
+                    <th>Lead ID</th>
+                    <th>Lead Name</th>
+                    <th>Company Name</th>
+                    <th>Mobile Number</th>
+                    <th>Email</th>
+                    <th>Lead Status</th>
+                    <th>Source</th>
+                    <th>Assigned To</th>
+                    <th>Follow-up Date</th>
+                    <th>Visit Location</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var lead in Model)
+                {
+                    <tr data-status="@lead.LeadStatus">
+                        <td class="cell-primary">@lead.LeadId</td>
+                        <td class="cell-primary">@lead.LeadName</td>
+                        <td>@lead.CompanyName</td>
+                        <td>@lead.MobileNumber</td>
+                        <td>@lead.Email</td>
+                        <td>@Html.Raw(StatusBadge(lead.LeadStatus))</td>
+                        <td>@lead.Source</td>
+                        <td>
+                            <div class="avatar-chip">
+                                <div class="initials">@Initials(lead.AssignedTo)</div>
+                                <span>@lead.AssignedTo</span>
+                            </div>
+                        </td>
+                        <td>@lead.FollowUpDate</td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:6px;max-width:200px;">
+                                <i class="bi bi-geo-alt" style="color:var(--ink-500);flex-shrink:0;"></i>
+                                <span style="font-size:12.5px;color:@(lead.Visits.Count > 0 ? "var(--ink-700)" : "var(--ink-500)");">@lead.LatestVisitLocation</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display:flex;gap:6px;">
+                                <a asp-controller="Lead" asp-action="Details" asp-route-id="@lead.LeadId" class="btn btn-soft btn-sm" title="View">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                                <button type="button" class="icon-btn" title="Edit"
+                                        onclick="openEditLeadModal(@Html.Raw(LeadJson(lead)))">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form method="post" asp-controller="Lead" asp-action="Delete" style="display:inline;"
+                                      onsubmit="return confirmDeleteLead('@lead.LeadName')">
+                                    <input type="hidden" name="id" value="@lead.LeadId" />
+                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+                                    <button type="submit" class="icon-btn" title="Delete" style="color:#c81e1e;border-color:#fda29b;">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination-bar">
+        <div class="info" id="leadPaginationInfo">Showing 1–@Model.Count of @Model.Count leads</div>
+        <div class="pg-btns">
+            <div class="pg-btn"><i class="bi bi-chevron-left"></i></div>
+            <div class="pg-btn active">1</div>
+            <div class="pg-btn"><i class="bi bi-chevron-right"></i></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function filterLeadListTable() {
+            var search = (document.getElementById('leadListSearch')?.value || '').toLowerCase();
+            var status = document.getElementById('leadStatusFilter')?.value || '';
+            var rows = document.querySelectorAll('#leadTable tbody tr');
+            var visibleCount = 0;
+
+            rows.forEach(function (row) {
+                var text = row.innerText.toLowerCase();
+                var rowStatus = row.getAttribute('data-status') || '';
+                var matchesSearch = !search || text.indexOf(search) > -1;
+                var matchesStatus = !status || rowStatus === status;
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            var hint = document.getElementById('leadCountHint');
+            if (hint) hint.textContent = visibleCount + ' leads found';
+            var pageInfo = document.getElementById('leadPaginationInfo');
+            if (pageInfo) pageInfo.textContent = 'Showing ' + (visibleCount > 0 ? '1–' + visibleCount : '0') + ' of ' + visibleCount + ' leads';
+        }
+
+        function clearLeadListFilters() {
+            var s = document.getElementById('leadListSearch');
+            var st = document.getElementById('leadStatusFilter');
+            if (s) s.value = '';
+            if (st) st.value = '';
+            filterLeadListTable();
+        }
+    </script>
+}
+
+@await Html.PartialAsync("_LeadFormModal")
+
+@functions {
+    string StatusBadge(string? status)
+    {
+        var s = status ?? "New";
+        var cls = s.ToLower().Replace(" ", "") switch
+        {
+            "new" => "st-new",
+            "contacted" => "st-contacted",
+            "qualified" => "st-qualified",
+            "proposalsent" => "st-proposalsent",
+            "negotiation" => "st-negotiation",
+            "won" => "st-won",
+            "lost" => "st-lost",
+            _ => "st-new"
+        };
+        return $"<span class='badge-status {cls}'>{s}</span>";
+    }
+
+    string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "—";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}" : name.Substring(0, Math.Min(2, name.Length));
+    }
+
+    string LeadJson(CrmLeadManagement.Models.Lead l)
+    {
+        string Esc(string? s) => (s ?? "").Replace("\\", "\\\\").Replace("'", "\\'").Replace("\"", "&quot;").Replace("\n", " ").Replace("\r", "");
+        return "{" +
+            $"leadId:'{Esc(l.LeadId)}'," +
+            $"leadName:'{Esc(l.LeadName)}'," +
+            $"companyName:'{Esc(l.CompanyName)}'," +
+            $"mobileNumber:'{Esc(l.MobileNumber)}'," +
+            $"email:'{Esc(l.Email)}'," +
+            $"designation:'{Esc(l.Designation)}'," +
+            $"location:'{Esc(l.Location)}'," +
+            $"source:'{Esc(l.Source)}'," +
+            $"leadStatus:'{Esc(l.LeadStatus)}'," +
+            $"assignedTo:'{Esc(l.AssignedTo)}'," +
+            $"priority:'{Esc(l.Priority)}'," +
+            $"followUpDate:'{Esc(l.FollowUpDate)}'," +
+            $"remarks:'{Esc(l.Remarks)}'" +
+        "}";
+    }
+}

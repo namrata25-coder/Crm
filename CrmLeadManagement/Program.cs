@@ -68,7 +68,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
     }
 
     // Development fallback
-    connectionString = "Host=localhost;Port=5432;Database=crm;Username=postgres;Password=postgres";
+    connectionString = "Host=127.0.0.1;Port=5432;Database=crm;Username=postgres;Password=postgres";
     connectionSource = "Default development fallback";
 }
 

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CrmLeadManagement.Controllers.Api;
 
 /// <summary>
-/// JSON REST API for Work Overview & Module Statistics.
+/// JSON REST API for Work Overview &amp; Module Statistics.
 /// Base route: /api/work
 /// </summary>
 [ApiController]

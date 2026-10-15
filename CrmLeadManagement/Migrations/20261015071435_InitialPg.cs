@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CrmLeadManagement.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialPostgres : Migration
+    public partial class InitialPg : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -36,19 +36,19 @@ namespace CrmLeadManagement.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     LeadId = table.Column<string>(type: "text", nullable: false),
                     LeadName = table.Column<string>(type: "text", nullable: false),
+                    CompanyName = table.Column<string>(type: "text", nullable: true),
                     MobileNumber = table.Column<string>(type: "text", nullable: true),
                     Email = table.Column<string>(type: "text", nullable: true),
-                    CompanyName = table.Column<string>(type: "text", nullable: true),
+                    Designation = table.Column<string>(type: "text", nullable: true),
                     Location = table.Column<string>(type: "text", nullable: true),
                     LeadStatus = table.Column<string>(type: "text", nullable: true),
                     Source = table.Column<string>(type: "text", nullable: true),
                     AssignedTo = table.Column<string>(type: "text", nullable: true),
-                    AssignedDate = table.Column<string>(type: "text", nullable: true),
-                    Priority = table.Column<string>(type: "text", nullable: true),
-                    FollowUpDate = table.Column<string>(type: "text", nullable: true),
                     CreatedDate = table.Column<string>(type: "text", nullable: true),
-                    Remarks = table.Column<string>(type: "text", nullable: true),
-                    Designation = table.Column<string>(type: "text", nullable: true)
+                    FollowUpDate = table.Column<string>(type: "text", nullable: true),
+                    Priority = table.Column<string>(type: "text", nullable: true),
+                    AssignedDate = table.Column<string>(type: "text", nullable: true),
+                    Remarks = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -63,9 +63,9 @@ namespace CrmLeadManagement.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     RoleName = table.Column<string>(type: "text", nullable: false),
                     Description = table.Column<string>(type: "text", nullable: true),
-                    PermissionsJson = table.Column<string>(type: "text", nullable: false),
+                    IsSystem = table.Column<bool>(type: "boolean", nullable: false),
                     DataAccess = table.Column<string>(type: "text", nullable: false),
-                    IsSystem = table.Column<bool>(type: "boolean", nullable: false)
+                    PermissionsJson = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -147,14 +147,14 @@ namespace CrmLeadManagement.Migrations
                     ClientName = table.Column<string>(type: "text", nullable: true),
                     ClientCompany = table.Column<string>(type: "text", nullable: true),
                     ProjectType = table.Column<string>(type: "text", nullable: true),
+                    Description = table.Column<string>(type: "text", nullable: true),
                     StartDate = table.Column<string>(type: "text", nullable: true),
                     Deadline = table.Column<string>(type: "text", nullable: true),
+                    ProjectManager = table.Column<string>(type: "text", nullable: true),
+                    AssignedMembers = table.Column<string>(type: "text", nullable: true),
                     Budget = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     Priority = table.Column<string>(type: "text", nullable: true),
                     Status = table.Column<string>(type: "text", nullable: true),
-                    ProjectManager = table.Column<string>(type: "text", nullable: true),
-                    AssignedMembers = table.Column<string>(type: "text", nullable: true),
-                    Description = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     CreatedDate = table.Column<string>(type: "text", nullable: true)
                 },
@@ -167,9 +167,9 @@ namespace CrmLeadManagement.Migrations
                 name: "AssignmentEntry",
                 columns: table => new
                 {
-                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     AssignedEmployee = table.Column<string>(type: "text", nullable: true),
                     AssignmentDate = table.Column<string>(type: "text", nullable: true),
                     Remarks = table.Column<string>(type: "text", nullable: true)
@@ -189,15 +189,15 @@ namespace CrmLeadManagement.Migrations
                 name: "CallHistoryEntry",
                 columns: table => new
                 {
-                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     CallDate = table.Column<string>(type: "text", nullable: true),
                     CallTime = table.Column<string>(type: "text", nullable: true),
                     CallType = table.Column<string>(type: "text", nullable: true),
                     Duration = table.Column<string>(type: "text", nullable: true),
-                    CallStatus = table.Column<string>(type: "text", nullable: true),
                     Employee = table.Column<string>(type: "text", nullable: true),
+                    CallStatus = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     Remark = table.Column<string>(type: "text", nullable: true)
                 },
@@ -223,12 +223,16 @@ namespace CrmLeadManagement.Migrations
                     LeadCustomer = table.Column<string>(type: "text", nullable: true),
                     ProjectRequirement = table.Column<string>(type: "text", nullable: true),
                     Subtotal = table.Column<string>(type: "text", nullable: true),
+                    Discount = table.Column<string>(type: "text", nullable: true),
                     TaxRate = table.Column<string>(type: "text", nullable: true),
                     Tax = table.Column<string>(type: "text", nullable: true),
-                    Discount = table.Column<string>(type: "text", nullable: true),
+                    TaxName = table.Column<string>(type: "text", nullable: true),
+                    TaxType = table.Column<string>(type: "text", nullable: true),
                     Total = table.Column<string>(type: "text", nullable: true),
-                    Terms = table.Column<string>(type: "text", nullable: true),
+                    ValidUntil = table.Column<string>(type: "text", nullable: true),
+                    TermsConditions = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<string>(type: "text", nullable: true),
                     AttachmentPath = table.Column<string>(type: "text", nullable: true),
                     AttachmentFileName = table.Column<string>(type: "text", nullable: true),
                     LeadId_FK = table.Column<int>(type: "integer", nullable: true)
@@ -248,15 +252,15 @@ namespace CrmLeadManagement.Migrations
                 name: "FollowUpEntry",
                 columns: table => new
                 {
-                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     FollowUpDate = table.Column<string>(type: "text", nullable: true),
                     FollowUpTime = table.Column<string>(type: "text", nullable: true),
                     FollowUpType = table.Column<string>(type: "text", nullable: true),
                     AssignedEmployee = table.Column<string>(type: "text", nullable: true),
-                    Remarks = table.Column<string>(type: "text", nullable: true),
-                    Status = table.Column<string>(type: "text", nullable: true)
+                    Status = table.Column<string>(type: "text", nullable: true),
+                    Remarks = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -280,12 +284,21 @@ namespace CrmLeadManagement.Migrations
                     LeadCustomer = table.Column<string>(type: "text", nullable: true),
                     ProjectRequirement = table.Column<string>(type: "text", nullable: true),
                     Title = table.Column<string>(type: "text", nullable: true),
-                    Description = table.Column<string>(type: "text", nullable: true),
                     ScopeOfWork = table.Column<string>(type: "text", nullable: true),
+                    Description = table.Column<string>(type: "text", nullable: true),
                     Deliverables = table.Column<string>(type: "text", nullable: true),
                     Timeline = table.Column<string>(type: "text", nullable: true),
                     Budget = table.Column<string>(type: "text", nullable: true),
-                    Terms = table.Column<string>(type: "text", nullable: true),
+                    Subtotal = table.Column<string>(type: "text", nullable: true),
+                    Discount = table.Column<string>(type: "text", nullable: true),
+                    TaxRate = table.Column<string>(type: "text", nullable: true),
+                    Tax = table.Column<string>(type: "text", nullable: true),
+                    TaxName = table.Column<string>(type: "text", nullable: true),
+                    TaxType = table.Column<string>(type: "text", nullable: true),
+                    GrandTotal = table.Column<string>(type: "text", nullable: true),
+                    TermsConditions = table.Column<string>(type: "text", nullable: true),
+                    Notes = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<string>(type: "text", nullable: true),
                     AttachmentPath = table.Column<string>(type: "text", nullable: true),
                     AttachmentFileName = table.Column<string>(type: "text", nullable: true),
                     LeadId_FK = table.Column<int>(type: "integer", nullable: true)
@@ -312,12 +325,16 @@ namespace CrmLeadManagement.Migrations
                     LeadCustomer = table.Column<string>(type: "text", nullable: true),
                     ProjectRequirement = table.Column<string>(type: "text", nullable: true),
                     Subtotal = table.Column<string>(type: "text", nullable: true),
+                    Discount = table.Column<string>(type: "text", nullable: true),
                     TaxRate = table.Column<string>(type: "text", nullable: true),
                     Tax = table.Column<string>(type: "text", nullable: true),
-                    Discount = table.Column<string>(type: "text", nullable: true),
-                    Total = table.Column<string>(type: "text", nullable: true),
-                    Terms = table.Column<string>(type: "text", nullable: true),
+                    TaxName = table.Column<string>(type: "text", nullable: true),
+                    TaxType = table.Column<string>(type: "text", nullable: true),
+                    GrandTotal = table.Column<string>(type: "text", nullable: true),
+                    ValidUntil = table.Column<string>(type: "text", nullable: true),
+                    TermsConditions = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<string>(type: "text", nullable: true),
                     AttachmentPath = table.Column<string>(type: "text", nullable: true),
                     AttachmentFileName = table.Column<string>(type: "text", nullable: true),
                     LeadId_FK = table.Column<int>(type: "integer", nullable: true)
@@ -337,21 +354,21 @@ namespace CrmLeadManagement.Migrations
                 name: "RequirementEntry",
                 columns: table => new
                 {
-                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
+                    Title = table.Column<string>(type: "text", nullable: true),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    Priority = table.Column<string>(type: "text", nullable: true),
+                    ExpectedDate = table.Column<string>(type: "text", nullable: true),
+                    Budget = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<string>(type: "text", nullable: true),
+                    ImagePath = table.Column<string>(type: "text", nullable: true),
                     RequirementType = table.Column<string>(type: "text", nullable: true),
                     ItemName = table.Column<string>(type: "text", nullable: true),
                     Quantity = table.Column<string>(type: "text", nullable: true),
-                    Budget = table.Column<string>(type: "text", nullable: true),
-                    ExpectedDate = table.Column<string>(type: "text", nullable: true),
-                    Remarks = table.Column<string>(type: "text", nullable: true),
-                    Priority = table.Column<string>(type: "text", nullable: true),
-                    Status = table.Column<string>(type: "text", nullable: true),
-                    ImagePath = table.Column<string>(type: "text", nullable: true),
-                    Title = table.Column<string>(type: "text", nullable: true),
-                    Description = table.Column<string>(type: "text", nullable: true),
-                    Details = table.Column<string>(type: "text", nullable: true)
+                    Details = table.Column<string>(type: "text", nullable: true),
+                    Remarks = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -368,9 +385,9 @@ namespace CrmLeadManagement.Migrations
                 name: "VisitEntry",
                 columns: table => new
                 {
-                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    LeadId_FK = table.Column<int>(type: "integer", nullable: false),
                     VisitDate = table.Column<string>(type: "text", nullable: true),
                     VisitTime = table.Column<string>(type: "text", nullable: true),
                     VisitLocation = table.Column<string>(type: "text", nullable: true),
@@ -416,36 +433,6 @@ namespace CrmLeadManagement.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "FinanceLineItems",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ItemName = table.Column<string>(type: "text", nullable: true),
-                    Quantity = table.Column<string>(type: "text", nullable: true),
-                    Rate = table.Column<string>(type: "text", nullable: true),
-                    Amount = table.Column<string>(type: "text", nullable: true),
-                    EstimationId_FK = table.Column<int>(type: "integer", nullable: true),
-                    QuotationId_FK = table.Column<int>(type: "integer", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_FinanceLineItems", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_FinanceLineItems_Estimations_EstimationId_FK",
-                        column: x => x.EstimationId_FK,
-                        principalTable: "Estimations",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_FinanceLineItems_Quotations_QuotationId_FK",
-                        column: x => x.QuotationId_FK,
-                        principalTable: "Quotations",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "WorkExpenses",
                 columns: table => new
                 {
@@ -455,16 +442,16 @@ namespace CrmLeadManagement.Migrations
                     ExpenseCode = table.Column<string>(type: "text", nullable: true),
                     ExpenseName = table.Column<string>(type: "text", nullable: true),
                     Category = table.Column<string>(type: "text", nullable: true),
-                    ExpenseDate = table.Column<string>(type: "text", nullable: true),
                     Amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     TaxAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     TotalAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    PaidBy = table.Column<string>(type: "text", nullable: true),
+                    ExpenseDate = table.Column<string>(type: "text", nullable: true),
                     PaymentMethod = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<string>(type: "text", nullable: true),
+                    PaidBy = table.Column<string>(type: "text", nullable: true),
                     ReceiptFileName = table.Column<string>(type: "text", nullable: true),
                     ReceiptFilePath = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
-                    Status = table.Column<string>(type: "text", nullable: true),
                     CreatedDate = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
@@ -488,11 +475,11 @@ namespace CrmLeadManagement.Migrations
                     FileName = table.Column<string>(type: "text", nullable: true),
                     OriginalFileName = table.Column<string>(type: "text", nullable: true),
                     FilePath = table.Column<string>(type: "text", nullable: true),
-                    FileType = table.Column<string>(type: "text", nullable: true),
                     FileSizeBytes = table.Column<long>(type: "bigint", nullable: false),
+                    FileType = table.Column<string>(type: "text", nullable: true),
                     UploadedBy = table.Column<string>(type: "text", nullable: true),
-                    Description = table.Column<string>(type: "text", nullable: true),
-                    UploadedDate = table.Column<string>(type: "text", nullable: true)
+                    UploadedDate = table.Column<string>(type: "text", nullable: true),
+                    Description = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -545,8 +532,8 @@ namespace CrmLeadManagement.Migrations
                     Title = table.Column<string>(type: "text", nullable: true),
                     Content = table.Column<string>(type: "text", nullable: true),
                     Category = table.Column<string>(type: "text", nullable: true),
-                    ColorTag = table.Column<string>(type: "text", nullable: true),
                     IsPinned = table.Column<bool>(type: "boolean", nullable: false),
+                    ColorTag = table.Column<string>(type: "text", nullable: true),
                     CreatedBy = table.Column<string>(type: "text", nullable: true),
                     CreatedDate = table.Column<string>(type: "text", nullable: true),
                     LastModifiedDate = table.Column<string>(type: "text", nullable: true)
@@ -563,14 +550,44 @@ namespace CrmLeadManagement.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "FinanceLineItems",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    EstimationId_FK = table.Column<int>(type: "integer", nullable: true),
+                    QuotationId_FK = table.Column<int>(type: "integer", nullable: true),
+                    ItemName = table.Column<string>(type: "text", nullable: true),
+                    Quantity = table.Column<string>(type: "text", nullable: true),
+                    Rate = table.Column<string>(type: "text", nullable: true),
+                    Amount = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FinanceLineItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_FinanceLineItems_Estimations_EstimationId_FK",
+                        column: x => x.EstimationId_FK,
+                        principalTable: "Estimations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_FinanceLineItems_Quotations_QuotationId_FK",
+                        column: x => x.QuotationId_FK,
+                        principalTable: "Quotations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "WorkInvoices",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    InvoiceNumber = table.Column<string>(type: "text", nullable: true),
                     ProjectId = table.Column<int>(type: "integer", nullable: false),
                     MilestoneId = table.Column<int>(type: "integer", nullable: true),
+                    InvoiceNumber = table.Column<string>(type: "text", nullable: true),
                     ClientName = table.Column<string>(type: "text", nullable: true),
                     ClientCompany = table.Column<string>(type: "text", nullable: true),
                     InvoiceDate = table.Column<string>(type: "text", nullable: true),
@@ -612,18 +629,16 @@ namespace CrmLeadManagement.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ProfileNumber = table.Column<string>(type: "text", nullable: true),
-                    Title = table.Column<string>(type: "text", nullable: true),
                     ProjectId = table.Column<int>(type: "integer", nullable: false),
                     MilestoneId = table.Column<int>(type: "integer", nullable: true),
+                    ProfileNumber = table.Column<string>(type: "text", nullable: true),
+                    Title = table.Column<string>(type: "text", nullable: true),
                     ClientName = table.Column<string>(type: "text", nullable: true),
                     ClientCompany = table.Column<string>(type: "text", nullable: true),
                     Frequency = table.Column<string>(type: "text", nullable: true),
                     StartDate = table.Column<string>(type: "text", nullable: true),
                     NextInvoiceDate = table.Column<string>(type: "text", nullable: true),
                     EndDate = table.Column<string>(type: "text", nullable: true),
-                    TotalCycles = table.Column<int>(type: "integer", nullable: false),
-                    CompletedCycles = table.Column<int>(type: "integer", nullable: false),
                     Amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     TaxRate = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     Tax = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
@@ -632,6 +647,8 @@ namespace CrmLeadManagement.Migrations
                     Discount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     GrandTotal = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     Status = table.Column<string>(type: "text", nullable: true),
+                    TotalCycles = table.Column<int>(type: "integer", nullable: false),
+                    CompletedCycles = table.Column<int>(type: "integer", nullable: false),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     CreatedDate = table.Column<string>(type: "text", nullable: true)
                 },
@@ -657,18 +674,18 @@ namespace CrmLeadManagement.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    TaskCode = table.Column<string>(type: "text", nullable: true),
-                    TaskName = table.Column<string>(type: "text", nullable: true),
                     ProjectId = table.Column<int>(type: "integer", nullable: false),
                     MilestoneId = table.Column<int>(type: "integer", nullable: true),
+                    TaskCode = table.Column<string>(type: "text", nullable: true),
+                    TaskName = table.Column<string>(type: "text", nullable: true),
+                    Description = table.Column<string>(type: "text", nullable: true),
                     AssignedMember = table.Column<string>(type: "text", nullable: true),
                     StartDate = table.Column<string>(type: "text", nullable: true),
                     DueDate = table.Column<string>(type: "text", nullable: true),
-                    Priority = table.Column<string>(type: "text", nullable: true),
-                    Status = table.Column<string>(type: "text", nullable: true),
                     TaskAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     CompletedAmount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: true),
+                    Priority = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     CreatedDate = table.Column<string>(type: "text", nullable: true)
                 },
@@ -694,10 +711,10 @@ namespace CrmLeadManagement.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    PaymentNumber = table.Column<string>(type: "text", nullable: true),
                     InvoiceId = table.Column<int>(type: "integer", nullable: false),
-                    PaymentDate = table.Column<string>(type: "text", nullable: true),
+                    PaymentNumber = table.Column<string>(type: "text", nullable: true),
                     Amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    PaymentDate = table.Column<string>(type: "text", nullable: true),
                     PaymentMethod = table.Column<string>(type: "text", nullable: true),
                     TransactionReference = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
@@ -724,13 +741,13 @@ namespace CrmLeadManagement.Migrations
                     TaskId = table.Column<int>(type: "integer", nullable: true),
                     MemberName = table.Column<string>(type: "text", nullable: true),
                     LogDate = table.Column<string>(type: "text", nullable: true),
+                    HoursWorked = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     StartTime = table.Column<string>(type: "text", nullable: true),
                     EndTime = table.Column<string>(type: "text", nullable: true),
-                    HoursWorked = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     HourlyRate = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
                     TotalCost = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: true),
                     BillingStatus = table.Column<string>(type: "text", nullable: true),
+                    Description = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     CreatedDate = table.Column<string>(type: "text", nullable: true)
                 },
@@ -939,7 +956,13 @@ namespace CrmLeadManagement.Migrations
                 name: "WorkPayments");
 
             migrationBuilder.DropTable(
+                name: "WorkRecurringInvoices");
+
+            migrationBuilder.DropTable(
                 name: "WorkTimesheets");
+
+            migrationBuilder.DropTable(
+                name: "Users");
 
             migrationBuilder.DropTable(
                 name: "Estimations");
@@ -948,13 +971,7 @@ namespace CrmLeadManagement.Migrations
                 name: "Quotations");
 
             migrationBuilder.DropTable(
-                name: "Users");
-
-            migrationBuilder.DropTable(
                 name: "WorkInvoices");
-
-            migrationBuilder.DropTable(
-                name: "WorkRecurringInvoices");
 
             migrationBuilder.DropTable(
                 name: "WorkTasks");

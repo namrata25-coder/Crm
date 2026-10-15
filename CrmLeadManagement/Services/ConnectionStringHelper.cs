@@ -37,6 +37,12 @@ public static class ConnectionStringHelper
         var port = uri.Port > 0 ? uri.Port : 5432;
         var database = uri.AbsolutePath.TrimStart('/');
 
-        return $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true;";
+        bool isLocal = string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase);
+        string sslSetting = isLocal
+            ? "SSL Mode=Prefer;"
+            : "SSL Mode=Require;Trust Server Certificate=true;";
+
+        return $"Host={host};Port={port};Database={database};Username={username};Password={password};{sslSetting}";
     }
 }

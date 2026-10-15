@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace CrmLeadManagement.Models;
 
 /// <summary>
-/// Represents a single permission row in the Roles & Permissions matrix.
+/// Represents a single permission row in the Roles &amp; Permissions matrix.
 /// </summary>
 public class ModulePermissionItem
 {
@@ -139,7 +139,7 @@ public class DeleteRoleDto
 }
 
 /// <summary>
-/// View model for the Roles & Permissions page.
+/// View model for the Roles &amp; Permissions page.
 /// </summary>
 public class RolesAndPermissionsViewModel
 {
@@ -156,7 +156,7 @@ public class RolesAndPermissionsViewModel
 public static class RoleStore
 {
     /// <summary>
-    /// Returns the exact standard template matching the requested Roles & Permissions table layout.
+    /// Returns the exact standard template matching the requested Roles &amp; Permissions table layout.
     /// </summary>
     public static List<ModulePermissionItem> GetDefaultMatrixTemplate()
     {

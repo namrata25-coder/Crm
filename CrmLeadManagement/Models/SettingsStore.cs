@@ -52,7 +52,7 @@ public static class SettingsStore
     public static List<UserRoleEntry> Users => DbAccessor.Db.Users.OrderBy(u => u.Id).ToList();
 
     /// <summary>Employee names, sourced from Users/Roles so Assign dropdowns stay in sync with Settings.</summary>
-    public static List<string> Employees => Users.Select(u => u.Name).ToList();
+    public static List<string> Employees => Users.Where(u => !string.IsNullOrWhiteSpace(u.Name)).Select(u => u.Name!).ToList();
 
     public static FollowUpSettings FollowUp
     {
@@ -126,7 +126,7 @@ public static class SettingsStore
     public static void RemoveUser(string email)
     {
         var db = DbAccessor.Db;
-        var existing = db.Users.FirstOrDefault(u => u.Email.ToLower() == email.ToLower());
+        var existing = db.Users.FirstOrDefault(u => u.Email != null && u.Email.ToLower() == email.ToLower());
         if (existing is not null)
         {
             db.Users.Remove(existing);

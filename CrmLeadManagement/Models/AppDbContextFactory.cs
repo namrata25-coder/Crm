@@ -22,14 +22,19 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString = config.GetConnectionString("DefaultConnection");
+        var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+        string? connectionString = null;
 
-        if (string.IsNullOrWhiteSpace(connectionString))
+        if (!string.IsNullOrWhiteSpace(databaseUrl))
         {
-            var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-            if (!string.IsNullOrWhiteSpace(databaseUrl))
+            connectionString = ConnectionStringHelper.FromUrl(databaseUrl);
+        }
+        else
+        {
+            var configConn = config.GetConnectionString("DefaultConnection");
+            if (!string.IsNullOrWhiteSpace(configConn) && !configConn.Contains("trusted_connection", StringComparison.OrdinalIgnoreCase))
             {
-                connectionString = ConnectionStringHelper.FromUrl(databaseUrl);
+                connectionString = configConn;
             }
         }
 

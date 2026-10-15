@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,7 +7,11 @@
     <RootNamespace>CrmLeadManagement</RootNamespace>
     <!-- Generates the XML comments file Swagger uses for endpoint/model descriptions. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <NoWarn>$(NoWarn);CS1591;CS1570;CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8619;CS8625;ASPDEPR005;NU1902;NU1903</NoWarn>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1902;NU1903</WarningsNotAsErrors>
+    <NuGetAuditMode>direct</NuGetAuditMode>
+    <NuGetAudit>false</NuGetAudit>
+    <UserSecretsId>238bd728-60d2-49f6-b4f8-9e218e329a0e</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

@@ -67,9 +67,10 @@ public class AuthController : Controller
     }
 
     /// <summary>
-    /// Handles user login submission (supports both standard HTML form post and AJAX/JSON).
+    /// Handles user login submission (supports standard HTML form post).
     /// </summary>
     [HttpPost]
+    [Consumes("application/x-www-form-urlencoded", "multipart/form-data")]
     [AllowAnonymous]
     [EnableRateLimiting("AuthRateLimit")]
     [Route("login")]

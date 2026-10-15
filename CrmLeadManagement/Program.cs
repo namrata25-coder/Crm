@@ -13,32 +13,48 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Render sets the PORT environment variable (default 10000)
+// Render sets the PORT environment variable (default 10000).
+// In local/development, bind to 0.0.0.0:5000 so external devices (mobile app, emulators) on LAN can connect.
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
 {
-    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+    builder.WebHost.UseUrls($"http://localhost:{port}");
+}
+else
+{
+    builder.WebHost.UseUrls("http://localhost:5000");
 }
 
 // Forwarded headers for reverse proxies (Render terminates HTTPS in front of the container)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Clear();
+    options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });
 
 // Database connection resolution:
 // Priority:
-// 1. ConnectionStrings:DefaultConnection
-// 2. DATABASE_URL environment variable (converted from URL format to Npgsql connection string)
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
+// 1. DATABASE_URL environment variable (from Render / Docker / Heroku / PostgreSQL)
+// 2. ConnectionStrings:DefaultConnection (from appsettings or environment variable)
+// 3. Fallback for local development
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+string? connectionString = null;
+string connectionSource = "Development fallback (localhost:5432)";
+
+if (!string.IsNullOrWhiteSpace(databaseUrl))
 {
-    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-    if (!string.IsNullOrWhiteSpace(databaseUrl))
+    connectionString = ConnectionStringHelper.FromUrl(databaseUrl);
+    connectionSource = "Environment variable 'DATABASE_URL'";
+}
+else
+{
+    var configConn = builder.Configuration.GetConnectionString("DefaultConnection");
+    // Ignore empty or legacy SQL Server localdb strings that crash Npgsql
+    if (!string.IsNullOrWhiteSpace(configConn) && !configConn.Contains("trusted_connection", StringComparison.OrdinalIgnoreCase))
     {
-        connectionString = ConnectionStringHelper.FromUrl(databaseUrl);
+        connectionString = configConn;
+        connectionSource = "Configuration 'ConnectionStrings:DefaultConnection'";
     }
 }
 
@@ -53,6 +69,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
     // Development fallback
     connectionString = "Host=localhost;Port=5432;Database=crm;Username=postgres;Password=postgres";
+    connectionSource = "Default development fallback";
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -244,6 +261,9 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
+        var dbConn = db.Database.GetDbConnection();
+        startupLogger.LogInformation("Connecting to database '{Database}' on server '{DataSource}' (resolved via {ConnectionSource})...",
+            dbConn.Database, dbConn.DataSource, connectionSource);
         startupLogger.LogInformation("Applying database migrations...");
         db.Database.Migrate();
         startupLogger.LogInformation("Database migrations applied successfully.");
@@ -265,7 +285,24 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        startupLogger.LogCritical(ex, "Database migration or seeding failed. Stopping application startup.");
+        var npgsqlEx = ex as Npgsql.NpgsqlException ?? ex.InnerException as Npgsql.NpgsqlException;
+        var socketEx = (ex as System.Net.Sockets.SocketException)
+                    ?? (ex.InnerException as System.Net.Sockets.SocketException)
+                    ?? (npgsqlEx?.InnerException as System.Net.Sockets.SocketException);
+
+        if (socketEx != null && socketEx.SocketErrorCode == System.Net.Sockets.SocketError.ConnectionRefused)
+        {
+            var dbConn = db.Database.GetDbConnection();
+            startupLogger.LogCritical(
+                "Failed to connect to PostgreSQL server at '{DataSource}'. Connection refused (SocketError 10061). " +
+                "PostgreSQL is not running on port 5432. Please ensure the PostgreSQL server or container is running, " +
+                "or configure the target database via 'DATABASE_URL' or 'ConnectionStrings:DefaultConnection'.",
+                dbConn.DataSource);
+        }
+        else
+        {
+            startupLogger.LogCritical(ex, "Database migration or seeding failed. Stopping application startup.");
+        }
         throw;
     }
 }

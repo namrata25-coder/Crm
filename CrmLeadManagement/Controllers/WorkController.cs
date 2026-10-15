@@ -96,7 +96,7 @@ public class WorkController : Controller
 
     private List<string> GetEmployeesList()
     {
-        var dbUsers = _db.Users.Select(u => u.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+        var dbUsers = _db.Users.Where(u => !string.IsNullOrWhiteSpace(u.Name)).Select(u => u.Name!).ToList();
         if (dbUsers.Any()) return dbUsers.Distinct().OrderBy(n => n).ToList();
         return SettingsStore.Employees;
     }

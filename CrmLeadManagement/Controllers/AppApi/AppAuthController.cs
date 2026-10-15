@@ -42,8 +42,12 @@ public class AppAuthController : ControllerBase
     /// <summary>
     /// Authenticates a user with email and password, returning an opaque Bearer token.
     /// Rate-limited to 10 requests per minute per IP.
+    /// Supports /api/v1/app/auth/login, /api/auth/login, /auth/login, and /login for JSON requests.
     /// </summary>
     [HttpPost("login")]
+    [HttpPost("/auth/login")]
+    [HttpPost("/login")]
+    [Consumes("application/json")]
     [AllowAnonymous]
     [EnableRateLimiting("AuthRateLimit")]
     public async Task<IActionResult> Login([FromBody] AppLoginRequest request)

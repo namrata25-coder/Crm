@@ -729,7 +729,7 @@ public class InvoicesApiController : ControllerBase
                 TaxRate                  = dto.TaxRate,
                 TaxAmount                = dto.Tax,
                 TaxName                  = dto.TaxName,
-                TaxType                  = dto.TaxType,
+                TaxType                  = dto.TaxType ?? "",
                 CgstRate                 = cgstRate,
                 CgstAmount               = cgstAmount,
                 SgstRate                 = sgstRate,

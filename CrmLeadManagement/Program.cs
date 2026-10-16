@@ -14,11 +14,12 @@ using System.Threading.RateLimiting;
 var builder = WebApplication.CreateBuilder(args);
 
 // Render sets the PORT environment variable (default 10000).
-// In local/development, bind to 0.0.0.0:5000 so external devices (mobile app, emulators) on LAN can connect.
+// When PORT is set (Render/Docker), bind to 0.0.0.0:{port} so reverse proxies can route traffic.
+// In local development, bind to localhost:5000 so browsers (Chrome/Edge) can open the site without ERR_ADDRESS_INVALID.
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
 {
-    builder.WebHost.UseUrls($"http://localhost:{port}");
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 }
 else
 {
@@ -34,42 +35,76 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 // Database connection resolution:
-// Priority:
-// 1. DATABASE_URL environment variable (from Render / Docker / Heroku / PostgreSQL)
-// 2. ConnectionStrings:DefaultConnection (from appsettings or environment variable)
-// 3. Fallback for local development
-var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-string? connectionString = null;
-string connectionSource = "Development fallback (localhost:5432)";
+// Strategy & Priority:
+// 1. Prefer 'ConnectionStrings:DefaultConnection' (from appsettings, secrets, or 'ConnectionStrings__DefaultConnection' env var)
+// 2. Otherwise, read 'DATABASE_URL' (from Render, Docker, Heroku, or environment)
+// 3. In non-production environments: fallback to local PostgreSQL (127.0.0.1:5432)
 
-if (!string.IsNullOrWhiteSpace(databaseUrl))
+string? connectionString = null;
+string connectionSource = "Not configured";
+
+// 1. Check ConnectionStrings:DefaultConnection (supports appsettings, env vars via ConnectionStrings__DefaultConnection)
+var configConn = builder.Configuration.GetConnectionString("DefaultConnection")
+              ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+              ?? Environment.GetEnvironmentVariable("ConnectionStrings:DefaultConnection");
+
+if (!string.IsNullOrWhiteSpace(configConn) && !configConn.Contains("trusted_connection", StringComparison.OrdinalIgnoreCase))
 {
-    connectionString = ConnectionStringHelper.FromUrl(databaseUrl);
-    connectionSource = "Environment variable 'DATABASE_URL'";
+    connectionString = ConnectionStringHelper.FromUrl(configConn);
+    connectionSource = "Configuration 'ConnectionStrings:DefaultConnection'";
 }
 else
 {
-    var configConn = builder.Configuration.GetConnectionString("DefaultConnection");
-    // Ignore empty or legacy SQL Server localdb strings that crash Npgsql
-    if (!string.IsNullOrWhiteSpace(configConn) && !configConn.Contains("trusted_connection", StringComparison.OrdinalIgnoreCase))
+    // 2. Otherwise, check DATABASE_URL
+    var databaseUrl = builder.Configuration["DATABASE_URL"]
+                   ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
+    if (!string.IsNullOrWhiteSpace(databaseUrl))
     {
-        connectionString = configConn;
-        connectionSource = "Configuration 'ConnectionStrings:DefaultConnection'";
+        connectionString = ConnectionStringHelper.FromUrl(databaseUrl);
+        connectionSource = "Environment variable 'DATABASE_URL'";
     }
 }
 
+// 3. Fallback or validate
 if (string.IsNullOrWhiteSpace(connectionString))
 {
     if (builder.Environment.IsProduction())
     {
+        // Safe startup validation: Never log secrets, report checked keys and clear instructions
         throw new InvalidOperationException(
-            "CRITICAL: Database connection string is not configured. " +
-            "Please provide 'ConnectionStrings:DefaultConnection' or the 'DATABASE_URL' environment variable.");
+            "CRITICAL: Database connection string is not configured for Production.\n" +
+            "Checked the following configuration sources (all were missing or empty):\n" +
+            "  1. Configuration 'ConnectionStrings:DefaultConnection' (or env var 'ConnectionStrings__DefaultConnection')\n" +
+            "  2. Environment variable 'DATABASE_URL'\n\n" +
+            "To resolve this in the Render dashboard:\n" +
+            "  1. Open your Render dashboard and navigate to your Web Service.\n" +
+            "  2. Go to the 'Environment' tab.\n" +
+            "  3. Set 'DATABASE_URL' to your PostgreSQL connection string (Internal Database URL if database is on Render),\n" +
+            "     or set 'ConnectionStrings__DefaultConnection' with your Npgsql connection string.\n" +
+            "  4. Click 'Save changes' to trigger a redeploy.");
     }
 
     // Development fallback
-    connectionString = "Host=127.0.0.1;Port=5432;Database=crm;Username=postgres;Password=postgres";
-    connectionSource = "Default development fallback";
+    connectionString = "Host=127.0.0.1;Port=5432;Database=crm;Username=postgres;Password=postgres;SSL Mode=Prefer;";
+    connectionSource = "Local development fallback (127.0.0.1:5432)";
+}
+
+// Check for Render internal hostname used outside Render's private network
+if (builder.Environment.IsDevelopment())
+{
+    try
+    {
+        var csb = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+        if (ConnectionStringHelper.IsRenderInternalHost(csb.Host))
+        {
+            Console.WriteLine(
+                $"[WARNING] Detected Render internal hostname '{csb.Host}' while running in Development. " +
+                "Render internal hostnames are only reachable from within Render's private network. " +
+                "For local development connecting to Render PostgreSQL, use the External Database URL instead.");
+        }
+    }
+    catch { /* Ignore parsing check in development */ }
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -264,9 +299,30 @@ using (var scope = app.Services.CreateScope())
         var dbConn = db.Database.GetDbConnection();
         startupLogger.LogInformation("Connecting to database '{Database}' on server '{DataSource}' (resolved via {ConnectionSource})...",
             dbConn.Database, dbConn.DataSource, connectionSource);
+        startupLogger.LogInformation("Database configuration: {SafeDescription}",
+            ConnectionStringHelper.GetSafeConnectionDescription(connectionString));
+
+        // If the database already contains tables (e.g. from schema.sql or an earlier migration name),
+        // baseline __EFMigrationsHistory with the current initial migration so Migrate() won't attempt
+        // to recreate existing tables and throw PostgresException 42P07.
+        BaselineExistingDatabaseIfNeeded(dbConn, startupLogger);
+
         startupLogger.LogInformation("Applying database migrations...");
-        db.Database.Migrate();
-        startupLogger.LogInformation("Database migrations applied successfully.");
+        try
+        {
+            db.Database.Migrate();
+            startupLogger.LogInformation("Database migrations applied successfully.");
+        }
+        catch (Exception migEx) when (IsRelationAlreadyExistsException(migEx))
+        {
+            startupLogger.LogWarning(
+                "One or more database tables already exist in PostgreSQL. " +
+                "Marking initial migration '20261015071435_InitialPg' as applied in '__EFMigrationsHistory' and continuing startup...");
+            EnsureMigrationMarked(dbConn, "20261015071435_InitialPg", startupLogger);
+        }
+
+        // Ensure all required tables, columns, and indexes exist in PostgreSQL (even if migration was skipped due to baseline)
+        DatabaseSchemaSync.EnsureAllTablesExist(dbConn, startupLogger);
 
         LeadStore.SeedIfEmpty(db);
         SettingsStore.SeedIfEmpty(db, builder.Configuration, startupLogger);
@@ -285,7 +341,10 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        var npgsqlEx = ex as Npgsql.NpgsqlException ?? ex.InnerException as Npgsql.NpgsqlException;
+        var pgEx = ex as Npgsql.PostgresException
+                ?? ex.InnerException as Npgsql.PostgresException;
+        var npgsqlEx = ex as Npgsql.NpgsqlException
+                    ?? ex.InnerException as Npgsql.NpgsqlException;
         var socketEx = (ex as System.Net.Sockets.SocketException)
                     ?? (ex.InnerException as System.Net.Sockets.SocketException)
                     ?? (npgsqlEx?.InnerException as System.Net.Sockets.SocketException);
@@ -298,6 +357,13 @@ using (var scope = app.Services.CreateScope())
                 "PostgreSQL is not running on port 5432. Please ensure the PostgreSQL server or container is running, " +
                 "or configure the target database via 'DATABASE_URL' or 'ConnectionStrings:DefaultConnection'.",
                 dbConn.DataSource);
+        }
+        else if (pgEx?.SqlState == "42P07")
+        {
+            startupLogger.LogCritical(
+                "Database table already exists ({Message}). Ensure '__EFMigrationsHistory' has recorded '20261015071435_InitialPg' or run: " +
+                "INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ('20261015071435_InitialPg', '9.0.4') ON CONFLICT DO NOTHING;",
+                pgEx.MessageText);
         }
         else
         {
@@ -360,3 +426,93 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+static void BaselineExistingDatabaseIfNeeded(System.Data.Common.DbConnection dbConn, ILogger logger)
+{
+    try
+    {
+        if (dbConn.State != System.Data.ConnectionState.Open)
+        {
+            dbConn.Open();
+        }
+
+        using var cmd = dbConn.CreateCommand();
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
+                ""MigrationId"" character varying(150) NOT NULL,
+                ""ProductVersion"" character varying(32) NOT NULL,
+                CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+            );
+
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname ILIKE 'FollowUpSettings'
+                ) OR EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE lower(table_name) = 'followupsettings'
+                ) THEN
+                    IF NOT EXISTS (SELECT 1 FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '20261015071435_InitialPg') THEN
+                        INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                        VALUES ('20261015071435_InitialPg', '9.0.4')
+                        ON CONFLICT (""MigrationId"") DO NOTHING;
+                    END IF;
+                END IF;
+            END $$;
+        ";
+        cmd.ExecuteNonQuery();
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Pre-migration baseline check encountered an issue; proceeding with standard migration.");
+    }
+}
+
+static void EnsureMigrationMarked(System.Data.Common.DbConnection dbConn, string migrationId, ILogger logger)
+{
+    try
+    {
+        if (dbConn.State != System.Data.ConnectionState.Open)
+        {
+            dbConn.Open();
+        }
+
+        using var cmd = dbConn.CreateCommand();
+        cmd.CommandText = $@"
+            CREATE TABLE IF NOT EXISTS ""__EFMigrationsHistory"" (
+                ""MigrationId"" character varying(150) NOT NULL,
+                ""ProductVersion"" character varying(32) NOT NULL,
+                CONSTRAINT ""PK___EFMigrationsHistory"" PRIMARY KEY (""MigrationId"")
+            );
+
+            INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+            VALUES ('{migrationId}', '9.0.4')
+            ON CONFLICT (""MigrationId"") DO NOTHING;
+
+            DELETE FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" = '20261013120000_InitialPostgres';
+        ";
+        cmd.ExecuteNonQuery();
+        logger.LogInformation("Successfully baselined migration '{MigrationId}' in '__EFMigrationsHistory'.", migrationId);
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Failed to mark migration '{MigrationId}' in history table.", migrationId);
+    }
+}
+
+static bool IsRelationAlreadyExistsException(Exception ex)
+{
+    var npgsqlEx = ex as Npgsql.NpgsqlException ?? ex.InnerException as Npgsql.NpgsqlException;
+    if (npgsqlEx is Npgsql.PostgresException pgEx && pgEx.SqlState == "42P07")
+    {
+        return true;
+    }
+    if (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) &&
+        (ex.Message.Contains("relation", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("table", StringComparison.OrdinalIgnoreCase)))
+    {
+        return true;
+    }
+    return false;
+}

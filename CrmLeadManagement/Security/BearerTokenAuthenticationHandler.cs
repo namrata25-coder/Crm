@@ -129,6 +129,8 @@ public class BearerTokenAuthenticationHandler : AuthenticationHandler<Authentica
 
     protected override async Task HandleChallengeAsync(AuthenticationProperties properties)
     {
+        if (Response.HasStarted) return;
+
         Response.StatusCode = StatusCodes.Status401Unauthorized;
         Response.Headers["WWW-Authenticate"] = "Bearer";
         Response.ContentType = "application/json";
@@ -143,6 +145,8 @@ public class BearerTokenAuthenticationHandler : AuthenticationHandler<Authentica
 
     protected override async Task HandleForbiddenAsync(AuthenticationProperties properties)
     {
+        if (Response.HasStarted) return;
+
         Response.StatusCode = StatusCodes.Status403Forbidden;
         Response.ContentType = "application/json";
 

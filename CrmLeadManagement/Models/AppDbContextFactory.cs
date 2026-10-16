@@ -22,26 +22,33 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
             .AddEnvironmentVariables()
             .Build();
 
-        var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
         string? connectionString = null;
 
-        if (!string.IsNullOrWhiteSpace(databaseUrl))
+        // 1. Prefer ConnectionStrings:DefaultConnection (from appsettings or ConnectionStrings__DefaultConnection env var)
+        var configConn = config.GetConnectionString("DefaultConnection")
+                      ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                      ?? Environment.GetEnvironmentVariable("ConnectionStrings:DefaultConnection");
+
+        if (!string.IsNullOrWhiteSpace(configConn) && !configConn.Contains("trusted_connection", StringComparison.OrdinalIgnoreCase))
         {
-            connectionString = ConnectionStringHelper.FromUrl(databaseUrl);
+            connectionString = ConnectionStringHelper.FromUrl(configConn);
         }
         else
         {
-            var configConn = config.GetConnectionString("DefaultConnection");
-            if (!string.IsNullOrWhiteSpace(configConn) && !configConn.Contains("trusted_connection", StringComparison.OrdinalIgnoreCase))
+            // 2. Otherwise, read DATABASE_URL
+            var databaseUrl = config["DATABASE_URL"]
+                           ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
+            if (!string.IsNullOrWhiteSpace(databaseUrl))
             {
-                connectionString = configConn;
+                connectionString = ConnectionStringHelper.FromUrl(databaseUrl);
             }
         }
 
+        // 3. Fallback for design-time tooling when running locally without environment variables
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            // Fallback for design-time tooling when no environment variable is provided
-            connectionString = "Host=localhost;Port=5432;Database=crm;Username=postgres;Password=postgres";
+            connectionString = "Host=127.0.0.1;Port=5432;Database=crm;Username=postgres;Password=postgres;SSL Mode=Prefer;";
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();

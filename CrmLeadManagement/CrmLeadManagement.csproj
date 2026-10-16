@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -40,9 +40,7 @@
       <_OldFiles Include="Migrations\202609*.cs" />
       <_OldFiles Include="Migrations\2026100*.cs" />
       <_OldFiles Include="Migrations\20261012*.cs" />
-      <_OldFiles Include="schema.sql" />
       <_OldFiles Include="Controllers\Api\AppLeadsController.cs" />
-      <_OldFiles Include="Dockerfile;render.yaml;.dockerignore;.gitignore" />
       <_OldFiles Include="wwwroot\uploads\requirements\*.png" />
     </ItemGroup>
     <Delete Files="@(_OldFiles)" />

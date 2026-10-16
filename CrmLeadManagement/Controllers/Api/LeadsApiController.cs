@@ -84,6 +84,43 @@ public class LeadsApiController : ControllerBase
         return Ok(LeadStore.Leads.Where(l => !string.IsNullOrWhiteSpace(l.AssignedTo)).ToList());
     }
 
+    // GET /api/leads/count
+    // GET /api/leads/counts
+    [HttpGet("count")]
+    [HttpGet("counts")]
+    public ActionResult<LeadCountSummaryDto> GetCount([FromQuery] string? assignedTo)
+    {
+        var leads = LeadStore.Leads.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(assignedTo))
+        {
+            leads = leads.Where(l => string.Equals(l.AssignedTo, assignedTo, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var list = leads.ToList();
+        var total = list.Count;
+        var assigned = list.Count(l => !string.IsNullOrWhiteSpace(l.AssignedTo));
+        var unassigned = total - assigned;
+
+        var byStatus = list
+            .Where(l => !string.IsNullOrWhiteSpace(l.LeadStatus))
+            .GroupBy(l => l.LeadStatus!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var byPriority = list
+            .Where(l => !string.IsNullOrWhiteSpace(l.Priority))
+            .GroupBy(l => l.Priority!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return Ok(new LeadCountSummaryDto
+        {
+            Total = total,
+            Assigned = assigned,
+            Unassigned = unassigned,
+            ByStatus = byStatus,
+            ByPriority = byPriority
+        });
+    }
+
     // GET /api/leads/{id}
     [HttpGet("{id}")]
     public ActionResult<Lead> GetById(string id)

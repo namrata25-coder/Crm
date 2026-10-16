@@ -119,3 +119,14 @@ public class ProposalRequest
     public string Notes { get; set; } = "";
     public string Status { get; set; } = "Draft";
 }
+
+/// <summary>Summary of lead counts overall, by assignment, by status, and by priority.</summary>
+public class LeadCountSummaryDto
+{
+    public int Count => Total;
+    public int Total { get; set; }
+    public int Assigned { get; set; }
+    public int Unassigned { get; set; }
+    public Dictionary<string, int> ByStatus { get; set; } = new();
+    public Dictionary<string, int> ByPriority { get; set; } = new();
+}

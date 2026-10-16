@@ -34,6 +34,47 @@ public class AppLeadsController : ControllerBase
     }
 
     /// <summary>
+    /// Gets lead count and summary metrics formatted for mobile/app consumption.
+    /// Route: GET /api/v1/app/leads/count (also /api/v1/app/leads/counts)
+    /// </summary>
+    [HttpGet("count")]
+    [HttpGet("counts")]
+    public async Task<ActionResult<LeadCountSummaryDto>> GetLeadCounts([FromQuery] string? assignedTo)
+    {
+        var query = _db.Leads.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(assignedTo))
+        {
+            query = query.Where(l => l.AssignedTo == assignedTo);
+        }
+
+        var total = await query.CountAsync();
+        var assigned = await query.CountAsync(l => !string.IsNullOrEmpty(l.AssignedTo));
+        var unassigned = total - assigned;
+
+        var statusGroups = await query
+            .Where(l => !string.IsNullOrEmpty(l.LeadStatus))
+            .GroupBy(l => l.LeadStatus!)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Status, x => x.Count);
+
+        var priorityGroups = await query
+            .Where(l => !string.IsNullOrEmpty(l.Priority))
+            .GroupBy(l => l.Priority!)
+            .Select(g => new { Priority = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Priority, x => x.Count);
+
+        return Ok(new LeadCountSummaryDto
+        {
+            Total = total,
+            Assigned = assigned,
+            Unassigned = unassigned,
+            ByStatus = statusGroups,
+            ByPriority = priorityGroups
+        });
+    }
+
+    /// <summary>
     /// Gets a single lead by LeadId code or numeric ID.
     /// </summary>
     [HttpGet("{id}")]

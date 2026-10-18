@@ -143,6 +143,7 @@ public class WorkInvoice
     public WorkMilestone? Milestone { get; set; }
 
     public string? InvoiceNumber  { get; set; } = "";
+    public string? ClientId       { get; set; } = "";
     public string? ClientName     { get; set; } = "";
     public string? ClientCompany  { get; set; } = "";
     public string? InvoiceDate    { get; set; } = "";

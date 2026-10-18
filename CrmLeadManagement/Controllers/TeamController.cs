@@ -1,7 +1,9 @@
 using CrmLeadManagement.Models;
+using CrmLeadManagement.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace CrmLeadManagement.Controllers;
 
@@ -9,10 +11,12 @@ namespace CrmLeadManagement.Controllers;
 public class TeamController : Controller
 {
     private readonly AppDbContext _db;
+    private readonly IConfiguration? _configuration;
 
-    public TeamController(AppDbContext db)
+    public TeamController(AppDbContext db, IConfiguration? configuration = null)
     {
         _db = db;
+        _configuration = configuration;
     }
 
     // GET /Team or /Team/Index - Team Members overview
@@ -22,6 +26,15 @@ public class TeamController : Controller
         ViewData["ActivePage"] = "TeamMembers";
 
         RoleStore.SeedIfEmpty(_db);
+
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Member", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Team Members.";
+            return RedirectToAction("List", "Lead");
+        }
 
         var query = _db.Users.AsQueryable();
 
@@ -54,6 +67,171 @@ public class TeamController : Controller
         return View(users);
     }
 
+    // POST /Team/SaveMember - Add or Update a team member
+    [HttpPost]
+    public async Task<IActionResult> SaveMember(int id, string name, string email, string role, string status, string? password = null)
+    {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        var requiredAction = id == 0 ? "Create" : "Edit";
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Member", requiredAction))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: You do not have permission to {requiredAction.ToLower()} team members.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!isAdmin && string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["ErrorMessage"] = "Access Denied: Only administrators can assign the Admin role.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var adminPassword = _configuration?["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
+        if (!string.IsNullOrWhiteSpace(password) && !string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(password.Trim(), adminPassword, StringComparison.Ordinal))
+        {
+            TempData["ErrorMessage"] = "User password must be different from the administrator password.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        name = name?.Trim() ?? "";
+        email = email?.Trim().ToLowerInvariant() ?? "";
+        role = string.IsNullOrWhiteSpace(role) ? "Sales Executive" : role.Trim();
+        status = string.IsNullOrWhiteSpace(status) ? "Active" : status.Trim();
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            TempData["ErrorMessage"] = "Full name is required.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email))
+        {
+            TempData["ErrorMessage"] = "A valid email address is required.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // Check duplicate email (excluding current member if updating)
+        var duplicate = await _db.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == email && u.Id != id);
+        if (duplicate)
+        {
+            TempData["ErrorMessage"] = $"Email address '{email}' is already in use by another team member.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // Fetch Role from RoleMasters to synchronize ModulePermissions
+        var roleMaster = await _db.RoleMasters.FirstOrDefaultAsync(r => r.RoleName.ToLower() == role.ToLower());
+        if (roleMaster == null)
+        {
+            roleMaster = await _db.RoleMasters.FirstOrDefaultAsync(r => r.RoleName == "Sales Executive")
+                         ?? await _db.RoleMasters.FirstOrDefaultAsync();
+        }
+
+        var permsList = roleMaster != null ? roleMaster.GetPermissions() : RoleStore.GetDefaultMatrixTemplate();
+        var modulePermsString = string.Join(",", permsList.Where(p => p.View).Select(p => p.Module));
+        var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<UserRoleEntry>();
+
+        if (id == 0)
+        {
+            if (string.IsNullOrWhiteSpace(password) || password.Trim().Length < 6)
+            {
+                TempData["ErrorMessage"] = "Password must be at least 6 characters for a new team member.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var newUser = new UserRoleEntry
+            {
+                Name = name,
+                Email = email,
+                Role = roleMaster != null ? roleMaster.RoleName : role,
+                Status = status,
+                ModulePermissions = modulePermsString,
+                CreatedAt = DateTime.UtcNow,
+                FailedLoginCount = 0,
+                MustChangePassword = false
+            };
+            newUser.PasswordHash = hasher.HashPassword(newUser, password.Trim());
+
+            _db.Users.Add(newUser);
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Team member '{name}' added successfully with role '{newUser.Role}'.";
+        }
+        else
+        {
+            var user = await _db.Users.FindAsync(id);
+            if (user == null)
+            {
+                TempData["ErrorMessage"] = "Team member not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            user.Name = name;
+            user.Email = email;
+            user.Role = roleMaster != null ? roleMaster.RoleName : role;
+            user.Status = status;
+            user.ModulePermissions = modulePermsString;
+
+            if (!string.IsNullOrWhiteSpace(password) && password.Trim().Length >= 6)
+            {
+                user.PasswordHash = hasher.HashPassword(user, password.Trim());
+                user.LastPasswordChangeAt = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Team member '{name}' updated successfully.";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    // POST /Team/DeleteMember - Remove a team member
+    [HttpPost]
+    public async Task<IActionResult> DeleteMember(int id)
+    {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == authEmail);
+
+        if (currentUser != null && !PermissionChecker.HasModulePermission(_db, currentUser, "Member", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete team members.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var user = await _db.Users.FindAsync(id);
+        if (user == null)
+        {
+            TempData["ErrorMessage"] = "Team member not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!string.IsNullOrEmpty(authEmail) && string.Equals(user.Email, authEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["ErrorMessage"] = "You cannot delete your own account while logged in.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (user.Role == "Super Admin" || user.Role == "Admin")
+        {
+            var adminCount = await _db.Users.CountAsync(u => (u.Role == "Super Admin" || u.Role == "Admin") && u.Id != user.Id);
+            if (adminCount == 0)
+            {
+                TempData["ErrorMessage"] = "Cannot delete the last remaining Administrator account.";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        var memberName = user.Name ?? user.Email;
+        _db.Users.Remove(user);
+        await _db.SaveChangesAsync();
+
+        TempData["SuccessMessage"] = $"Team member '{memberName}' removed successfully.";
+        return RedirectToAction(nameof(Index));
+    }
+
     // GET /Team/Roles - Team > Roles & Permissions
     public IActionResult Roles(string? role = null)
     {
@@ -62,6 +240,15 @@ public class TeamController : Controller
 
         RoleStore.SeedIfEmpty(_db);
 
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Roles & Permissions", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: Only administrators can access Roles & Permissions.";
+            return RedirectToAction(nameof(Index));
+        }
+
         var allRoles = _db.RoleMasters.OrderBy(r => r.Id).ToList();
         if (!allRoles.Any())
         {
@@ -69,7 +256,6 @@ public class TeamController : Controller
             allRoles = _db.RoleMasters.OrderBy(r => r.Id).ToList();
         }
 
-        // Default to "Sales Executive" if not specified, matching the design prompt
         var selectedRole = allRoles.FirstOrDefault(r => string.Equals(r.RoleName, role, StringComparison.OrdinalIgnoreCase))
                            ?? allRoles.FirstOrDefault(r => string.Equals(r.RoleName, "Sales Executive", StringComparison.OrdinalIgnoreCase))
                            ?? allRoles.First();
@@ -127,6 +313,14 @@ public class TeamController : Controller
         if (dto == null || string.IsNullOrWhiteSpace(dto.RoleName))
             return BadRequest(new { success = false, message = "Invalid role data." });
 
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Roles & Permissions", "Edit"))
+        {
+            return Forbid();
+        }
+
         var role = _db.RoleMasters.FirstOrDefault(r => r.RoleName == dto.RoleName);
         if (role == null)
             return NotFound(new { success = false, message = $"Role '{dto.RoleName}' not found." });
@@ -134,7 +328,7 @@ public class TeamController : Controller
         role.DataAccess = string.Equals(dto.DataAccess, "All", StringComparison.OrdinalIgnoreCase) ? "All" : "OnlyAssigned";
         role.SetPermissions(dto.Permissions);
 
-        // Also update the comma-separated permitted modules on assigned users so existing filters work seamlessly
+        // Update the comma-separated permitted modules on assigned users so existing filters work seamlessly
         var permittedModules = dto.Permissions
             .Where(p => p.View)
             .Select(p => p.Module)
@@ -163,6 +357,14 @@ public class TeamController : Controller
     {
         if (dto == null || string.IsNullOrWhiteSpace(dto.RoleName))
             return BadRequest(new { success = false, message = "Role name is required." });
+
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Roles & Permissions", "Create"))
+        {
+            return Forbid();
+        }
 
         var cleanName = dto.RoleName.Trim();
         if (_db.RoleMasters.Any(r => r.RoleName.ToLower() == cleanName.ToLower()))
@@ -216,6 +418,14 @@ public class TeamController : Controller
         if (dto == null || string.IsNullOrWhiteSpace(dto.OldRoleName) || string.IsNullOrWhiteSpace(dto.NewRoleName))
             return BadRequest(new { success = false, message = "Both old and new role names are required." });
 
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Roles & Permissions", "Edit"))
+        {
+            return Forbid();
+        }
+
         var oldName = dto.OldRoleName.Trim();
         var newName = dto.NewRoleName.Trim();
 
@@ -225,6 +435,9 @@ public class TeamController : Controller
         var role = _db.RoleMasters.FirstOrDefault(r => r.RoleName == oldName);
         if (role == null)
             return NotFound(new { success = false, message = $"Role '{oldName}' not found." });
+
+        if (role.IsSystem || string.Equals(role.RoleName, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(role.RoleName, "Super Admin", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { success = false, message = "System roles cannot be renamed." });
 
         if (_db.RoleMasters.Any(r => r.RoleName.ToLower() == newName.ToLower() && r.Id != role.Id))
             return BadRequest(new { success = false, message = $"A role named '{newName}' already exists." });
@@ -255,13 +468,21 @@ public class TeamController : Controller
         if (dto == null || string.IsNullOrWhiteSpace(dto.RoleName))
             return BadRequest(new { success = false, message = "Role name is required." });
 
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Roles & Permissions", "Delete"))
+        {
+            return Forbid();
+        }
+
         var roleName = dto.RoleName.Trim();
         var role = _db.RoleMasters.FirstOrDefault(r => r.RoleName == roleName);
         if (role == null)
             return NotFound(new { success = false, message = $"Role '{roleName}' not found." });
 
-        if (role.IsSystem || string.Equals(role.RoleName, "Admin", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(new { success = false, message = "The 'Admin' system role cannot be deleted." });
+        if (role.IsSystem || string.Equals(role.RoleName, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(role.RoleName, "Super Admin", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { success = false, message = "System roles cannot be deleted." });
 
         var assignedUsers = _db.Users.Where(u => u.Role == roleName).ToList();
         if (assignedUsers.Any())
@@ -281,9 +502,13 @@ public class TeamController : Controller
             if (reassignTarget == null)
                 return BadRequest(new { success = false, message = $"Target role '{dto.ReassignToRole}' does not exist." });
 
+            var targetPerms = reassignTarget.GetPermissions();
+            var targetModulePermsString = string.Join(",", targetPerms.Where(p => p.View).Select(p => p.Module));
+
             foreach (var u in assignedUsers)
             {
                 u.Role = reassignTarget.RoleName;
+                u.ModulePermissions = targetModulePermsString;
             }
         }
 
@@ -303,6 +528,13 @@ public class TeamController : Controller
     {
         if (string.IsNullOrWhiteSpace(roleName))
             return BadRequest(new { success = false, message = "Role name is required." });
+
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        if (currentUser != null && !PermissionChecker.HasModulePermission(_db, currentUser, "Roles & Permissions", "Edit"))
+        {
+            return Forbid();
+        }
 
         var role = _db.RoleMasters.FirstOrDefault(r => r.RoleName == roleName);
         if (role == null)

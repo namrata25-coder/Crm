@@ -4,6 +4,8 @@ using CrmLeadManagement.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CrmLeadManagement.Controllers.Api;
 
@@ -17,6 +19,13 @@ namespace CrmLeadManagement.Controllers.Api;
 [Authorize(AuthenticationSchemes = CookieAuthenticationDefaults.AuthenticationScheme + "," + BearerTokenAuthenticationHandler.SchemeName)]
 public class SettingsApiController : ControllerBase
 {
+    private readonly ILogger<SettingsApiController> _logger;
+
+    public SettingsApiController(ILogger<SettingsApiController> logger)
+    {
+        _logger = logger;
+    }
+
     // GET /api/settings
     [HttpGet]
     public ActionResult<SettingsViewModel> GetAll()
@@ -90,13 +99,47 @@ public class SettingsApiController : ControllerBase
     // POST /api/settings/users
     [HttpPost("users")]
     [Authorize(Roles = "Admin")]
-    public ActionResult<IEnumerable<UserRoleEntry>> AddUser([FromBody] UserRoleEntry newUser)
+    public ActionResult<object> AddUser([FromBody] UserRoleEntry newUser)
     {
-        if (string.IsNullOrWhiteSpace(newUser.Name) || string.IsNullOrWhiteSpace(newUser.Email))
-            return BadRequest(new ApiError { Message = "Name and Email are required." });
+        string generatedPassword;
+        try
+        {
+            generatedPassword = SettingsStore.AddUser(newUser);
+        }
+        catch (DuplicateUserEmailException)
+        {
+            return Conflict(new ApiError { Message = "A user with that email address already exists." });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ApiError { Message = ex.Message });
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Database error while creating user {Email}", newUser.Email);
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new ApiError { Message = "The user could not be created because of a database error." });
+        }
+        catch (NpgsqlException ex)
+        {
+            _logger.LogError(ex, "Database error while creating user {Email}", newUser.Email);
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new ApiError { Message = "The user could not be created because of a database error." });
+        }
 
-        SettingsStore.AddUser(newUser);
-        return Ok(SettingsStore.Users);
+        return Ok(new
+        {
+            user = new
+            {
+                newUser.Id,
+                newUser.Name,
+                newUser.Email,
+                newUser.Role,
+                newUser.Status,
+                newUser.ModulePermissions
+            },
+            generatedPassword
+        });
     }
 
     // DELETE /api/settings/users/{email}

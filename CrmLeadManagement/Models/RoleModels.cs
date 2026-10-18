@@ -121,6 +121,21 @@ public class CreateRoleDto
 }
 
 /// <summary>
+/// DTO for creating a user and optionally a role from Team & Role page.
+/// </summary>
+public class CreateUserWithRoleDto
+{
+    public string Name { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Role { get; set; } = "";
+    public string Password { get; set; } = "";
+    public string? Status { get; set; } = "Active";
+    public string? Description { get; set; } = "";
+    public string? CopyFromRole { get; set; } = "";
+    public string DataAccess { get; set; } = "OnlyAssigned";
+}
+
+/// <summary>
 /// DTO for renaming a role.
 /// </summary>
 public class RenameRoleDto
@@ -175,6 +190,7 @@ public static class RoleStore
             new ModulePermissionItem { Section = "FINANCE", Module = "Proposal", HasView = true, HasCreate = true, HasEdit = true, HasDelete = true, ExtraName = null },
             new ModulePermissionItem { Section = "FINANCE", Module = "Invoice", HasView = true, HasCreate = true, HasEdit = true, HasDelete = true, ExtraName = "Send" },
             new ModulePermissionItem { Section = "FINANCE", Module = "Expenses", HasView = true, HasCreate = true, HasEdit = true, HasDelete = true, ExtraName = "Approve" },
+            new ModulePermissionItem { Section = "FINANCE", Module = "Payment", HasView = true, HasCreate = true, HasEdit = true, HasDelete = true, ExtraName = null },
 
             // PROJECTS
             new ModulePermissionItem { Section = "PROJECTS", Module = "Project", HasView = true, HasCreate = true, HasEdit = true, HasDelete = true, ExtraName = null },
@@ -236,6 +252,7 @@ public static class RoleStore
                     item.View = true; item.Create = true; item.Edit = true; item.Delete = false; item.Extra = false;
                     break;
                 case "Expenses":
+                case "Payment":
                     item.View = true; item.Create = true; item.Edit = true; item.Delete = false; item.Extra = false;
                     break;
 
@@ -386,7 +403,29 @@ public static class RoleStore
             };
             telecaller.SetPermissions(GetTelecallerPermissions());
 
-            db.RoleMasters.AddRange(salesExec, salesMgr, admin, telecaller);
+            var superAdmin = new RoleMaster
+            {
+                RoleName = "Super Admin",
+                Description = "Primary administrative authority with complete system, user, and security management privileges.",
+                IsSystem = true,
+                DataAccess = "All"
+            };
+            superAdmin.SetPermissions(GetAdminPermissions());
+
+            db.RoleMasters.AddRange(superAdmin, salesExec, salesMgr, admin, telecaller);
+            db.SaveChanges();
+        }
+        else if (!db.RoleMasters.Any(r => r.RoleName == "Super Admin"))
+        {
+            var superAdmin = new RoleMaster
+            {
+                RoleName = "Super Admin",
+                Description = "Primary administrative authority with complete system, user, and security management privileges.",
+                IsSystem = true,
+                DataAccess = "All"
+            };
+            superAdmin.SetPermissions(GetAdminPermissions());
+            db.RoleMasters.Add(superAdmin);
             db.SaveChanges();
         }
     }

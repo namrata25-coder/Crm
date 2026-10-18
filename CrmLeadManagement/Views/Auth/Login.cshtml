@@ -561,6 +561,13 @@
                 align-items: flex-start;
                 gap: 8px;
             }
+
+            .demo-bar-pills {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+
         }
     </style>
 </head>
@@ -664,11 +671,11 @@
                         <i class="bi bi-lightning-charge" style="color: #2563eb;"></i> Quick Fill:
                     </span>
                     <div class="demo-bar-pills">
-                        <button type="button" class="demo-pill" onclick="fillCredentials('admin@nimbuscrm.com', 'AdminPassword123!')" title="Load Administrator credentials">
+                        <button type="button" class="demo-pill" onclick="fillCredentials('@(ViewBag.AdminEmail ?? "admin@nimbuscrm.com")', '@(ViewBag.AdminPassword ?? "AdminPassword123!")')" title="Load Administrator credentials">
                             Admin
                         </button>
-                        <button type="button" class="demo-pill" onclick="fillCredentials('ananya.sharma@nimbuscrm.com', 'AdminPassword123!')" title="Load Sales Manager credentials">
-                            Sales Manager
+                        <button type="button" class="demo-pill" id="userOptionBtn" onclick="fillCredentials('@(ViewBag.UserEmail ?? "ananya.sharma@nimbuscrm.com")', '@(ViewBag.UserPassword ?? "Ananya@123!")')" title="Load User credentials">
+                            User
                         </button>
                     </div>
                 </aside>
@@ -699,6 +706,7 @@
                                    autofocus />
                         </div>
                     </div>
+
 
                     <!-- Password Input with Eye Visibility Toggle -->
                     <div class="form-group">

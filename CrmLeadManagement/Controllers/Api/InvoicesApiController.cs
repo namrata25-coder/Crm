@@ -252,7 +252,7 @@ public class InvoicesApiController : ControllerBase
                     .AnyAsync(i => i.MilestoneId == input.MilestoneId.Value);
                 if (existingMilestoneInvoice)
                 {
-                    return Conflict(new { message = $"An invoice already exists for milestone '{milestone.MilestoneName}'. Duplicate milestone invoices are not allowed." });
+                    return Conflict(new { message = "An invoice already exists for this milestone." });
                 }
             }
 
@@ -294,11 +294,22 @@ public class InvoicesApiController : ControllerBase
                 ? project.ClientCompany ?? ""
                 : (!string.IsNullOrWhiteSpace(input.ClientCompany) ? input.ClientCompany.Trim() : project.ClientCompany ?? "");
 
+            var leads = await _db.Leads.AsNoTracking().ToListAsync();
+
+            var clientId = !string.IsNullOrWhiteSpace(input.ClientId)
+                ? input.ClientId.Trim()
+                : (leads.FirstOrDefault(l =>
+                    (!string.IsNullOrWhiteSpace(clientName) && (string.Equals(l.LeadName, clientName, StringComparison.OrdinalIgnoreCase) || string.Equals(l.CompanyName, clientName, StringComparison.OrdinalIgnoreCase))) ||
+                    (!string.IsNullOrWhiteSpace(clientCompany) && (string.Equals(l.CompanyName, clientCompany, StringComparison.OrdinalIgnoreCase) || string.Equals(l.LeadName, clientCompany, StringComparison.OrdinalIgnoreCase))) ||
+                    (!string.IsNullOrWhiteSpace(project.ClientName) && string.Equals(l.LeadName, project.ClientName, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(project.ClientCompany) && string.Equals(l.CompanyName, project.ClientCompany, StringComparison.OrdinalIgnoreCase)))?.LeadId ?? "");
+
             var invoice = new WorkInvoice
             {
                 ProjectId          = input.ProjectId,
                 MilestoneId        = input.MilestoneId > 0 ? input.MilestoneId : null,
                 InvoiceNumber      = invoiceNumber,
+                ClientId           = clientId,
                 ClientName         = clientName,
                 ClientCompany      = clientCompany,
                 InvoiceDate        = input.InvoiceDate.Trim(),
@@ -327,16 +338,16 @@ public class InvoicesApiController : ControllerBase
             if (invoice.MilestoneId.HasValue)
                 await _db.Entry(invoice).Reference(i => i.Milestone).LoadAsync();
 
-            var leads = await _db.Leads.AsNoTracking().ToListAsync();
             return CreatedAtAction(nameof(GetById), new { id = invoice.Id }, MapToDto(invoice, leads));
         }
         catch (DbUpdateException ex)
         {
             if (input.MilestoneId.HasValue &&
-                await _db.WorkInvoices.AnyAsync(i => i.MilestoneId == input.MilestoneId.Value))
+                (await _db.WorkInvoices.AnyAsync(i => i.MilestoneId == input.MilestoneId.Value) ||
+                 ex.InnerException?.Message.Contains("IX_WorkInvoices_MilestoneId") == true))
             {
                 _logger.LogWarning(ex, "Duplicate invoice attempt for milestone {MilestoneId}", input.MilestoneId);
-                return Conflict(new { message = "An invoice already exists for this milestone. Duplicate milestone invoices are not allowed." });
+                return Conflict(new { message = "An invoice already exists for this milestone." });
             }
 
             _logger.LogError(ex, "POST /api/invoices failed");
@@ -490,7 +501,7 @@ public class InvoicesApiController : ControllerBase
                 // Check duplicate milestone invoice
                 var duplicate = await _db.WorkInvoices.AnyAsync(i => i.MilestoneId == input.MilestoneId.Value && i.Id != id);
                 if (duplicate)
-                    return Conflict(new { message = "An invoice already exists for this milestone. Duplicate milestone invoices are not allowed." });
+                    return Conflict(new { message = "An invoice already exists for this milestone." });
 
                 invoice.MilestoneId = input.MilestoneId.Value;
                 invoice.Milestone = selectedMilestone;
@@ -518,6 +529,9 @@ public class InvoicesApiController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(input.InvoiceNumber))
                 invoice.InvoiceNumber = input.InvoiceNumber.Trim().ToUpper();
+
+            if (!string.IsNullOrWhiteSpace(input.ClientId))
+                invoice.ClientId = input.ClientId.Trim();
 
             invoice.ClientName         = selectedMilestone is not null ? project?.ClientName ?? "" : input.ClientName?.Trim() ?? invoice.ClientName;
             invoice.ClientCompany      = selectedMilestone is not null ? project?.ClientCompany ?? "" : input.ClientCompany?.Trim() ?? invoice.ClientCompany;
@@ -557,10 +571,11 @@ public class InvoicesApiController : ControllerBase
         catch (DbUpdateException ex)
         {
             if (input.MilestoneId.HasValue &&
-                await _db.WorkInvoices.AnyAsync(i => i.MilestoneId == input.MilestoneId.Value && i.Id != id))
+                (await _db.WorkInvoices.AnyAsync(i => i.MilestoneId == input.MilestoneId.Value && i.Id != id) ||
+                 ex.InnerException?.Message.Contains("IX_WorkInvoices_MilestoneId") == true))
             {
                 _logger.LogWarning(ex, "Duplicate invoice update attempt for milestone {MilestoneId}", input.MilestoneId);
-                return Conflict(new { message = "An invoice already exists for this milestone. Duplicate milestone invoices are not allowed." });
+                return Conflict(new { message = "An invoice already exists for this milestone." });
             }
 
             _logger.LogError(ex, "PUT /api/invoices/{Id} failed", id);
@@ -819,6 +834,7 @@ public class InvoicesApiController : ControllerBase
             MilestoneCode            = milestoneCode,
             MilestoneDescription      = milestoneDesc,
             MilestoneProgressPercent = milestoneProgress,
+            ClientId                 = inv.ClientId ?? (matchedLead?.LeadId ?? ""),
             ClientName               = clientName,
             ClientCompany            = clientCompany,
             ClientEmail              = clientEmail,
@@ -862,6 +878,7 @@ public class InvoiceInputDto
     public int ProjectId { get; set; }
     public int? MilestoneId { get; set; }
     public string? InvoiceNumber { get; set; }
+    public string? ClientId { get; set; }
     public string? ClientName { get; set; }
     public string? ClientCompany { get; set; }
     public string? InvoiceDate { get; set; }
@@ -880,6 +897,7 @@ public class InvoiceResponseDto
 {
     public int Id { get; set; }
     public string InvoiceNumber { get; set; } = "";
+    public string ClientId { get; set; } = "";
     public int ProjectId { get; set; }
     public string ProjectName { get; set; } = "";
     public string ProjectCode { get; set; } = "";

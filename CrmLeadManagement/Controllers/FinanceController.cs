@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using CrmLeadManagement.Models;
+using CrmLeadManagement.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,12 +21,33 @@ public class FinanceController : Controller
         _db = db;
     }
 
+    private bool CheckPermission(string module, string action = "View")
+    {
+        if (User.IsInRole("Admin")) return true;
+
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        if (currentUser != null && (string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(currentUser.Role, "Super Admin", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return PermissionChecker.HasModulePermission(_db, currentUser, module, action);
+    }
+
     // ===================== INVOICE =====================
 
     // GET /Finance/InvoiceList
     // GET /Finance/Invoices
     public IActionResult InvoiceList()
     {
+        if (!CheckPermission("Invoice", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Invoices.";
+            return RedirectToAction("List", "Lead");
+        }
+
         ViewData["Title"] = "Invoices";
         ViewData["ActivePage"] = "FinanceInvoice";
         return View();
@@ -33,6 +56,12 @@ public class FinanceController : Controller
     // GET /Finance/InvoiceDetails/5
     public async Task<IActionResult> InvoiceDetails(int id)
     {
+        if (!CheckPermission("Invoice", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Invoice details.";
+            return RedirectToAction(nameof(InvoiceList));
+        }
+
         ViewData["Title"] = "Invoice Details";
         ViewData["ActivePage"] = "FinanceInvoice";
         ViewData["InvoiceId"] = id;
@@ -57,6 +86,12 @@ public class FinanceController : Controller
     // GET /Finance/Payments
     public IActionResult PaymentList()
     {
+        if (!CheckPermission("Payment", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Payments.";
+            return RedirectToAction("List", "Lead");
+        }
+
         ViewData["Title"] = "Payments";
         ViewData["ActivePage"] = "FinancePayment";
         return View();
@@ -68,6 +103,12 @@ public class FinanceController : Controller
     // GET /Finance/RecurringInvoices
     public IActionResult RecurringInvoiceList()
     {
+        if (!CheckPermission("Invoice", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Recurring Invoices.";
+            return RedirectToAction("List", "Lead");
+        }
+
         ViewData["Title"] = "Recurring Invoices";
         ViewData["ActivePage"] = "FinanceRecurring";
         return View();
@@ -78,6 +119,12 @@ public class FinanceController : Controller
     // GET /Finance/EstimationList
     public IActionResult EstimationList()
     {
+        if (!CheckPermission("Estimation", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Estimations.";
+            return RedirectToAction("List", "Lead");
+        }
+
         ViewData["Title"] = "Estimation List";
         ViewData["ActivePage"] = "FinanceEstimation";
 
@@ -103,6 +150,12 @@ public class FinanceController : Controller
     // GET /Finance/EstimationDetails?leadId=LD-1001&number=EST-2001
     public IActionResult EstimationDetails(string leadId, string number)
     {
+        if (!CheckPermission("Estimation", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Estimation details.";
+            return RedirectToAction(nameof(EstimationList));
+        }
+
         var lead = LeadStore.GetById(leadId);
         var entry = lead?.Estimations.FirstOrDefault(e => e.Number == number);
         if (lead is null || entry is null)
@@ -120,6 +173,12 @@ public class FinanceController : Controller
     [HttpPost]
     public IActionResult DeleteEstimation(string leadId, string number)
     {
+        if (!CheckPermission("Estimation", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete estimations.";
+            return RedirectToAction(nameof(EstimationList));
+        }
+
         var lead = LeadStore.GetById(leadId);
         var existing = lead?.Estimations.FirstOrDefault(e => e.Number == number);
         if (existing is not null)
@@ -136,6 +195,12 @@ public class FinanceController : Controller
     // GET /Finance/QuotationList
     public IActionResult QuotationList()
     {
+        if (!CheckPermission("Quotation", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Quotations.";
+            return RedirectToAction("List", "Lead");
+        }
+
         ViewData["Title"] = "Quotation List";
         ViewData["ActivePage"] = "FinanceQuotation";
 
@@ -161,6 +226,12 @@ public class FinanceController : Controller
     // GET /Finance/QuotationDetails?leadId=LD-1001&number=QUO-2001
     public IActionResult QuotationDetails(string leadId, string number)
     {
+        if (!CheckPermission("Quotation", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Quotation details.";
+            return RedirectToAction(nameof(QuotationList));
+        }
+
         var lead = LeadStore.GetById(leadId);
         var entry = lead?.Quotations.FirstOrDefault(q => q.Number == number);
         if (lead is null || entry is null)
@@ -178,6 +249,12 @@ public class FinanceController : Controller
     [HttpPost]
     public IActionResult DeleteQuotation(string leadId, string number)
     {
+        if (!CheckPermission("Quotation", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete quotations.";
+            return RedirectToAction(nameof(QuotationList));
+        }
+
         var lead = LeadStore.GetById(leadId);
         var existing = lead?.Quotations.FirstOrDefault(q => q.Number == number);
         if (existing is not null)
@@ -194,6 +271,12 @@ public class FinanceController : Controller
     // GET /Finance/ProposalList
     public IActionResult ProposalList()
     {
+        if (!CheckPermission("Proposal", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Proposals.";
+            return RedirectToAction("List", "Lead");
+        }
+
         ViewData["Title"] = "Proposal List";
         ViewData["ActivePage"] = "FinanceProposal";
 
@@ -219,6 +302,12 @@ public class FinanceController : Controller
     // GET /Finance/ProposalDetails?leadId=LD-1001&number=PRO-2001
     public IActionResult ProposalDetails(string leadId, string number)
     {
+        if (!CheckPermission("Proposal", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Proposal details.";
+            return RedirectToAction(nameof(ProposalList));
+        }
+
         var lead = LeadStore.GetById(leadId);
         var entry = lead?.Proposals.FirstOrDefault(p => p.Number == number);
         if (lead is null || entry is null)
@@ -236,6 +325,12 @@ public class FinanceController : Controller
     [HttpPost]
     public IActionResult DeleteProposal(string leadId, string number)
     {
+        if (!CheckPermission("Proposal", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete proposals.";
+            return RedirectToAction(nameof(ProposalList));
+        }
+
         var lead = LeadStore.GetById(leadId);
         var existing = lead?.Proposals.FirstOrDefault(p => p.Number == number);
         if (existing is not null)

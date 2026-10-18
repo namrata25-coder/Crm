@@ -202,44 +202,89 @@
                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700;background:#f1f5f9;color:var(--ink-800);" />
                 </div>
 
-                <!-- Step 1: Project Selection -->
+                <!-- 1. CLIENT NAME DROPDOWN (Searchable) -->
                 <div style="margin-bottom:1rem;">
                     <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
-                        1. Project <span style="color:#ef4444;">*</span>
+                        1. Client Name <span style="color:#ef4444;">*</span>
                     </label>
-                    <select id="modalProjectSelect" required onchange="onProjectSelected()"
-                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:none;">
-                        <option value="">-- Select Project --</option>
-                    </select>
+                    <div class="searchable-dropdown" id="clientDropdownContainer" style="position:relative;">
+                        <div id="clientSelectDisplay" tabindex="0" onclick="toggleSearchDropdown('client')"
+                             style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:space-between;min-height:38px;">
+                            <span id="clientSelectText" style="color:var(--ink-500);">-- Select Client --</span>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <span id="clientClearBtn" onclick="clearSelectedClient(event)" style="display:none;font-size:15px;color:var(--ink-400);cursor:pointer;padding:0 3px;line-height:1;" title="Clear">&times;</span>
+                                <i class="bi bi-chevron-down" style="font-size:11px;color:var(--ink-400);"></i>
+                            </div>
+                        </div>
+                        <input type="hidden" id="modalClientId" name="clientId" />
+                        <input type="hidden" id="modalClientSelect" name="clientName" required />
+                        
+                        <div id="clientDropdownMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.12);z-index:1060;max-height:260px;overflow:hidden;flex-direction:column;">
+                            <div style="padding:8px;border-bottom:1px solid var(--line);background:#f8fafc;">
+                                <div style="position:relative;">
+                                    <i class="bi bi-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--ink-400);"></i>
+                                    <input type="text" id="clientSearchFilter" placeholder="Search client by name, company..."
+                                           style="width:100%;padding:6px 10px 6px 28px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;outline:none;"
+                                           oninput="filterClientList(this.value)" onclick="event.stopPropagation();" />
+                                </div>
+                            </div>
+                            <div id="clientOptionsList" style="overflow-y:auto;max-height:200px;padding:4px 0;">
+                                <!-- Options rendered dynamically -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Step 2: Client Selection -->
+                <!-- 2. PROJECT NAME DROPDOWN (Searchable, filtered by selected Client) -->
                 <div style="margin-bottom:1rem;">
                     <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
-                        2. Client <span style="color:#ef4444;">*</span>
+                        2. Project Name <span style="color:#ef4444;">*</span>
                     </label>
-                    <select id="modalClientSelect" required onchange="onClientSelected()"
-                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:none;">
-                        <option value="">-- Select Client --</option>
-                    </select>
+                    <div class="searchable-dropdown" id="projectDropdownContainer" style="position:relative;">
+                        <div id="projectSelectDisplay" tabindex="0" onclick="toggleSearchDropdown('project')"
+                             style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:space-between;min-height:38px;">
+                            <span id="projectSelectText" style="color:var(--ink-500);">-- Select Project --</span>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <span id="projectClearBtn" onclick="clearSelectedProject(event)" style="display:none;font-size:15px;color:var(--ink-400);cursor:pointer;padding:0 3px;line-height:1;" title="Clear">&times;</span>
+                                <i class="bi bi-chevron-down" style="font-size:11px;color:var(--ink-400);"></i>
+                            </div>
+                        </div>
+                        <input type="hidden" id="modalProjectSelect" name="projectId" required />
+                        
+                        <div id="projectDropdownMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.12);z-index:1060;max-height:260px;overflow:hidden;flex-direction:column;">
+                            <div style="padding:8px;border-bottom:1px solid var(--line);background:#f8fafc;">
+                                <div style="position:relative;">
+                                    <i class="bi bi-search" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--ink-400);"></i>
+                                    <input type="text" id="projectSearchFilter" placeholder="Search project by name, code..."
+                                           style="width:100%;padding:6px 10px 6px 28px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;outline:none;"
+                                           oninput="filterProjectList(this.value)" onclick="event.stopPropagation();" />
+                                </div>
+                            </div>
+                            <div id="projectOptionsList" style="overflow-y:auto;max-height:200px;padding:4px 0;">
+                                <!-- Options rendered dynamically -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Step 3: Milestone Selection (Displayed directly in the Create Invoice form) -->
+                <!-- 3. AUTOMATIC MILESTONE NAME (Dropdown & Auto-select) -->
                 <div style="margin-bottom:1rem;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
                         <label style="font-size:12.5px;font-weight:600;color:var(--ink-700);margin:0;">
-                            3. Milestone <span style="color:#ef4444;">*</span> <small style="color:var(--brand-600);font-weight:600;">(1 Milestone = 1 Invoice)</small>
+                            3. Milestone Name <span style="color:#ef4444;">*</span> <small style="color:var(--brand-600);font-weight:600;">(1 Milestone = 1 Invoice)</small>
                         </label>
-                        <span id="modalMilestoneCountBadge" style="font-size:11px;color:var(--ink-500);font-weight:600;"></span>
+                        <span id="modalMilestoneCountBadge" style="font-size:11px;color:var(--brand-600);font-weight:600;"></span>
                     </div>
+                    <select id="modalMilestoneSelect" required onchange="onMilestoneDropdownChange()"
+                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:none;">
+                        <option value="">-- Select Project First --</option>
+                    </select>
                     <input type="hidden" id="modalMilestoneId" name="milestoneId" required />
-                    <div id="modalMilestonesContainer" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:8px;max-height:220px;overflow-y:auto;padding:2px;">
-                        <div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);">
-                            Select a project to display its milestones.
-                        </div>
-                    </div>
+                    <input type="hidden" id="modalMilestoneName" name="milestoneName" />
+
+                    <div id="modalMilestoneMessage" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;"></div>
                     <div id="milestoneWarning" style="display:none;font-size:11.5px;color:#dc2626;font-weight:600;margin-top:4px;">
-                        <i class="bi bi-exclamation-triangle"></i> This milestone already has an invoice. Duplicate milestone invoices are not allowed.
+                        <i class="bi bi-exclamation-triangle"></i> An invoice already exists for this milestone.
                     </div>
                 </div>
 
@@ -658,12 +703,24 @@
         loadClientsFromServer();
         loadProjectsFromServer();
 
-        // Close export dropdown when clicking outside
+        // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             const menu = document.getElementById('exportDropdownMenu');
             const btn = document.getElementById('btnExport');
             if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
                 menu.style.display = 'none';
+            }
+
+            const cCont = document.getElementById('clientDropdownContainer');
+            const pCont = document.getElementById('projectDropdownContainer');
+            const cMenu = document.getElementById('clientDropdownMenu');
+            const pMenu = document.getElementById('projectDropdownMenu');
+
+            if (cCont && cMenu && !cCont.contains(e.target)) {
+                cMenu.style.display = 'none';
+            }
+            if (pCont && pMenu && !pCont.contains(e.target)) {
+                pMenu.style.display = 'none';
             }
         });
     });
@@ -778,7 +835,42 @@
                 const errData = await res.json().catch(() => ({}));
                 throw new Error(errData.message || `Server returned ${res.status}: Failed to fetch invoices`);
             }
-            rawInvoices = await res.json();
+            const data = await res.json();
+            rawInvoices = (Array.isArray(data) ? data : []).map(i => ({
+                id: i.Id !== undefined ? i.Id : i.id,
+                invoiceNumber: i.InvoiceNumber || i.invoiceNumber || '',
+                clientId: i.ClientId || i.clientId || '',
+                projectId: i.ProjectId !== undefined ? i.ProjectId : i.projectId,
+                projectName: i.ProjectName || i.projectName || '',
+                projectCode: i.ProjectCode || i.projectCode || '',
+                milestoneId: i.MilestoneId !== undefined ? i.MilestoneId : i.milestoneId,
+                milestoneName: i.MilestoneName || i.milestoneName || '',
+                milestoneCode: i.MilestoneCode || i.milestoneCode || '',
+                milestoneDescription: i.MilestoneDescription || i.milestoneDescription || '',
+                milestoneProgressPercent: i.MilestoneProgressPercent !== undefined ? i.MilestoneProgressPercent : (i.milestoneProgressPercent || 0),
+                clientName: i.ClientName || i.clientName || '',
+                clientCompany: i.ClientCompany || i.clientCompany || '',
+                clientEmail: i.ClientEmail || i.clientEmail || '',
+                clientMobile: i.ClientMobile || i.clientMobile || '',
+                invoiceDate: i.InvoiceDate || i.invoiceDate || '',
+                dueDate: i.DueDate || i.dueDate || '',
+                amount: i.Amount !== undefined ? i.Amount : (i.amount || 0),
+                taxRate: i.TaxRate !== undefined ? i.TaxRate : (i.taxRate || 0),
+                tax: i.Tax !== undefined ? i.Tax : (i.tax || 0),
+                taxName: i.TaxName || i.taxName || '',
+                taxType: i.TaxType || i.taxType || '',
+                discount: i.Discount !== undefined ? i.Discount : (i.discount || 0),
+                grandTotal: i.GrandTotal !== undefined ? i.GrandTotal : (i.grandTotal || 0),
+                paidAmount: i.PaidAmount !== undefined ? i.PaidAmount : (i.paidAmount || 0),
+                remainingAmount: i.RemainingAmount !== undefined ? i.RemainingAmount : (i.remainingAmount !== undefined ? i.remainingAmount : 0),
+                paymentStatus: i.PaymentStatus || i.paymentStatus || 'Pending',
+                paymentDate: i.PaymentDate || i.paymentDate || '',
+                isRecurring: i.IsRecurring !== undefined ? i.IsRecurring : (i.isRecurring || false),
+                recurringFrequency: i.RecurringFrequency || i.recurringFrequency || '',
+                notes: i.Notes || i.notes || '',
+                createdDate: i.CreatedDate || i.createdDate || '',
+                payments: i.Payments || i.payments || []
+            }));
             updateInvoiceStats(rawInvoices);
             filterInvoiceTable();
         } catch (err) {
@@ -836,8 +928,18 @@
         try {
             const res = await fetch('/api/clients');
             if (res.ok) {
-                allClients = await res.json();
+                const data = await res.json();
+                allClients = (Array.isArray(data) ? data : []).map(c => ({
+                    clientId: c.ClientId || c.clientId || c.LeadId || c.leadId || '',
+                    leadId: c.LeadId || c.leadId || '',
+                    clientName: c.ClientName || c.clientName || '',
+                    companyName: c.CompanyName || c.companyName || c.ClientName || c.clientName || '',
+                    email: c.Email || c.email || '',
+                    mobileNumber: c.MobileNumber || c.mobileNumber || '',
+                    projectsCount: c.ProjectsCount !== undefined ? c.ProjectsCount : (c.projectsCount || 0)
+                }));
                 populateClientDropdowns(allClients);
+                renderClientOptions(allClients);
             }
         } catch (e) {
             console.warn('Clients lookup error:', e);
@@ -845,26 +947,7 @@
     }
 
     function populateClientDropdowns(clients) {
-        const invSelect = document.getElementById('modalClientSelect');
         const recSelect = document.getElementById('recClientSelect');
-
-        if (invSelect) {
-            invSelect.innerHTML = '';
-            const defaultOpt = document.createElement('option');
-            defaultOpt.value = '';
-            defaultOpt.textContent = '-- Select Client --';
-            invSelect.appendChild(defaultOpt);
-
-            clients.forEach(c => {
-                const name = c.companyName || c.clientName || 'Client';
-                const extra = c.clientName && c.companyName !== c.clientName ? ` (${c.clientName})` : '';
-                const opt = document.createElement('option');
-                opt.value = name;
-                opt.textContent = name + extra;
-                invSelect.appendChild(opt);
-            });
-        }
-
         if (recSelect) {
             recSelect.innerHTML = '';
             const defaultOpt = document.createElement('option');
@@ -888,35 +971,21 @@
         try {
             const res = await fetch('/api/projects');
             if (res.ok) {
-                allProjects = await res.json();
-                populateProjectDropdown(allProjects);
+                const data = await res.json();
+                allProjects = (Array.isArray(data) ? data : []).map(p => ({
+                    id: p.Id !== undefined ? p.Id : p.id,
+                    projectName: p.ProjectName || p.projectName || '',
+                    projectCode: p.ProjectCode || p.projectCode || '',
+                    clientName: p.ClientName || p.clientName || '',
+                    clientCompany: p.ClientCompany || p.clientCompany || '',
+                    budget: p.Budget !== undefined ? p.Budget : (p.budget || 0),
+                    milestones: p.Milestones || p.milestones || []
+                }));
+                currentFilteredProjects = allProjects.slice();
+                renderProjectOptions(allProjects);
             }
         } catch (e) {
             console.warn('Projects lookup error:', e);
-        }
-    }
-
-    function populateProjectDropdown(projects, selectedProjectId = null) {
-        const select = document.getElementById('modalProjectSelect');
-        if (!select) return;
-
-        select.innerHTML = '';
-        const defaultOpt = document.createElement('option');
-        defaultOpt.value = '';
-        defaultOpt.textContent = projects.length > 0 ? '-- Select Project --' : 'No projects available';
-        select.appendChild(defaultOpt);
-
-        projects.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            const codePrefix = p.projectCode ? p.projectCode + ' - ' : '';
-            const clientLabel = p.clientCompany || p.clientName;
-            opt.textContent = `${codePrefix}${p.projectName}${clientLabel ? ' (' + clientLabel + ')' : ''}`;
-            select.appendChild(opt);
-        });
-
-        if (selectedProjectId) {
-            select.value = String(selectedProjectId);
         }
     }
 
@@ -1161,7 +1230,521 @@
         });
     }
 
-    // ── Create / Edit Invoice Modal Logic ──────────────────────────────────────
+    // ── Searchable Dropdowns (Client & Project) & Milestone Selection ─────────
+    let currentFilteredProjects = [];
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function toggleSearchDropdown(type) {
+        const clientMenu = document.getElementById('clientDropdownMenu');
+        const projectMenu = document.getElementById('projectDropdownMenu');
+
+        if (type === 'client') {
+            if (projectMenu) projectMenu.style.display = 'none';
+            if (clientMenu) {
+                const isHidden = clientMenu.style.display === 'none' || !clientMenu.style.display;
+                clientMenu.style.display = isHidden ? 'flex' : 'none';
+                if (isHidden) {
+                    const filterInput = document.getElementById('clientSearchFilter');
+                    if (filterInput) {
+                        filterInput.value = '';
+                        filterClientList('');
+                        setTimeout(() => filterInput.focus(), 50);
+                    }
+                }
+            }
+        } else if (type === 'project') {
+            if (clientMenu) clientMenu.style.display = 'none';
+            if (projectMenu) {
+                const isHidden = projectMenu.style.display === 'none' || !projectMenu.style.display;
+                projectMenu.style.display = isHidden ? 'flex' : 'none';
+                if (isHidden) {
+                    const filterInput = document.getElementById('projectSearchFilter');
+                    if (filterInput) {
+                        filterInput.value = '';
+                        filterProjectList('');
+                        setTimeout(() => filterInput.focus(), 50);
+                    }
+                }
+            }
+        }
+    }
+
+    function renderClientOptions(clientsToRender) {
+        const container = document.getElementById('clientOptionsList');
+        if (!container) return;
+
+        container.innerHTML = '';
+        if (!clientsToRender || !clientsToRender.length) {
+            container.innerHTML = '<div style="padding:10px 12px;font-size:12.5px;color:var(--ink-400);text-align:center;">No matching clients found</div>';
+            return;
+        }
+
+        const selectedClientId = document.getElementById('modalClientId')?.value || '';
+        const selectedClientName = (document.getElementById('modalClientSelect')?.value || '').toLowerCase();
+
+        clientsToRender.forEach(c => {
+            const displayName = c.companyName || c.clientName || 'Client';
+            const extra = c.clientName && c.companyName && c.companyName !== c.clientName ? c.clientName : (c.leadId || '');
+            const cid = c.clientId || c.leadId || '';
+            const isSelected = (cid && cid === selectedClientId) || (displayName.toLowerCase() === selectedClientName);
+
+            const item = document.createElement('div');
+            item.className = 'custom-dropdown-item' + (isSelected ? ' selected' : '');
+            item.style.padding = '8px 12px';
+            item.style.cursor = 'pointer';
+            item.style.fontSize = '13px';
+            item.style.borderBottom = '1px solid #f8fafc';
+            item.style.display = 'flex';
+            item.style.justifyContent = 'space-between';
+            item.style.alignItems = 'center';
+            item.style.background = isSelected ? '#eff6ff' : '#fff';
+
+            item.innerHTML = `
+                <div>
+                    <div style="font-weight:600;color:var(--ink-800);">${escapeHtml(displayName)}</div>
+                    ${extra ? `<div style="font-size:11px;color:var(--ink-500);">${escapeHtml(extra)}</div>` : ''}
+                </div>
+                <span class="badge" style="font-size:10px;background:#f1f5f9;color:var(--ink-600);border:1px solid #e2e8f0;">
+                    ${c.projectsCount || 0} proj
+                </span>
+            `;
+
+            item.onmouseover = () => { if (!isSelected) item.style.background = '#f8fafc'; };
+            item.onmouseout = () => { if (!isSelected) item.style.background = '#fff'; };
+            item.onclick = (e) => {
+                e.stopPropagation();
+                selectClient(cid, displayName, c.companyName || displayName);
+            };
+
+            container.appendChild(item);
+        });
+    }
+
+    function filterClientList(term) {
+        const q = (term || '').trim().toLowerCase();
+        if (!q) {
+            renderClientOptions(allClients);
+            return;
+        }
+        const filtered = allClients.filter(c =>
+            (c.companyName && c.companyName.toLowerCase().includes(q)) ||
+            (c.clientName && c.clientName.toLowerCase().includes(q)) ||
+            (c.clientId && c.clientId.toLowerCase().includes(q)) ||
+            (c.leadId && c.leadId.toLowerCase().includes(q)) ||
+            (c.email && c.email.toLowerCase().includes(q))
+        );
+        renderClientOptions(filtered);
+    }
+
+    function selectClient(clientId, clientName, clientCompany) {
+        const idInput = document.getElementById('modalClientId');
+        const nameInput = document.getElementById('modalClientSelect');
+        const textSpan = document.getElementById('clientSelectText');
+        const clearBtn = document.getElementById('clientClearBtn');
+
+        if (idInput) idInput.value = clientId || '';
+        if (nameInput) nameInput.value = clientName || '';
+        const displayText = clientCompany || clientName || '-- Select Client --';
+        if (textSpan) {
+            textSpan.textContent = displayText;
+            textSpan.style.color = 'var(--ink-900)';
+            textSpan.style.fontWeight = '600';
+        }
+        if (clearBtn) clearBtn.style.display = 'inline';
+
+        const menu = document.getElementById('clientDropdownMenu');
+        if (menu) menu.style.display = 'none';
+
+        onClientSelected();
+    }
+
+    function clearSelectedClient(e) {
+        if (e) e.stopPropagation();
+        const idInput = document.getElementById('modalClientId');
+        const nameInput = document.getElementById('modalClientSelect');
+        const textSpan = document.getElementById('clientSelectText');
+        const clearBtn = document.getElementById('clientClearBtn');
+
+        if (idInput) idInput.value = '';
+        if (nameInput) nameInput.value = '';
+        if (textSpan) {
+            textSpan.textContent = '-- Select Client --';
+            textSpan.style.color = 'var(--ink-500)';
+            textSpan.style.fontWeight = 'normal';
+        }
+        if (clearBtn) clearBtn.style.display = 'none';
+
+        onClientSelected();
+    }
+
+    function onClientSelected() {
+        const clientName = (document.getElementById('modalClientSelect')?.value || '').trim();
+        const clientId = (document.getElementById('modalClientId')?.value || '').trim();
+
+        if (!clientName && !clientId) {
+            currentFilteredProjects = allProjects.slice();
+        } else {
+            const cLower = clientName.toLowerCase();
+            currentFilteredProjects = allProjects.filter(p => {
+                const pClient = (p.clientName || '').toLowerCase();
+                const pComp = (p.clientCompany || '').toLowerCase();
+                return pClient === cLower || pComp === cLower ||
+                       (cLower && (pClient.includes(cLower) || pComp.includes(cLower)));
+            });
+        }
+
+        // When client changes, clear previously selected project and milestone if they do not belong to newly selected client
+        const currentProjId = parseInt(document.getElementById('modalProjectSelect')?.value, 10) || 0;
+        if (currentProjId > 0) {
+            const belongs = currentFilteredProjects.some(p => p.id === currentProjId);
+            if (!belongs) {
+                clearSelectedProject();
+            }
+        }
+
+        renderProjectOptions(currentFilteredProjects);
+    }
+
+    function renderProjectOptions(projectsToRender) {
+        const container = document.getElementById('projectOptionsList');
+        if (!container) return;
+
+        container.innerHTML = '';
+        if (!projectsToRender || !projectsToRender.length) {
+            const clientName = document.getElementById('modalClientSelect')?.value;
+            const msg = clientName ? 'No projects belonging to this client' : 'No projects available';
+            container.innerHTML = `<div style="padding:10px 12px;font-size:12.5px;color:var(--ink-400);text-align:center;">${msg}</div>`;
+            return;
+        }
+
+        const selectedProjectId = parseInt(document.getElementById('modalProjectSelect')?.value, 10) || 0;
+
+        projectsToRender.forEach(p => {
+            const isSelected = p.id === selectedProjectId;
+            const item = document.createElement('div');
+            item.className = 'custom-dropdown-item' + (isSelected ? ' selected' : '');
+            item.style.padding = '8px 12px';
+            item.style.cursor = 'pointer';
+            item.style.fontSize = '13px';
+            item.style.borderBottom = '1px solid #f8fafc';
+            item.style.display = 'flex';
+            item.style.justifyContent = 'space-between';
+            item.style.alignItems = 'center';
+            item.style.background = isSelected ? '#eff6ff' : '#fff';
+
+            const codePrefix = p.projectCode ? p.projectCode + ' - ' : '';
+            const clientLabel = p.clientCompany || p.clientName || '';
+
+            item.innerHTML = `
+                <div>
+                    <div style="font-weight:600;color:var(--ink-800);">${escapeHtml(codePrefix + (p.projectName || 'Project'))}</div>
+                    <div style="font-size:11px;color:var(--ink-500);">${clientLabel ? escapeHtml(clientLabel) + ' &bull; ' : ''}Budget: ${formatCurrency(p.budget || 0)}</div>
+                </div>
+                <span class="badge" style="font-size:10px;background:#f1f5f9;color:var(--ink-600);border:1px solid #e2e8f0;">
+                    ${(p.milestones ? p.milestones.length : 0)} MLS
+                </span>
+            `;
+
+            item.onmouseover = () => { if (!isSelected) item.style.background = '#f8fafc'; };
+            item.onmouseout = () => { if (!isSelected) item.style.background = '#fff'; };
+            item.onclick = (e) => {
+                e.stopPropagation();
+                selectProject(p.id);
+            };
+
+            container.appendChild(item);
+        });
+    }
+
+    function filterProjectList(term) {
+        const q = (term || '').trim().toLowerCase();
+        const baseList = currentFilteredProjects.length ? currentFilteredProjects : allProjects;
+        if (!q) {
+            renderProjectOptions(baseList);
+            return;
+        }
+        const filtered = baseList.filter(p =>
+            (p.projectName && p.projectName.toLowerCase().includes(q)) ||
+            (p.projectCode && p.projectCode.toLowerCase().includes(q)) ||
+            (p.clientName && p.clientName.toLowerCase().includes(q)) ||
+            (p.clientCompany && p.clientCompany.toLowerCase().includes(q))
+        );
+        renderProjectOptions(filtered);
+    }
+
+    function selectProject(projectId) {
+        const project = allProjects.find(p => p.id === Number(projectId));
+        if (!project) return;
+
+        const projIdInput = document.getElementById('modalProjectSelect');
+        const projText = document.getElementById('projectSelectText');
+        const projClear = document.getElementById('projectClearBtn');
+
+        if (projIdInput) projIdInput.value = project.id;
+        const codePrefix = project.projectCode ? project.projectCode + ' - ' : '';
+        if (projText) {
+            projText.textContent = codePrefix + project.projectName;
+            projText.style.color = 'var(--ink-900)';
+            projText.style.fontWeight = '600';
+        }
+        if (projClear) projClear.style.display = 'inline';
+
+        const menu = document.getElementById('projectDropdownMenu');
+        if (menu) menu.style.display = 'none';
+
+        // Auto-populate client if not already selected
+        const currentClient = (document.getElementById('modalClientSelect')?.value || '').trim();
+        const targetClient = project.clientCompany || project.clientName;
+        if (!currentClient && targetClient) {
+            const matchedClient = allClients.find(c =>
+                (c.companyName && c.companyName.toLowerCase() === targetClient.toLowerCase()) ||
+                (c.clientName && c.clientName.toLowerCase() === targetClient.toLowerCase())
+            );
+            if (matchedClient) {
+                selectClient(matchedClient.clientId || matchedClient.leadId, matchedClient.clientName, matchedClient.companyName);
+            } else {
+                document.getElementById('modalClientId').value = '';
+                document.getElementById('modalClientSelect').value = targetClient;
+                const clientText = document.getElementById('clientSelectText');
+                if (clientText) {
+                    clientText.textContent = targetClient;
+                    clientText.style.color = 'var(--ink-900)';
+                    clientText.style.fontWeight = '600';
+                }
+                const clearBtn = document.getElementById('clientClearBtn');
+                if (clearBtn) clearBtn.style.display = 'inline';
+            }
+        }
+
+        loadMilestonesForProject(project.id);
+    }
+
+    function clearSelectedProject(e) {
+        if (e) e.stopPropagation();
+        const projIdInput = document.getElementById('modalProjectSelect');
+        const projText = document.getElementById('projectSelectText');
+        const projClear = document.getElementById('projectClearBtn');
+
+        if (projIdInput) projIdInput.value = '';
+        if (projText) {
+            projText.textContent = '-- Select Project --';
+            projText.style.color = 'var(--ink-500)';
+            projText.style.fontWeight = 'normal';
+        }
+        if (projClear) projClear.style.display = 'none';
+
+        resetMilestoneDropdown();
+    }
+
+    function resetMilestoneDropdown() {
+        const msSelect = document.getElementById('modalMilestoneSelect');
+        const msIdInput = document.getElementById('modalMilestoneId');
+        const msNameInput = document.getElementById('modalMilestoneName');
+        const msMsg = document.getElementById('modalMilestoneMessage');
+        const countBadge = document.getElementById('modalMilestoneCountBadge');
+        const warning = document.getElementById('milestoneWarning');
+        const autoHint = document.getElementById('milestoneAutoHint');
+
+        if (msSelect) {
+            msSelect.innerHTML = '<option value="">-- Select Project First --</option>';
+            msSelect.disabled = false;
+        }
+        if (msIdInput) msIdInput.value = '';
+        if (msNameInput) msNameInput.value = '';
+        if (msMsg) { msMsg.style.display = 'none'; msMsg.textContent = ''; }
+        if (countBadge) countBadge.textContent = '';
+        if (warning) warning.style.display = 'none';
+        if (autoHint) autoHint.style.display = 'none';
+
+        currentProjectMilestones = [];
+    }
+
+    async function loadMilestonesForProject(projectId, selectedMilestoneId = null, isEdit = false) {
+        const msSelect = document.getElementById('modalMilestoneSelect');
+        const msIdInput = document.getElementById('modalMilestoneId');
+        const msNameInput = document.getElementById('modalMilestoneName');
+        const msMsg = document.getElementById('modalMilestoneMessage');
+        const countBadge = document.getElementById('modalMilestoneCountBadge');
+        const warning = document.getElementById('milestoneWarning');
+        const autoHint = document.getElementById('milestoneAutoHint');
+
+        if (!msSelect) return;
+
+        msSelect.innerHTML = '<option value="">Loading milestones...</option>';
+        msSelect.disabled = true;
+        if (msMsg) msMsg.style.display = 'none';
+        if (warning) warning.style.display = 'none';
+
+        try {
+            const res = await fetch(`/api/milestones?projectId=${projectId}`);
+            const rawMs = res.ok ? await res.json() : [];
+            currentProjectMilestones = (Array.isArray(rawMs) ? rawMs : []).map(m => ({
+                id: m.Id !== undefined ? m.Id : m.id,
+                projectId: m.ProjectId !== undefined ? m.ProjectId : m.projectId,
+                milestoneName: m.MilestoneName || m.milestoneName || '',
+                milestoneCode: m.MilestoneCode || m.milestoneCode || '',
+                amount: m.Amount !== undefined ? m.Amount : (m.amount || 0),
+                effectiveAmount: m.EffectiveAmount !== undefined ? m.EffectiveAmount : (m.effectiveAmount || 0),
+                dueDate: m.DueDate || m.dueDate || '',
+                description: m.Description || m.description || '',
+                notes: m.Notes || m.notes || '',
+                status: m.Status || m.status || 'Pending'
+            }));
+
+            const currentInvId = parseInt(document.getElementById('modalInvId')?.value, 10) || 0;
+
+            // Rule: 1 Milestone = 1 Invoice
+            // Exclude milestones that already have an invoice (unless editing this invoice's own milestone)
+            const eligibleMilestones = currentProjectMilestones.filter(m => {
+                if (currentInvId > 0 && selectedMilestoneId && m.id === Number(selectedMilestoneId)) {
+                    return true;
+                }
+                const hasInvoice = rawInvoices.some(i => i.milestoneId === m.id && i.id !== currentInvId);
+                return !hasInvoice;
+            });
+
+            if (countBadge) {
+                countBadge.textContent = `${eligibleMilestones.length} Eligible Milestone${eligibleMilestones.length === 1 ? '' : 's'}`;
+            }
+
+            // Case 1: No eligible milestones exist
+            if (eligibleMilestones.length === 0) {
+                msSelect.innerHTML = '<option value="">-- No eligible milestones available --</option>';
+                msSelect.disabled = true;
+                if (msIdInput) msIdInput.value = '';
+                if (msNameInput) msNameInput.value = '';
+                if (autoHint) autoHint.style.display = 'none';
+
+                if (msMsg) {
+                    msMsg.style.display = 'block';
+                    msMsg.style.background = '#fef2f2';
+                    msMsg.style.border = '1px solid #fecaca';
+                    msMsg.style.color = '#dc2626';
+                    msMsg.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> No eligible milestones available for this project. All milestones have already been invoiced.';
+                }
+                return;
+            }
+
+            msSelect.disabled = false;
+
+            // Case 2: Exactly 1 eligible milestone -> AUTOMATICALLY SELECT IT
+            if (eligibleMilestones.length === 1) {
+                const singleMs = eligibleMilestones[0];
+                const amt = Number(singleMs.amount > 0 ? singleMs.amount : (singleMs.effectiveAmount || 0));
+
+                msSelect.innerHTML = '';
+                const opt = document.createElement('option');
+                opt.value = singleMs.id;
+                opt.selected = true;
+                opt.textContent = `${singleMs.milestoneName} (${formatCurrency(amt)})`;
+                msSelect.appendChild(opt);
+
+                if (msIdInput) msIdInput.value = singleMs.id;
+                if (msNameInput) msNameInput.value = singleMs.milestoneName;
+
+                if (msMsg) {
+                    msMsg.style.display = 'block';
+                    msMsg.style.background = '#eff6ff';
+                    msMsg.style.border = '1px solid #bfdbfe';
+                    msMsg.style.color = 'var(--brand-600)';
+                    msMsg.innerHTML = `<i class="bi bi-check-circle-fill"></i> Automatically selected eligible milestone: <strong>${escapeHtml(singleMs.milestoneName)}</strong>`;
+                }
+
+                if (!isEdit) {
+                    populateMilestoneDetails(singleMs);
+                }
+                return;
+            }
+
+            // Case 3: Multiple eligible milestones -> Show dropdown containing available milestones
+            msSelect.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = `-- Select Milestone (${eligibleMilestones.length} available) --`;
+            msSelect.appendChild(defaultOpt);
+
+            eligibleMilestones.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                const amt = Number(m.amount > 0 ? m.amount : (m.effectiveAmount || 0));
+                opt.textContent = `${m.milestoneName} (${formatCurrency(amt)})`;
+                if (selectedMilestoneId && Number(selectedMilestoneId) === m.id) {
+                    opt.selected = true;
+                }
+                msSelect.appendChild(opt);
+            });
+
+            if (selectedMilestoneId && eligibleMilestones.some(m => m.id === Number(selectedMilestoneId))) {
+                const selected = eligibleMilestones.find(m => m.id === Number(selectedMilestoneId));
+                if (msIdInput) msIdInput.value = selected.id;
+                if (msNameInput) msNameInput.value = selected.milestoneName;
+                if (!isEdit) {
+                    populateMilestoneDetails(selected);
+                }
+            } else {
+                if (msIdInput) msIdInput.value = '';
+                if (msNameInput) msNameInput.value = '';
+                if (autoHint) autoHint.style.display = 'none';
+            }
+        } catch (e) {
+            console.error(e);
+            msSelect.innerHTML = '<option value="">Failed to load milestones</option>';
+            msSelect.disabled = true;
+        }
+    }
+
+    function onMilestoneDropdownChange() {
+        const msSelect = document.getElementById('modalMilestoneSelect');
+        const selectedId = parseInt(msSelect.value, 10);
+        const msIdInput = document.getElementById('modalMilestoneId');
+        const msNameInput = document.getElementById('modalMilestoneName');
+        const autoHint = document.getElementById('milestoneAutoHint');
+
+        if (!selectedId) {
+            if (msIdInput) msIdInput.value = '';
+            if (msNameInput) msNameInput.value = '';
+            if (autoHint) autoHint.style.display = 'none';
+            return;
+        }
+
+        const milestone = currentProjectMilestones.find(m => m.id === selectedId);
+        if (milestone) {
+            if (msIdInput) msIdInput.value = milestone.id;
+            if (msNameInput) msNameInput.value = milestone.milestoneName;
+            populateMilestoneDetails(milestone);
+        }
+    }
+
+    function populateMilestoneDetails(milestone) {
+        const amountInput = document.getElementById('modalAmount');
+        const dueInput = document.getElementById('modalDueDate');
+        const notesInput = document.getElementById('modalNotes');
+        const autoHint = document.getElementById('milestoneAutoHint');
+
+        const amount = Number(milestone.amount > 0 ? milestone.amount : (milestone.effectiveAmount || 0));
+        if (amountInput) amountInput.value = amount;
+        if (autoHint) autoHint.style.display = amount > 0 ? 'inline' : 'none';
+
+        if (milestone.dueDate && dueInput) {
+            dueInput.value = milestone.dueDate;
+        }
+
+        if (notesInput && (!notesInput.value || notesInput.value.startsWith('Invoice for Milestone:'))) {
+            notesInput.value = `Invoice for Milestone: ${milestone.milestoneName}${milestone.description ? ' - ' + milestone.description : ''}`;
+        }
+
+        calculateTotals();
+    }
+
     async function openCreateInvoiceModal() {
         document.getElementById('modalInvId').value = '0';
         document.getElementById('invModalTitle').textContent = 'Create Milestone Invoice';
@@ -1186,16 +1769,9 @@
             document.getElementById('modalInvNumber').value = 'INV-0001';
         }
 
-        document.getElementById('modalClientSelect').value = '';
-        populateProjectDropdown(allProjects);
-
-        document.getElementById('modalMilestoneId').value = '';
-        const msContainer = document.getElementById('modalMilestonesContainer');
-        if (msContainer) {
-            msContainer.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);">Select a project to display its milestones.</div>';
-        }
-        const countBadge = document.getElementById('modalMilestoneCountBadge');
-        if (countBadge) countBadge.textContent = '';
+        clearSelectedClient();
+        clearSelectedProject();
+        resetMilestoneDropdown();
 
         calculateTotals();
         document.getElementById('invoiceModal').style.display = 'flex';
@@ -1249,12 +1825,16 @@
         document.getElementById('milestoneWarning').style.display = 'none';
         document.getElementById('milestoneAutoHint').style.display = 'none';
 
-        const clientName = inv.clientCompany || inv.clientName || '';
-        document.getElementById('modalClientSelect').value = clientName;
+        // Set Client in searchable dropdown
+        const clientCompany = inv.clientCompany || inv.clientName || '';
+        const clientName = inv.clientName || clientCompany;
+        const clientId = inv.clientId || '';
+        selectClient(clientId, clientName, clientCompany);
 
-        populateProjectDropdown(allProjects, inv.projectId);
+        // Set Project in searchable dropdown and load milestone
         if (inv.projectId) {
-            await loadMilestonesForProject(inv.projectId, inv.milestoneId);
+            selectProject(inv.projectId);
+            await loadMilestonesForProject(inv.projectId, inv.milestoneId, /* isEdit */ true);
         }
 
         calculateTotals();
@@ -1263,257 +1843,6 @@
 
     function closeInvoiceModal() {
         document.getElementById('invoiceModal').style.display = 'none';
-    }
-
-    function onClientSelected() {
-        const client = document.getElementById('modalClientSelect').value;
-        const projectSelect = document.getElementById('modalProjectSelect');
-        const container = document.getElementById('modalMilestonesContainer');
-        const hiddenMilestoneId = document.getElementById('modalMilestoneId');
-
-        if (hiddenMilestoneId) hiddenMilestoneId.value = '';
-        if (container) {
-            container.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);">Select a project to display its milestones.</div>';
-        }
-
-        if (!client) {
-            populateProjectDropdown(allProjects);
-            return;
-        }
-
-        const filtered = allProjects.filter(p =>
-            (p.clientCompany && p.clientCompany.toLowerCase() === client.toLowerCase()) ||
-            (p.clientName && p.clientName.toLowerCase() === client.toLowerCase()));
-
-        populateProjectDropdown(filtered);
-    }
-
-    async function onProjectSelected() {
-        const projectId = document.getElementById('modalProjectSelect').value;
-        const container = document.getElementById('modalMilestonesContainer');
-        const hiddenMilestoneId = document.getElementById('modalMilestoneId');
-
-        if (hiddenMilestoneId) hiddenMilestoneId.value = '';
-        if (container) container.innerHTML = '';
-
-        if (!projectId) {
-            if (container) {
-                container.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);">Select a project to display its milestones.</div>';
-            }
-            selectMilestoneForInvoiceModal(null);
-            return;
-        }
-
-        // Auto-select client matching the selected project
-        const project = allProjects.find(p => p.id === Number(projectId));
-        if (project) {
-            const clientSelect = document.getElementById('modalClientSelect');
-            const targetClient = project.clientCompany || project.clientName;
-            if (clientSelect && targetClient) {
-                clientSelect.value = targetClient;
-            }
-        }
-
-        await loadMilestonesForProject(projectId);
-    }
-
-    async function loadMilestonesForProject(projectId, selectedMilestoneId = null) {
-        const container = document.getElementById('modalMilestonesContainer');
-        const hiddenInput = document.getElementById('modalMilestoneId');
-        const countBadge = document.getElementById('modalMilestoneCountBadge');
-        if (!container) return;
-
-        container.innerHTML = ''; // Clean container during fetch
-
-        try {
-            const res = await fetch(`/api/milestones?projectId=${projectId}`);
-            currentProjectMilestones = res.ok ? await res.json() : [];
-            const currentInvId = parseInt(document.getElementById('modalInvId').value, 10) || 0;
-
-            if (countBadge) {
-                countBadge.textContent = `${currentProjectMilestones.length} Milestone${currentProjectMilestones.length === 1 ? '' : 's'}`;
-            }
-
-            if (!currentProjectMilestones.length) {
-                container.innerHTML = `
-                    <div style="grid-column:1/-1;font-size:12px;color:var(--ink-500);padding:10px;background:#f8fafc;border-radius:6px;border:1px dashed var(--line);text-align:center;">
-                        No milestones found for this project.
-                    </div>
-                `;
-                if (hiddenInput) hiddenInput.value = '';
-                selectMilestoneForInvoiceModal(null);
-                return;
-            }
-
-            let defaultSelectedId = null;
-
-            currentProjectMilestones.forEach(m => {
-                const amount = Number(m.amount > 0 ? m.amount : (m.effectiveAmount || 0));
-                const alreadyInvoiced = rawInvoices.some(i => i.milestoneId === m.id && i.id !== currentInvId);
-                const isSelected = selectedMilestoneId && Number(selectedMilestoneId) === m.id;
-                const status = m.status || 'Pending';
-                const msCode = m.milestoneCode || 'MLS';
-                const msName = m.milestoneName || 'Milestone';
-                const prog = Number(m.progressPercent) || 0;
-
-                if (!alreadyInvoiced && !defaultSelectedId) {
-                    defaultSelectedId = m.id;
-                }
-
-                const card = document.createElement('div');
-                card.className = 'inv-modal-ms-card' + (alreadyInvoiced ? ' inv-modal-ms-disabled' : '');
-                card.id = `modal-ms-card-${m.id}`;
-                card.style.borderRadius = '8px';
-                card.style.padding = '9px 11px';
-                card.style.transition = 'all 0.15s ease';
-                card.style.display = 'flex';
-                card.style.flexDirection = 'column';
-                card.style.justifyContent = 'space-between';
-
-                if (alreadyInvoiced) {
-                    card.style.border = '1px solid #e2e8f0';
-                    card.style.background = '#f8fafc';
-                    card.style.opacity = '0.65';
-                    card.style.cursor = 'not-allowed';
-
-                    card.innerHTML = `
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
-                            <span class="badge" style="font-size:10px;background:#f1f5f9;color:var(--ink-600);border:1px solid #cbd5e1;"></span>
-                            <span class="badge" style="font-size:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;font-weight:700;">
-                                <i class="bi bi-lock-fill"></i> Invoiced
-                            </span>
-                        </div>
-                        <div class="ms-card-name" style="font-weight:700;font-size:12.5px;color:var(--ink-700);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-                        <div style="font-size:11.5px;color:var(--ink-500);display:flex;justify-content:space-between;align-items:center;">
-                            <span class="ms-card-amount"></span>
-                            <span class="ms-card-due"></span>
-                        </div>
-                    `;
-                    card.querySelector('.badge').textContent = msCode;
-                    const nameEl = card.querySelector('.ms-card-name');
-                    nameEl.textContent = msName;
-                    nameEl.title = msName;
-                    card.querySelector('.ms-card-amount').textContent = formatCurrency(amount);
-                    if (m.dueDate) card.querySelector('.ms-card-due').textContent = 'Due: ' + m.dueDate;
-                } else {
-                    card.style.cursor = 'pointer';
-                    if (isSelected) {
-                        card.style.border = '2px solid var(--brand-600)';
-                        card.style.background = '#eff6ff';
-                        card.style.boxShadow = '0 2px 6px rgba(79,70,229,0.15)';
-                    } else {
-                        card.style.border = '1px solid var(--line)';
-                        card.style.background = '#fff';
-                    }
-
-                    const statusBadgeClass = status === 'Completed' ? 'badge-success' : status === 'In Progress' ? 'badge-info' : 'badge-secondary';
-                    card.innerHTML = `
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;">
-                            <span class="badge badge-code" style="font-weight:700;font-size:10px;"></span>
-                            <div style="display:flex;align-items:center;gap:6px;">
-                                <span class="badge ${statusBadgeClass}" style="font-size:10px;"></span>
-                                <span class="modal-ms-check" id="modal-ms-check-${m.id}">
-                                    ${isSelected ? '<i class="bi bi-check-circle-fill" style="color:var(--brand-600);font-size:15px;"></i>' : '<i class="bi bi-circle" style="color:var(--ink-400);font-size:15px;"></i>'}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="ms-card-name" style="font-weight:700;font-size:13px;color:var(--ink-900);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-                        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;padding-top:3px;border-top:1px dashed #e2e8f0;margin-top:2px;">
-                            <strong class="ms-card-amount" style="color:var(--brand-600);font-size:12.5px;"></strong>
-                            <span class="ms-card-meta" style="color:var(--ink-500);font-size:11px;"></span>
-                        </div>
-                    `;
-
-                    card.querySelector('.badge-code').textContent = msCode;
-                    card.querySelector('.' + statusBadgeClass).textContent = status;
-                    const nameEl = card.querySelector('.ms-card-name');
-                    nameEl.textContent = msName;
-                    nameEl.title = msName;
-                    card.querySelector('.ms-card-amount').textContent = formatCurrency(amount);
-                    card.querySelector('.ms-card-meta').textContent = `${prog}% • ${m.dueDate || ''}`;
-
-                    card.onclick = () => selectMilestoneForInvoiceModal(m.id);
-                }
-
-                container.appendChild(card);
-            });
-
-            const targetId = selectedMilestoneId || defaultSelectedId;
-            if (targetId) {
-                selectMilestoneForInvoiceModal(targetId);
-            } else {
-                selectMilestoneForInvoiceModal(null);
-            }
-        } catch (e) {
-            console.error(e);
-            container.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:#dc2626;padding:8px;">Failed to load milestones.</div>';
-        }
-    }
-
-    function selectMilestoneForInvoiceModal(selectedId) {
-        const hiddenInput = document.getElementById('modalMilestoneId');
-        const warning = document.getElementById('milestoneWarning');
-        const autoHint = document.getElementById('milestoneAutoHint');
-        const amountInput = document.getElementById('modalAmount');
-        const dueInput = document.getElementById('modalDueDate');
-        const notesInput = document.getElementById('modalNotes');
-
-        // Clear all active card styling
-        document.querySelectorAll('.inv-modal-ms-card').forEach(card => {
-            if (!card.classList.contains('inv-modal-ms-disabled')) {
-                card.classList.remove('active');
-                card.style.border = '1px solid var(--line)';
-                card.style.background = '#fff';
-                card.style.boxShadow = 'none';
-                const check = card.querySelector('.modal-ms-check');
-                if (check) check.innerHTML = '<i class="bi bi-circle" style="color:var(--ink-400);font-size:15px;"></i>';
-            }
-        });
-
-        if (!selectedId) {
-            if (hiddenInput) hiddenInput.value = '';
-            if (warning) warning.style.display = 'none';
-            if (autoHint) autoHint.style.display = 'none';
-            calculateTotals();
-            return;
-        }
-
-        const milestone = currentProjectMilestones ? currentProjectMilestones.find(m => m.id === Number(selectedId)) : null;
-        if (!milestone) return;
-
-        if (hiddenInput) hiddenInput.value = milestone.id;
-
-        // Highlight selected card
-        const card = document.getElementById(`modal-ms-card-${milestone.id}`);
-        if (card) {
-            card.classList.add('active');
-            card.style.border = '2px solid var(--brand-600)';
-            card.style.background = '#eff6ff';
-            card.style.boxShadow = '0 2px 6px rgba(79,70,229,0.15)';
-            const check = document.getElementById(`modal-ms-check-${milestone.id}`);
-            if (check) check.innerHTML = '<i class="bi bi-check-circle-fill" style="color:var(--brand-600);font-size:15px;"></i>';
-        }
-
-        const currentInvId = parseInt(document.getElementById('modalInvId').value, 10) || 0;
-        const alreadyInvoiced = rawInvoices.some(i => i.milestoneId === milestone.id && i.id !== currentInvId);
-        if (warning) warning.style.display = alreadyInvoiced ? 'block' : 'none';
-
-        // Auto-fill Amount / Price from dynamic milestone data
-        const amount = Number(milestone.amount > 0 ? milestone.amount : (milestone.effectiveAmount || 0));
-        if (amountInput) amountInput.value = amount;
-        if (autoHint) autoHint.style.display = amount > 0 ? 'inline' : 'none';
-
-        // Auto-fill Due Date if available
-        if (milestone.dueDate && dueInput) {
-            dueInput.value = milestone.dueDate;
-        }
-
-        // Auto-fill Notes / Description
-        if (notesInput && (!notesInput.value || notesInput.value.startsWith('Invoice for Milestone:'))) {
-            notesInput.value = `Invoice for Milestone: ${milestone.milestoneName}${milestone.description ? ' - ' + milestone.description : ''}`;
-        }
-
-        calculateTotals();
     }
 
     function calculateTotals() {
@@ -1573,7 +1902,13 @@
         const projectId = parseInt(document.getElementById('modalProjectSelect').value, 10);
         const milestoneVal = document.getElementById('modalMilestoneId').value;
         const milestoneId = milestoneVal ? parseInt(milestoneVal, 10) : null;
-        let clientName = document.getElementById('modalClientSelect').value;
+        let clientName = (document.getElementById('modalClientSelect')?.value || '').trim();
+        const clientId = (document.getElementById('modalClientId')?.value || '').trim();
+
+        if (!clientName) {
+            showToast('Please select a client', true);
+            return;
+        }
 
         if (!projectId) {
             showToast('Please select a project', true);
@@ -1581,16 +1916,8 @@
         }
 
         if (!milestoneId) {
-            showToast('Please select a milestone for this invoice', true);
+            showToast('Please select an eligible milestone for this invoice', true);
             return;
-        }
-
-        // Fallback client from selected project if not selected
-        if (!clientName) {
-            const proj = allProjects.find(p => p.id === projectId);
-            if (proj) {
-                clientName = proj.clientCompany || proj.clientName || 'Client';
-            }
         }
 
         const taxSel = document.getElementById('modalTaxRate');
@@ -1604,6 +1931,7 @@
             projectId: projectId,
             milestoneId: milestoneId,
             invoiceNumber: document.getElementById('modalInvNumber').value.trim(),
+            clientId: clientId,
             clientName: clientName,
             clientCompany: clientName,
             invoiceDate: document.getElementById('modalInvDate').value,
@@ -1631,7 +1959,15 @@
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.message || 'Failed to save invoice');
+                const errMsg = errData.message || (res.status === 409 ? 'An invoice already exists for this milestone.' : 'Failed to save invoice');
+                if (res.status === 409) {
+                    const warn = document.getElementById('milestoneWarning');
+                    if (warn) {
+                        warn.textContent = 'An invoice already exists for this milestone.';
+                        warn.style.display = 'block';
+                    }
+                }
+                throw new Error(errMsg);
             }
 
             showToast(isEdit ? 'Invoice updated successfully' : 'Invoice created successfully');

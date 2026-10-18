@@ -10,6 +10,14 @@
     </div>
 </div>
 
+
+@if (TempData["ErrorMessage"] is string errorMessage)
+{
+    <div role="alert" style="margin-bottom:18px;padding:12px 16px;border:1px solid #fca5a5;border-radius:8px;background:#fef2f2;color:#991b1b;">
+        @errorMessage
+    </div>
+}
+
     <!-- ============ LEAD STATUS ============ -->
     <div class="panel" id="lead-status" style="margin-bottom:22px;">
         <div class="panel-header">
@@ -42,63 +50,8 @@
         </div>
     </div>
 
-<!-- ============ USERS / ROLES ============ -->
-<div class="panel" id="users-roles" style="margin-bottom:22px;">
-    <div class="panel-header">
-        <div>
-            <h2><i class="bi bi-people" style="color:var(--brand-600);margin-right:6px;"></i> Users &amp; Roles</h2>
-            <div class="hint">Team members who can be assigned leads</div>
-        </div>
-        <div style="display:flex;gap:8px;">
-            <a asp-controller="Team" asp-action="Roles" class="btn btn-secondary btn-sm"><i class="bi bi-shield-lock"></i> Configure Roles &amp; Permissions</a>
-            <button type="button" class="btn btn-primary btn-sm" onclick="openModal('addUserModal')"><i class="bi bi-person-plus"></i> Add User</button>
-        </div>
-    </div>
-    <div class="table-wrap">
-        <table class="data-table">
-            <thead>
-                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var u in Model.Users)
-                {
-                    <tr>
-                        <td>
-                            <div class="avatar-chip">
-                                <div class="initials">@Initials(u.Name)</div>
-                                <span class="cell-primary">@u.Name</span>
-                            </div>
-                        </td>
-                        <td>@u.Email</td>
-                        <td>@u.Role</td>
-                        <td>
-                            @if (u.Status == "Active")
-                            {
-                                <span class="badge-status st-qualified">Active</span>
-                            }
-                            else
-                            {
-                                <span class="badge-status st-lost">Inactive</span>
-                            }
-                        </td>
-                        <td>
-                            <form method="post" asp-controller="Settings" asp-action="RemoveUser"
-                                  onsubmit="return confirm('Remove @u.Name from the team?')">
-                                <input type="hidden" name="email" value="@u.Email" />
-                                <button type="submit" class="icon-btn" title="Remove" style="color:#c81e1e;border-color:#fda29b;">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-</div>
-
 <!-- ============ FOLLOW-UP SETTINGS ============ -->
-<div class="panel" id="followup-settings">
+<div class="panel" id="followup-settings" style="margin-bottom:22px;">
     <div class="panel-header">
         <div>
             <h2><i class="bi bi-calendar-check" style="color:var(--accent);margin-right:6px;"></i> Follow-up Settings</h2>
@@ -359,39 +312,6 @@
     </div>
 </div>
 
-<!-- ============ ADD USER MODAL ============ -->
-<div class="modal-backdrop-custom" id="addUserModal">
-    <div class="modal-box">
-        <div class="modal-box-head">
-            <div>
-                <h3><i class="bi bi-person-plus-fill" style="color:var(--brand-600);"></i> Add User</h3>
-                <p>New team member who can be assigned leads</p>
-            </div>
-            <button class="modal-close" type="button" onclick="closeModal('addUserModal')">&times;</button>
-        </div>
-        <div class="modal-box-body">
-            <form method="post" asp-controller="Settings" asp-action="AddUser">
-                <div class="form-grid">
-                    <div class="form-field"><label>Full Name <span class="req">*</span></label><input type="text" name="NewUser.Name" required placeholder="e.g., Isha Patil" /></div>
-                    <div class="form-field"><label>Email <span class="req">*</span></label><input type="email" name="NewUser.Email" required placeholder="name@nimbuscrm.com" /></div>
-                    <div class="form-field"><label>Role</label><input type="text" name="NewUser.Role" placeholder="e.g., Sales Executive" /></div>
-                    <div class="form-field">
-                        <label>Status</label>
-                        <select name="NewUser.Status">
-                            <option selected>Active</option>
-                            <option>Inactive</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-outline" onclick="closeModal('addUserModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Add User</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
 <script>
     function openEditTaxModal(id, name, type, rate, desc, status) {
         document.getElementById('editTaxId').value = id;
@@ -405,12 +325,6 @@
 </script>
 
 @functions {
-    string Initials(string name)
-    {
-        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}" : name.Substring(0, Math.Min(2, name.Length));
-    }
-
     string JavaScriptEncoder(string input)
     {
         if (string.IsNullOrEmpty(input)) return "";

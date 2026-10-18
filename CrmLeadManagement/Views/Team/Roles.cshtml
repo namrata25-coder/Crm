@@ -63,7 +63,7 @@
 
         <div class="roles-toolbar-right">
             <button type="button" class="btn btn-primary btn-sm" onclick="openNewRoleModal()">
-                <i class="bi bi-plus-lg"></i> + New Role
+                <i class="bi bi-plus-lg"></i> New Role
             </button>
             <button type="button" class="btn btn-secondary btn-sm" onclick="openRenameRoleModal()">
                 <i class="bi bi-pencil"></i> Rename
@@ -287,46 +287,60 @@
 
 <!-- ================= MODALS ================= -->
 
-<!-- 1. NEW ROLE MODAL -->
-<div class="modal-backdrop-custom" id="modalNewRole" style="display:none;">
-    <div class="modal-dialog-custom">
+<!-- 1. CREATE NEW ROLE MODAL -->
+<div class="modal-backdrop-custom" id="modalNewRole" style="display:none;" onclick="if(event.target.id==='modalNewRole') closeModal('modalNewRole')">
+    <div class="modal-dialog-custom" style="max-width:520px;" onclick="event.stopPropagation()">
         <div class="modal-header-custom">
-            <div class="modal-title-custom">
-                <i class="bi bi-plus-circle-fill text-primary"></i> Create New Role
+            <div>
+                <div class="modal-title-custom">
+                    <i class="bi bi-shield-plus text-primary"></i> Create New Role
+                </div>
+                <div style="font-size:12.5px;color:var(--ink-500);margin-top:2px;">
+                    Define a new role and establish its baseline permissions matrix.
+                </div>
             </div>
             <button type="button" class="btn-close-modal" onclick="closeModal('modalNewRole')">&times;</button>
         </div>
         <form id="formNewRole" onsubmit="submitNewRole(event)">
             <div class="modal-body-custom">
+                <!-- Role Name -->
                 <div class="form-group-custom">
                     <label class="form-label-custom">Role Name <span class="text-danger">*</span></label>
-                    <input type="text" id="newRoleName" class="form-input-custom" placeholder="e.g. Project Manager, Finance Officer" required />
+                    <input type="text" id="newRoleName" class="form-input-custom" placeholder="e.g. Senior Sales Executive" required autocomplete="off" />
                 </div>
+
+                <!-- Description -->
                 <div class="form-group-custom">
                     <label class="form-label-custom">Description (Optional)</label>
-                    <textarea id="newRoleDesc" class="form-input-custom" rows="2" placeholder="Briefly describe responsibilities and module scope..."></textarea>
+                    <textarea id="newRoleDesc" class="form-input-custom" rows="2" placeholder="Briefly describe responsibilities of this role..."></textarea>
                 </div>
+
+                <!-- Copy Permissions From -->
                 <div class="form-group-custom">
                     <label class="form-label-custom">Copy Permissions From</label>
                     <select id="newRoleCopyFrom" class="form-input-custom">
-                        <option value="">Start from standard default template</option>
+                        <option value="">Standard Default Template</option>
                         @foreach (var r in Model.AllRoles)
                         {
-                            <option value="@r.RoleName">Copy permissions from: @r.RoleName</option>
+                            <option value="@r.RoleName">Copy from: @r.RoleName</option>
                         }
                     </select>
                 </div>
+
+                <!-- Data Access Scope -->
                 <div class="form-group-custom">
                     <label class="form-label-custom">Default Data Access Scope</label>
                     <select id="newRoleDataAccess" class="form-input-custom">
-                        <option value="OnlyAssigned">Only my assigned records</option>
-                        <option value="All">All records</option>
+                        <option value="OnlyAssigned">Only my assigned records (Standard executive)</option>
+                        <option value="All">All records (Managerial / Departmental)</option>
                     </select>
                 </div>
             </div>
             <div class="modal-footer-custom">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalNewRole')">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitNewRole">Create Role</button>
+                <button type="submit" class="btn btn-primary btn-sm" id="btnSubmitNewRole">
+                    <i class="bi bi-shield-plus"></i> Create Role
+                </button>
             </div>
         </form>
     </div>
@@ -935,26 +949,30 @@
 .modal-backdrop-custom {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(16,24,40,.5);
-    backdrop-filter: blur(2px);
-    display: flex;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    display: none;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 1060;
     padding: 16px;
+    overflow-y: auto;
 }
 .modal-dialog-custom {
     background: #fff;
-    border-radius: 12px;
+    border-radius: 16px;
     width: 100%;
-    max-width: 480px;
-    box-shadow: var(--shadow-2);
+    max-width: 520px;
+    box-shadow: 0 24px 48px -12px rgba(16, 24, 40, 0.25), 0 4px 12px rgba(16, 24, 40, 0.08);
+    border: 1px solid var(--line);
     overflow: hidden;
-    animation: modalIn .15s ease-out;
+    margin: auto;
+    animation: modalIn .18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @@keyframes modalIn {
-    from { opacity: 0; transform: scale(.95); }
-    to { opacity: 1; transform: scale(1); }
+    0% { transform: scale(0.95) translateY(10px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 .modal-header-custom {
     display: flex;
@@ -1368,18 +1386,38 @@ async function resetPermissions() {
 // Modal handling
 function openModal(id) {
     const el = document.getElementById(id);
-    if (el) el.style.display = "flex";
+    if (el) {
+        el.style.display = "flex";
+        el.classList.add("show", "open");
+    }
 }
 function closeModal(id) {
     const el = document.getElementById(id);
-    if (el) el.style.display = "none";
+    if (el) {
+        el.style.display = "none";
+        el.classList.remove("show", "open");
+    }
 }
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+        closeModal("modalNewRole");
+        closeModal("modalRenameRole");
+        closeModal("modalDeleteRole");
+    }
+});
 
 function openNewRoleModal() {
     document.getElementById("newRoleName").value = "";
     document.getElementById("newRoleDesc").value = "";
-    document.getElementById("newRoleCopyFrom").value = currentRole;
+    const copySelect = document.getElementById("newRoleCopyFrom");
+    if (copySelect) copySelect.value = currentRole || "";
+    const dataAccess = document.getElementById("newRoleDataAccess");
+    if (dataAccess) dataAccess.value = "OnlyAssigned";
     openModal("modalNewRole");
+    setTimeout(() => {
+        const inp = document.getElementById("newRoleName");
+        if (inp) inp.focus();
+    }, 100);
 }
 
 async function submitNewRole(e) {
@@ -1389,40 +1427,78 @@ async function submitNewRole(e) {
     const copyFrom = document.getElementById("newRoleCopyFrom").value;
     const dataAccess = document.getElementById("newRoleDataAccess").value;
 
-    if (!roleName) return;
+    if (!roleName) {
+        alert("Please enter a role name.");
+        return;
+    }
+
+    const btn = document.getElementById("btnSubmitNewRole");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status"></span> Creating...`;
+    }
 
     try {
         const res = await fetch("/Team/CreateRole", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ RoleName: roleName, Description: description, CopyFromRole: copyFrom, DataAccess: dataAccess })
+            body: JSON.stringify({
+                RoleName: roleName,
+                Description: description,
+                CopyFromRole: copyFrom,
+                DataAccess: dataAccess
+            })
         });
+
         const data = await res.json();
         if (data.success) {
             closeModal("modalNewRole");
             showToast(data.message, "success");
 
-            // Add new role to dropdown
+            // Update role dropdown if new role was created
             const sel = document.getElementById("roleSelector");
-            const opt = document.createElement("option");
-            opt.value = roleName;
-            opt.textContent = roleName;
-            sel.appendChild(opt);
-            sel.value = roleName;
+            let roleExists = false;
+            for (let opt of sel.options) {
+                if (opt.value.toLowerCase() === roleName.toLowerCase()) {
+                    roleExists = true;
+                    break;
+                }
+            }
+            if (!roleExists) {
+                const opt = document.createElement("option");
+                opt.value = roleName;
+                opt.textContent = roleName;
+                sel.appendChild(opt);
+            }
 
-            onRoleChange(roleName);
+            sel.value = roleName;
+            await onRoleChange(roleName);
         } else {
             alert(data.message || "Could not create role.");
         }
     } catch (err) {
+        console.error("Create role error:", err);
         alert("Error creating role.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-shield-plus"></i> Create Role`;
+        }
     }
 }
 
 function openRenameRoleModal() {
+    if (isSystemRole || currentRole.toLowerCase() === "admin" || currentRole.toLowerCase() === "super admin") {
+        alert("System roles (Admin, Super Admin) cannot be renamed.");
+        return;
+    }
     document.getElementById("renameRoleCurrent").value = currentRole;
     document.getElementById("renameRoleNew").value = currentRole;
     openModal("modalRenameRole");
+    setTimeout(() => {
+        const inp = document.getElementById("renameRoleNew");
+        if (inp) { inp.focus(); inp.select(); }
+    }, 100);
 }
 
 async function submitRenameRole(e) {
@@ -1463,8 +1539,8 @@ async function submitRenameRole(e) {
 }
 
 async function openDeleteRoleModal() {
-    if (isSystemRole || currentRole.toLowerCase() === "admin") {
-        alert("System roles cannot be deleted.");
+    if (isSystemRole || currentRole.toLowerCase() === "admin" || currentRole.toLowerCase() === "super admin") {
+        alert("System roles (Admin, Super Admin) cannot be deleted.");
         return;
     }
 
@@ -1479,9 +1555,15 @@ async function openDeleteRoleModal() {
         const countTxt = document.getElementById("deleteAssignedCountText");
         const reassignSel = document.getElementById("deleteReassignToRole");
 
-        // Filter out current role from target
+        // Filter out current role from target options
+        let hasAvailableTarget = false;
         Array.from(reassignSel.options).forEach(opt => {
-            opt.style.display = opt.value === currentRole ? "none" : "";
+            const isMatch = opt.value.toLowerCase() === currentRole.toLowerCase();
+            opt.style.display = isMatch ? "none" : "";
+            if (!isMatch && !hasAvailableTarget) {
+                reassignSel.value = opt.value;
+                hasAvailableTarget = true;
+            }
         });
 
         if (assignedCount > 0) {
@@ -1499,7 +1581,20 @@ async function openDeleteRoleModal() {
 
 async function submitDeleteRole(e) {
     e.preventDefault();
+    const countTxt = document.getElementById("deleteAssignedCountText");
+    const assignedCount = parseInt(countTxt?.textContent || "0", 10);
     const reassignTo = document.getElementById("deleteReassignToRole")?.value || "";
+
+    if (assignedCount > 0 && !reassignTo) {
+        alert("Please select a target role to reassign existing members before deleting.");
+        return;
+    }
+
+    const btn = document.getElementById("btnConfirmDeleteRole");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status"></span> Deleting...`;
+    }
 
     try {
         const res = await fetch("/Team/DeleteRole", {
@@ -1513,12 +1608,19 @@ async function submitDeleteRole(e) {
             showToast(data.message, "success");
 
             // Reload page on default role
-            window.location.href = "/Team/Roles";
+            setTimeout(() => {
+                window.location.href = "/Team/Roles";
+            }, 600);
         } else {
             alert(data.message || "Failed to delete role.");
         }
     } catch (err) {
         alert("Error deleting role.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `Confirm Delete`;
+        }
     }
 }
 

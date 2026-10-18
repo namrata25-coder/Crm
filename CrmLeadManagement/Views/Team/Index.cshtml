@@ -32,6 +32,28 @@
     </div>
 </div>
 
+<!-- Alert Notifications -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="team-alert-banner team-alert-success">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <i class="bi bi-check-circle-fill" style="font-size:16px;color:#10b981;"></i>
+            <span>@TempData["SuccessMessage"]</span>
+        </div>
+        <button type="button" class="team-alert-close" onclick="this.parentElement.remove()" title="Close">&times;</button>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="team-alert-banner team-alert-error">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size:16px;color:#ef4444;"></i>
+            <span>@TempData["ErrorMessage"]</span>
+        </div>
+        <button type="button" class="team-alert-close" onclick="this.parentElement.remove()" title="Close">&times;</button>
+    </div>
+}
+
 <!-- Navigation Tabs -->
 <div class="team-nav-tabs">
     <a asp-controller="Team" asp-action="Index" class="team-tab-btn active">
@@ -46,13 +68,14 @@
 <div class="panel" style="margin-top:16px;">
     <!-- Filter bar -->
     <div class="panel-header" style="flex-wrap:wrap;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);">
-        <form method="get" asp-controller="Team" asp-action="Index" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1;">
+        <form method="get" asp-controller="Team" asp-action="Index" id="teamFilterForm" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex:1;">
             <div class="search-box" style="width:260px;background:var(--ink-100);border:1px solid var(--ink-300);border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:8px;">
                 <i class="bi bi-search" style="color:var(--ink-500);"></i>
-                <input type="text" name="search" value="@search" placeholder="Search by name, email..." style="border:none;background:transparent;outline:none;width:100%;font-size:13px;" />
+                <input type="text" id="memberSearchInput" name="search" value="@search" placeholder="Search by name, email..." 
+                       style="border:none;background:transparent;outline:none;width:100%;font-size:13px;" onkeyup="filterMembersTableClientSide()" />
             </div>
 
-            <select name="role" class="form-control" style="width:auto;min-width:160px;padding:6px 12px;border-radius:8px;font-size:13px;border:1px solid var(--ink-300);" onchange="this.form.submit()">
+            <select name="role" id="roleFilterSelect" class="form-control" style="width:auto;min-width:160px;padding:6px 12px;border-radius:8px;font-size:13px;border:1px solid var(--ink-300);" onchange="this.form.submit()">
                 <option value="">All Roles</option>
                 @foreach (var r in allRoles)
                 {
@@ -60,7 +83,7 @@
                 }
             </select>
 
-            <select name="status" class="form-control" style="width:auto;min-width:130px;padding:6px 12px;border-radius:8px;font-size:13px;border:1px solid var(--ink-300);" onchange="this.form.submit()">
+            <select name="status" id="statusFilterSelect" class="form-control" style="width:auto;min-width:130px;padding:6px 12px;border-radius:8px;font-size:13px;border:1px solid var(--ink-300);" onchange="this.form.submit()">
                 <option value="">All Statuses</option>
                 <!option value="Active" @(selectedStatus == "Active" ? "selected" : "")>Active</!option>
                 <!option value="Inactive" @(selectedStatus == "Inactive" ? "selected" : "")>Inactive</!option>
@@ -74,13 +97,13 @@
             }
         </form>
 
-        <div style="font-size:13px;color:var(--ink-500);font-weight:600;">
+        <div style="font-size:13px;color:var(--ink-500);font-weight:600;" id="memberCountDisplay">
             Showing @Model.Count member(s)
         </div>
     </div>
 
     <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table" id="membersDataTable">
             <thead>
                 <tr>
                     <th>Member</th>
@@ -94,7 +117,7 @@
             <tbody>
                 @if (!Model.Any())
                 {
-                    <tr>
+                    <tr id="emptyMembersRow">
                         <td colspan="6" style="text-align:center;padding:40px;color:var(--ink-500);">
                             <i class="bi bi-people" style="font-size:28px;display:block;margin-bottom:8px;color:var(--ink-300);"></i>
                             No team members found matching your search.
@@ -103,7 +126,7 @@
                 }
                 @foreach (var u in Model)
                 {
-                    <tr>
+                    <tr class="member-data-row" data-name="@u.Name" data-email="@u.Email" data-role="@u.Role" data-status="@u.Status">
                         <td>
                             <div class="avatar-chip">
                                 <div class="initials">@GetInitials(u.Name)</div>
@@ -136,15 +159,22 @@
                         </td>
                         <td style="text-align:right;">
                             <div style="display:inline-flex;gap:6px;">
-                                <button type="button" class="icon-btn" title="Edit Member" onclick="openEditMemberModal(@u.Id, '@u.Name', '@u.Email', '@u.Role', '@u.Status')">
+                                <button type="button" class="icon-btn" title="Edit Member"
+                                        data-id="@u.Id"
+                                        data-name="@u.Name"
+                                        data-email="@u.Email"
+                                        data-role="@u.Role"
+                                        data-status="@u.Status"
+                                        onclick="handleEditMemberClick(this)">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <form method="post" asp-controller="Settings" asp-action="RemoveUser" onsubmit="return confirm('Remove @u.Name from the team?');" style="display:inline;">
-                                    <input type="hidden" name="email" value="@u.Email" />
-                                    <button type="submit" class="icon-btn" title="Remove" style="color:#dc2626;">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="icon-btn" title="Delete Member" style="color:#dc2626;"
+                                        data-id="@u.Id"
+                                        data-name="@u.Name"
+                                        data-email="@u.Email"
+                                        onclick="openDeleteMemberModal(this)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -154,46 +184,476 @@
     </div>
 </div>
 
-<!-- ADD/EDIT MEMBER MODAL -->
-<div class="modal-backdrop-custom" id="modalMember" style="display:none;">
-    <div class="modal-dialog-custom">
-        <div class="modal-header-custom">
-            <div class="modal-title-custom" id="memberModalTitle">
-                <i class="bi bi-person-plus-fill text-primary"></i> Add Team Member
+<!-- ================= ADD / EDIT MEMBER MODAL ================= -->
+<style>
+    /* Alert Banners */
+    .team-alert-banner {
+        padding: 12px 18px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 500;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .team-alert-success {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #15803d;
+    }
+    .team-alert-error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+    }
+    .team-alert-close {
+        background: transparent;
+        border: none;
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+        color: inherit;
+        opacity: 0.7;
+        padding: 0;
+    }
+    .team-alert-close:hover {
+        opacity: 1;
+    }
+
+    /* Centered popup modal backdrop */
+    .team-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        z-index: 1050;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        overflow-y: auto;
+    }
+    .team-modal-backdrop.show,
+    .team-modal-backdrop.open {
+        display: flex;
+    }
+
+    /* Modal card */
+    .team-modal-card {
+        background: #ffffff;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 580px;
+        box-shadow: 0 24px 48px -12px rgba(16, 24, 40, 0.25), 0 4px 12px rgba(16, 24, 40, 0.08);
+        border: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin: auto;
+        animation: teamModalZoom .2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @@keyframes teamModalZoom {
+        0% { transform: scale(0.95) translateY(10px); opacity: 0; }
+        100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    /* Modal header */
+    .team-modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        background: #ffffff;
+    }
+    .team-modal-icon-badge {
+        width: 42px;
+        height: 42px;
+        background: var(--brand-100);
+        color: var(--brand-600);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 19px;
+        flex-shrink: 0;
+    }
+    .team-modal-icon-badge.danger {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+    .team-modal-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--ink-900);
+        letter-spacing: -0.2px;
+    }
+    .team-modal-subtitle {
+        margin: 3px 0 0;
+        font-size: 13px;
+        color: var(--ink-500);
+    }
+    .team-modal-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        color: var(--ink-500);
+        font-size: 22px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        padding: 0;
+    }
+    .team-modal-close:hover {
+        background: var(--ink-100);
+        color: var(--ink-900);
+    }
+
+    /* Modal body */
+    .team-modal-body {
+        padding: 22px 24px;
+        max-height: calc(88vh - 140px);
+        overflow-y: auto;
+    }
+
+    /* Form alert */
+    .team-modal-alert {
+        padding: 10px 14px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        color: #b91c1c;
+        font-size: 12.5px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        animation: teamModalZoom .15s ease;
+    }
+
+    /* Grid layout */
+    .team-form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+    @@media (max-width: 576px) {
+        .team-form-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+    }
+
+    .team-form-group {
+        display: flex;
+        flex-direction: column;
+    }
+    .team-form-label {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--ink-700);
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .team-form-label .req-star {
+        color: #ef4444;
+        font-weight: 700;
+        margin-left: 2px;
+    }
+
+    /* Input wrapper with icons */
+    .team-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .team-input-icon {
+        position: absolute;
+        left: 12px;
+        color: var(--ink-500);
+        font-size: 15px;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .team-form-input,
+    .team-form-select {
+        width: 100%;
+        padding: 9.5px 14px 9.5px 38px;
+        border: 1px solid var(--ink-300);
+        border-radius: 8px;
+        font-size: 13.5px;
+        color: var(--ink-900);
+        background: #ffffff;
+        outline: none;
+        font-family: inherit;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .team-form-input:focus,
+    .team-form-select:focus {
+        border-color: var(--brand-600);
+        box-shadow: 0 0 0 3px var(--brand-100);
+    }
+    .team-form-input.is-invalid,
+    .team-form-select.is-invalid {
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+    }
+
+    .team-field-error {
+        font-size: 11.5px;
+        color: #dc2626;
+        margin-top: 4px;
+        font-weight: 500;
+        display: none;
+    }
+
+    /* Password tools */
+    .team-input-btn-right {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        color: var(--ink-500);
+        cursor: pointer;
+        padding: 6px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.15s ease;
+    }
+    .team-input-btn-right:hover {
+        color: var(--ink-900);
+    }
+    .team-btn-generate {
+        background: var(--brand-100);
+        color: var(--brand-700);
+        border: 1px solid rgba(37, 99, 168, 0.2);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 11.5px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s ease;
+    }
+    .team-btn-generate:hover {
+        background: #dbeafe;
+        color: var(--brand-700);
+    }
+    .team-pw-notice {
+        font-size: 12px;
+        color: #15803d;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        padding: 6px 10px;
+        margin-top: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+        animation: teamModalZoom .15s ease;
+    }
+
+    /* Footer */
+    .team-modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        background: #fafbfc;
+    }
+</style>
+
+<div class="team-modal-backdrop" id="modalMember" style="display:none;" onclick="handleBackdropClick(event)">
+    <div class="team-modal-card" onclick="event.stopPropagation()">
+        <!-- Header -->
+        <div class="team-modal-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div class="team-modal-icon-badge" id="memberModalIcon">
+                    <i class="bi bi-person-plus-fill"></i>
+                </div>
+                <div>
+                    <h2 class="team-modal-title" id="memberModalTitle">Add Team Member</h2>
+                    <p class="team-modal-subtitle" id="memberModalSubtitle">Enter member details and configure their role and login credentials.</p>
+                </div>
             </div>
-            <button type="button" class="btn-close-modal" onclick="closeModal('modalMember')">&times;</button>
+            <button type="button" class="team-modal-close" onclick="closeModal('modalMember')" title="Close">&times;</button>
         </div>
-        <form method="post" asp-controller="Work" asp-action="SaveMember">
+
+        <form method="post" asp-controller="Team" asp-action="SaveMember" id="teamMemberForm" onsubmit="return validateMemberForm(event)">
             <input type="hidden" id="memberId" name="id" value="0" />
-            <div class="modal-body-custom">
-                <div class="form-group-custom">
-                    <label class="form-label-custom">Full Name <span class="text-danger">*</span></label>
-                    <input type="text" id="memberName" name="name" class="form-input-custom" placeholder="e.g. Rahul Sharma" required />
+
+            <div class="team-modal-body">
+                <!-- Validation Summary Alert -->
+                <div id="modalFormAlert" class="team-modal-alert" style="display:none;">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size:14px;color:#dc2626;"></i>
+                    <span id="modalFormAlertText">Please correct the highlighted fields below.</span>
                 </div>
-                <div class="form-group-custom">
-                    <label class="form-label-custom">Email Address <span class="text-danger">*</span></label>
-                    <input type="email" id="memberEmail" name="email" class="form-input-custom" placeholder="rahul@company.com" required />
+
+                <!-- Row 1: Full Name & Email -->
+                <div class="team-form-grid">
+                    <div class="team-form-group">
+                        <label class="team-form-label" for="memberName">
+                            Full Name <span class="req-star">*</span>
+                        </label>
+                        <div class="team-input-wrapper">
+                            <i class="bi bi-person team-input-icon"></i>
+                            <input type="text" id="memberName" name="name" class="team-form-input" 
+                                   placeholder="e.g. Rahul Sharma" autocomplete="off" oninput="clearErrorFor(this)" />
+                        </div>
+                        <span class="team-field-error" id="err-memberName"></span>
+                    </div>
+
+                    <div class="team-form-group">
+                        <label class="team-form-label" for="memberEmail">
+                            Email Address <span class="req-star">*</span>
+                        </label>
+                        <div class="team-input-wrapper">
+                            <i class="bi bi-envelope team-input-icon"></i>
+                            <input type="email" id="memberEmail" name="email" class="team-form-input" 
+                                   placeholder="rahul@company.com" autocomplete="off" oninput="clearErrorFor(this)" />
+                        </div>
+                        <span class="team-field-error" id="err-memberEmail"></span>
+                    </div>
                 </div>
-                <div class="form-group-custom">
-                    <label class="form-label-custom">Role / Designation <span class="text-danger">*</span></label>
-                    <select id="memberRole" name="role" class="form-input-custom" required>
-                        @foreach (var r in allRoles)
-                        {
-                            <option value="@r">@r</option>
-                        }
-                    </select>
+
+                <!-- Row 2: Role & Status -->
+                <div class="team-form-grid" style="margin-top:14px;">
+                    <div class="team-form-group">
+                        <label class="team-form-label" for="memberRole">
+                            Role / Designation <span class="req-star">*</span>
+                        </label>
+                        <div class="team-input-wrapper">
+                            <i class="bi bi-shield-check team-input-icon"></i>
+                            <select id="memberRole" name="role" class="team-form-select" onchange="clearErrorFor(this)">
+                                @if (allRoles != null && allRoles.Any())
+                                {
+                                    @foreach (var r in allRoles)
+                                    {
+                                        <option value="@r">@r</option>
+                                    }
+                                }
+                                else
+                                {
+                                    <option value="Super Admin">Super Admin</option>
+                                    <option value="Admin">Admin</option>
+                                    <option value="Sales Manager">Sales Manager</option>
+                                    <option value="Sales Executive">Sales Executive</option>
+                                    <option value="Telecaller">Telecaller</option>
+                                }
+                            </select>
+                        </div>
+                        <span class="team-field-error" id="err-memberRole"></span>
+                    </div>
+
+                    <div class="team-form-group">
+                        <label class="team-form-label" for="memberStatus">
+                            Account Status
+                        </label>
+                        <div class="team-input-wrapper">
+                            <i class="bi bi-activity team-input-icon"></i>
+                            <select id="memberStatus" name="status" class="team-form-select">
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group-custom">
-                    <label class="form-label-custom">Account Status</label>
-                    <select id="memberStatus" name="status" class="form-input-custom">
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
+
+                <!-- Row 3: Login Password -->
+                <div class="team-form-group" style="margin-top:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <label class="team-form-label" for="memberPassword" style="margin-bottom:0;" id="memberPasswordLabel">
+                            Login Password <span class="req-star" id="memberPasswordReq">*</span>
+                            <span id="memberPasswordLabelHint" style="display:none;font-weight:400;font-size:11.5px;color:var(--ink-500);margin-left:4px;">(Leave blank to keep current)</span>
+                        </label>
+                        <button type="button" class="team-btn-generate" onclick="generateMemberPassword()">
+                            <i class="bi bi-key-fill"></i> Generate Password
+                        </button>
+                    </div>
+                    <div class="team-input-wrapper">
+                        <i class="bi bi-lock team-input-icon"></i>
+                        <input type="password" id="memberPassword" name="password" class="team-form-input" 
+                               placeholder="Enter login password (min 6 characters)" style="padding-right:42px;" oninput="clearErrorFor(this)" />
+                        <button type="button" class="team-input-btn-right" onclick="toggleMemberPasswordVisibility()" title="Show/Hide Password">
+                            <i class="bi bi-eye" id="toggleMemberPwIcon"></i>
+                        </button>
+                    </div>
+                    <div id="memberPwNotice" class="team-pw-notice" style="display:none;">
+                        <i class="bi bi-check2-circle"></i> Password generated &amp; copied to clipboard!
+                    </div>
+                    <span class="team-field-error" id="err-memberPassword"></span>
                 </div>
             </div>
-            <div class="modal-footer-custom">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalMember')">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm">Save Member</button>
+
+            <!-- Footer -->
+            <div class="team-modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('modalMember')">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="btnSubmitMember">
+                    <i class="bi bi-person-plus-fill" id="btnSubmitMemberIcon" style="margin-right:4px;"></i>
+                    <span id="btnSubmitMemberText">Add Member</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= DELETE MEMBER MODAL ================= -->
+<div class="team-modal-backdrop" id="modalDeleteMember" style="display:none;" onclick="handleDeleteBackdropClick(event)">
+    <div class="team-modal-card" style="max-width:480px;" onclick="event.stopPropagation()">
+        <div class="team-modal-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div class="team-modal-icon-badge danger">
+                    <i class="bi bi-trash-fill"></i>
+                </div>
+                <div>
+                    <h2 class="team-modal-title" style="color:#b91c1c;">Delete Team Member</h2>
+                    <p class="team-modal-subtitle">Confirm member removal from the CRM system.</p>
+                </div>
+            </div>
+            <button type="button" class="team-modal-close" onclick="closeModal('modalDeleteMember')" title="Close">&times;</button>
+        </div>
+
+        <form method="post" asp-controller="Team" asp-action="DeleteMember" id="formDeleteMember" onsubmit="return submitDeleteMember(event)">
+            <input type="hidden" id="deleteMemberId" name="id" value="0" />
+
+            <div class="team-modal-body">
+                <p style="font-size:14px;color:var(--ink-700);line-height:1.5;margin:0 0 12px;">
+                    Are you sure you want to remove <strong id="deleteMemberNameText" style="color:var(--ink-900);">Rahul Sharma</strong> 
+                    (<span id="deleteMemberEmailText" style="color:var(--brand-600);">rahul@example.com</span>) from the team?
+                </p>
+                <div style="padding:10px 14px;background:#fff8f8;border:1px solid #fed7d7;border-radius:8px;font-size:12.5px;color:#c53030;display:flex;align-items:flex-start;gap:8px;">
+                    <i class="bi bi-exclamation-triangle-fill" style="margin-top:2px;"></i>
+                    <span>This action will permanently delete their user record and revoke their login credentials immediately.</span>
+                </div>
+            </div>
+
+            <div class="team-modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('modalDeleteMember')">Cancel</button>
+                <button type="submit" class="btn btn-danger" id="btnConfirmDeleteMember" style="background:#dc2626;border-color:#dc2626;color:#fff;">
+                    <i class="bi bi-trash-fill" style="margin-right:4px;"></i> Confirm Delete
+                </button>
             </div>
         </form>
     </div>
@@ -211,26 +671,331 @@
 
 <script>
 function openAddMemberModal() {
-    document.getElementById("memberModalTitle").innerHTML = `<i class="bi bi-person-plus-fill text-primary"></i> Add Team Member`;
+    clearFormErrors();
+    const form = document.getElementById("teamMemberForm");
+    if (form) form.reset();
+
     document.getElementById("memberId").value = "0";
     document.getElementById("memberName").value = "";
     document.getElementById("memberEmail").value = "";
     document.getElementById("memberStatus").value = "Active";
-    document.getElementById("modalMember").style.display = "flex";
+    document.getElementById("memberPassword").value = "";
+    document.getElementById("memberPassword").type = "password";
+    document.getElementById("memberPassword").placeholder = "Enter login password (min 6 characters)";
+    
+    document.getElementById("memberModalIcon").className = "team-modal-icon-badge";
+    document.getElementById("memberModalIcon").innerHTML = `<i class="bi bi-person-plus-fill"></i>`;
+    document.getElementById("memberModalTitle").innerText = "Add Team Member";
+    document.getElementById("memberModalSubtitle").innerText = "Enter member details and configure their role and login credentials.";
+    
+    document.getElementById("memberPasswordReq").style.display = "inline";
+    document.getElementById("memberPasswordLabelHint").style.display = "none";
+    document.getElementById("toggleMemberPwIcon").className = "bi bi-eye";
+    document.getElementById("memberPwNotice").style.display = "none";
+
+    document.getElementById("btnSubmitMemberIcon").className = "bi bi-person-plus-fill";
+    document.getElementById("btnSubmitMemberText").innerText = "Add Member";
+    const submitBtn = document.getElementById("btnSubmitMember");
+    if (submitBtn) submitBtn.disabled = false;
+
+    const modal = document.getElementById("modalMember");
+    modal.style.display = "flex";
+    modal.classList.add("show", "open");
+
+    setTimeout(() => {
+        const nameInput = document.getElementById("memberName");
+        if (nameInput) nameInput.focus();
+    }, 100);
+}
+
+function handleEditMemberClick(btn) {
+    if (!btn) return;
+    const id = btn.getAttribute("data-id");
+    const name = btn.getAttribute("data-name");
+    const email = btn.getAttribute("data-email");
+    const role = btn.getAttribute("data-role");
+    const status = btn.getAttribute("data-status");
+    openEditMemberModal(id, name, email, role, status);
 }
 
 function openEditMemberModal(id, name, email, role, status) {
-    document.getElementById("memberModalTitle").innerHTML = `<i class="bi bi-pencil-square text-primary"></i> Edit Team Member`;
+    clearFormErrors();
     document.getElementById("memberId").value = id;
-    document.getElementById("memberName").value = name;
-    document.getElementById("memberEmail").value = email;
-    document.getElementById("memberRole").value = role;
-    document.getElementById("memberStatus").value = status;
-    document.getElementById("modalMember").style.display = "flex";
+    document.getElementById("memberName").value = name || "";
+    document.getElementById("memberEmail").value = email || "";
+    document.getElementById("memberRole").value = role || "";
+    document.getElementById("memberStatus").value = status || "Active";
+    document.getElementById("memberPassword").value = "";
+    document.getElementById("memberPassword").type = "password";
+    document.getElementById("memberPassword").placeholder = "Leave blank to keep current password";
+    
+    document.getElementById("memberModalIcon").className = "team-modal-icon-badge";
+    document.getElementById("memberModalIcon").innerHTML = `<i class="bi bi-pencil-square"></i>`;
+    document.getElementById("memberModalTitle").innerText = "Edit Team Member";
+    document.getElementById("memberModalSubtitle").innerText = "Update member profile details, role, or change login password.";
+    
+    document.getElementById("memberPasswordReq").style.display = "none";
+    document.getElementById("memberPasswordLabelHint").style.display = "inline";
+    document.getElementById("toggleMemberPwIcon").className = "bi bi-eye";
+    document.getElementById("memberPwNotice").style.display = "none";
+
+    document.getElementById("btnSubmitMemberIcon").className = "bi bi-check-lg";
+    document.getElementById("btnSubmitMemberText").innerText = "Save Changes";
+    const submitBtn = document.getElementById("btnSubmitMember");
+    if (submitBtn) submitBtn.disabled = false;
+
+    const modal = document.getElementById("modalMember");
+    modal.style.display = "flex";
+    modal.classList.add("show", "open");
+
+    setTimeout(() => {
+        const nameInput = document.getElementById("memberName");
+        if (nameInput) nameInput.focus();
+    }, 100);
+}
+
+function openDeleteMemberModal(btn) {
+    if (!btn) return;
+    const id = btn.getAttribute("data-id");
+    const name = btn.getAttribute("data-name");
+    const email = btn.getAttribute("data-email");
+
+    document.getElementById("deleteMemberId").value = id;
+    document.getElementById("deleteMemberNameText").innerText = name || "Team Member";
+    document.getElementById("deleteMemberEmailText").innerText = email || "";
+
+    const submitBtn = document.getElementById("btnConfirmDeleteMember");
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="bi bi-trash-fill" style="margin-right:4px;"></i> Confirm Delete`;
+    }
+
+    const modal = document.getElementById("modalDeleteMember");
+    modal.style.display = "flex";
+    modal.classList.add("show", "open");
+}
+
+function submitDeleteMember(e) {
+    const submitBtn = document.getElementById("btnConfirmDeleteMember");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:14px;height:14px;border-width:2px;margin-right:6px;display:inline-block;vertical-align:middle;"></span> Deleting...';
+    }
+    return true;
 }
 
 function closeModal(id) {
     const el = document.getElementById(id);
-    if (el) el.style.display = "none";
+    if (el) {
+        el.style.display = "none";
+        el.classList.remove("show", "open");
+    }
+    clearFormErrors();
+}
+
+function handleBackdropClick(e) {
+    if (e.target && e.target.id === 'modalMember') {
+        closeModal('modalMember');
+    }
+}
+
+function handleDeleteBackdropClick(e) {
+    if (e.target && e.target.id === 'modalDeleteMember') {
+        closeModal('modalDeleteMember');
+    }
+}
+
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        closeModal('modalMember');
+        closeModal('modalDeleteMember');
+    }
+});
+
+function toggleMemberPasswordVisibility() {
+    const pw = document.getElementById("memberPassword");
+    const icon = document.getElementById("toggleMemberPwIcon");
+    if (!pw || !icon) return;
+    if (pw.type === "password") {
+        pw.type = "text";
+        icon.className = "bi bi-eye-slash";
+    } else {
+        pw.type = "password";
+        icon.className = "bi bi-eye";
+    }
+}
+
+function generateMemberPassword() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!#$%&*";
+    const specialChars = "!#$%&*?";
+    let pwd = "";
+    pwd += "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.floor(Math.random() * 24)];
+    pwd += "abcdefghijkmnopqrstuvwxyz"[Math.floor(Math.random() * 24)];
+    pwd += "23456789"[Math.floor(Math.random() * 8)];
+    pwd += specialChars[Math.floor(Math.random() * specialChars.length)];
+    for (let i = 0; i < 6; i++) {
+        pwd += chars[Math.floor(Math.random() * chars.length)];
+    }
+    pwd = pwd.split("").sort(() => 0.5 - Math.random()).join("");
+
+    const input = document.getElementById("memberPassword");
+    const icon = document.getElementById("toggleMemberPwIcon");
+    const notice = document.getElementById("memberPwNotice");
+    if (input) {
+        input.value = pwd;
+        input.type = "text";
+        clearErrorFor(input);
+        if (icon) icon.className = "bi bi-eye-slash";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(pwd).catch(() => {});
+        }
+        if (notice) notice.style.display = "flex";
+    }
+}
+
+function clearFormErrors() {
+    const alert = document.getElementById("modalFormAlert");
+    if (alert) alert.style.display = "none";
+
+    const invalidInputs = document.querySelectorAll("#teamMemberForm .is-invalid");
+    invalidInputs.forEach(el => el.classList.remove("is-invalid"));
+
+    const errSpans = document.querySelectorAll("#teamMemberForm .team-field-error");
+    errSpans.forEach(span => {
+        span.innerText = "";
+        span.style.display = "none";
+    });
+}
+
+function clearErrorFor(input) {
+    if (!input) return;
+    input.classList.remove("is-invalid");
+    const errSpan = document.getElementById("err-" + input.id);
+    if (errSpan) {
+        errSpan.innerText = "";
+        errSpan.style.display = "none";
+    }
+    const hasAnyErrors = document.querySelectorAll("#teamMemberForm .is-invalid").length > 0;
+    if (!hasAnyErrors) {
+        const alert = document.getElementById("modalFormAlert");
+        if (alert) alert.style.display = "none";
+    }
+}
+
+function setFieldError(fieldId, errorMsg) {
+    const field = document.getElementById(fieldId);
+    if (field) field.classList.add("is-invalid");
+    const errSpan = document.getElementById("err-" + fieldId);
+    if (errSpan) {
+        errSpan.innerText = errorMsg;
+        errSpan.style.display = "block";
+    }
+}
+
+function validateMemberForm(e) {
+    clearFormErrors();
+    let isValid = true;
+    let firstInvalidField = null;
+
+    const memberId = (document.getElementById("memberId").value || "0").trim();
+    const nameInput = document.getElementById("memberName");
+    const emailInput = document.getElementById("memberEmail");
+    const roleInput = document.getElementById("memberRole");
+    const passwordInput = document.getElementById("memberPassword");
+
+    const name = (nameInput.value || "").trim();
+    const email = (emailInput.value || "").trim();
+    const role = (roleInput.value || "").trim();
+    const password = (passwordInput.value || "").trim();
+
+    // 1. Name validation
+    if (!name) {
+        setFieldError("memberName", "Full name is required.");
+        isValid = false;
+        if (!firstInvalidField) firstInvalidField = nameInput;
+    } else if (name.length < 2) {
+        setFieldError("memberName", "Full name must be at least 2 characters.");
+        isValid = false;
+        if (!firstInvalidField) firstInvalidField = nameInput;
+    }
+
+    // 2. Email validation
+    const emailRegex = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+    if (!email) {
+        setFieldError("memberEmail", "Email address is required.");
+        isValid = false;
+        if (!firstInvalidField) firstInvalidField = emailInput;
+    } else if (!emailRegex.test(email)) {
+        setFieldError("memberEmail", "Please enter a valid email address (e.g. rahul@company.com).");
+        isValid = false;
+        if (!firstInvalidField) firstInvalidField = emailInput;
+    }
+
+    // 3. Role validation
+    if (!role) {
+        setFieldError("memberRole", "Please select a role.");
+        isValid = false;
+        if (!firstInvalidField) firstInvalidField = roleInput;
+    }
+
+    // 4. Password validation
+    if (memberId === "0") {
+        if (!password) {
+            setFieldError("memberPassword", "Login password is required for new team members.");
+            isValid = false;
+            if (!firstInvalidField) firstInvalidField = passwordInput;
+        } else if (password.length < 6) {
+            setFieldError("memberPassword", "Password must be at least 6 characters.");
+            isValid = false;
+            if (!firstInvalidField) firstInvalidField = passwordInput;
+        }
+    } else {
+        if (password && password.length < 6) {
+            setFieldError("memberPassword", "New password must be at least 6 characters.");
+            isValid = false;
+            if (!firstInvalidField) firstInvalidField = passwordInput;
+        }
+    }
+
+    if (!isValid) {
+        const alert = document.getElementById("modalFormAlert");
+        if (alert) alert.style.display = "flex";
+        if (firstInvalidField) firstInvalidField.focus();
+        if (e) e.preventDefault();
+        return false;
+    }
+
+    // Submit state
+    const submitBtn = document.getElementById("btnSubmitMember");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:14px;height:14px;border-width:2px;margin-right:6px;display:inline-block;vertical-align:middle;"></span> Saving...';
+    }
+
+    return true;
+}
+
+// Client-side instant filter on table rows for live responsiveness
+function filterMembersTableClientSide() {
+    const input = document.getElementById("memberSearchInput");
+    if (!input) return;
+    const term = input.value.toLowerCase().trim();
+    const rows = document.querySelectorAll(".member-data-row");
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const name = (row.getAttribute("data-name") || "").toLowerCase();
+        const email = (row.getAttribute("data-email") || "").toLowerCase();
+        const role = (row.getAttribute("data-role") || "").toLowerCase();
+
+        const match = !term || name.includes(term) || email.includes(term) || role.includes(term);
+        row.style.display = match ? "" : "none";
+        if (match) visibleCount++;
+    });
+
+    const countDisplay = document.getElementById("memberCountDisplay");
+    if (countDisplay) {
+        countDisplay.textContent = `Showing ${visibleCount} member(s)`;
+    }
 }
 </script>

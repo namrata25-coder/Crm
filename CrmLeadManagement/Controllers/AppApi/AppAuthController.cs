@@ -60,12 +60,26 @@ public class AppAuthController : ControllerBase
             return Unauthorized(new AppApiError { Message = "Invalid email or password." });
         }
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == email.ToLower());
+        int.TryParse(email, out var numericId);
+        var user = await _db.Users.FirstOrDefaultAsync(u =>
+            (numericId > 0 && u.Id == numericId) ||
+            (u.Email != null && u.Email.ToLower() == email.ToLower()));
 
         if (user == null)
         {
             _logger.LogWarning("Failed login for unknown email: {Email} from IP: {IP}, Device: {Device}", email, ip, request.DeviceId);
             return Unauthorized(new AppApiError { Message = "Invalid email or password." });
+        }
+
+        // Role check: The mobile app API is only for field and operational team roles (e.g. Sales Manager, Sales Executive, Telecaller), NOT for Admin.
+        var isAppApi = Request.Path.Value?.Contains("/app", StringComparison.OrdinalIgnoreCase) == true;
+        if (isAppApi && string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Admin login rejected on mobile app API for user {UserId} ({Email}) from IP: {IP}", user.Id, user.Email, ip);
+            return StatusCode(StatusCodes.Status403Forbidden, new AppApiError
+            {
+                Message = "Admin is not allowed to log in to the mobile app. This app is for Sales Manager and other team roles only. Please use the web portal."
+            });
         }
 
         var now = DateTime.UtcNow;
@@ -78,12 +92,25 @@ public class AppAuthController : ControllerBase
             });
         }
 
+        var adminPassword = _configuration["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
+
         bool passwordValid = false;
         if (!string.IsNullOrWhiteSpace(user.PasswordHash))
         {
             var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
             passwordValid = verifyResult == PasswordVerificationResult.Success ||
                             verifyResult == PasswordVerificationResult.SuccessRehashNeeded;
+        }
+        else
+        {
+            // Fallback for sample user record before explicit password hash was generated
+            var firstWord = (user.Name ?? "User").Split(' ')[0];
+            var userInitialPassword = $"{firstWord}@123!";
+            if (request.Password == userInitialPassword)
+            {
+                passwordValid = true;
+                user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
+            }
         }
 
         if (!passwordValid)
@@ -234,6 +261,16 @@ public class AppAuthController : ControllerBase
             });
         }
 
+        var adminPw = _configuration["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
+        if (!string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(request.NewPassword.Trim(), adminPw, StringComparison.Ordinal))
+        {
+            return BadRequest(new AppApiError
+            {
+                Message = "User password must be different from the administrator password."
+            });
+        }
+
         user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
         await _db.SaveChangesAsync();
 
@@ -280,6 +317,15 @@ public class AppAuthController : ControllerBase
             return BadRequest(new AppApiError
             {
                 Message = "Password must be at least 8 characters long and contain at least one letter and one number."
+            });
+        }
+
+        var adminSeedPw = _configuration["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
+        if (string.Equals(request.Password.Trim(), adminSeedPw, StringComparison.Ordinal))
+        {
+            return BadRequest(new AppApiError
+            {
+                Message = "User password must be different from the administrator password."
             });
         }
 

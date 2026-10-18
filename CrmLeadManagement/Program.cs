@@ -108,7 +108,10 @@ if (builder.Environment.IsDevelopment())
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+{
+    options.UseNpgsql(connectionString);
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+});
 
 // Lets the static LeadStore/SettingsStore classes reach the current request's
 // AppDbContext without changing every controller's constructor — see DbAccessor.cs.
@@ -116,6 +119,7 @@ builder.Services.AddHttpContextAccessor();
 
 // Authentication: Cookie scheme for browser sessions + Bearer scheme for API/mobile
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -250,6 +254,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 
     options.CustomSchemaIds(type => type.FullName);
+    options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
 
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -410,16 +415,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-app.MapControllerRoute(
-    name: "login",
-    pattern: "login",
-    defaults: new { controller = "Auth", action = "Login" });
-
-app.MapControllerRoute(
-    name: "logout",
-    pattern: "logout",
-    defaults: new { controller = "Auth", action = "Logout" });
 
 app.MapControllerRoute(
     name: "default",

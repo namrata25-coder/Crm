@@ -49,6 +49,8 @@ public class ProjectsApiController : ControllerBase
     public async Task<ActionResult<IEnumerable<WorkProject>>> GetAll(
         [FromQuery] string? status,
         [FromQuery] string? projectType,
+        [FromQuery] string? client,
+        [FromQuery] string? clientId,
         [FromQuery] string? search)
     {
         try
@@ -64,6 +66,30 @@ public class ProjectsApiController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(projectType))
                 query = query.Where(p => p.ProjectType == projectType);
+
+            if (!string.IsNullOrWhiteSpace(client))
+            {
+                var cTerm = client.Trim().ToLower();
+                query = query.Where(p =>
+                    (p.ClientName != null && p.ClientName.ToLower() == cTerm) ||
+                    (p.ClientCompany != null && p.ClientCompany.ToLower() == cTerm) ||
+                    (p.ClientName != null && p.ClientName.ToLower().Contains(cTerm)) ||
+                    (p.ClientCompany != null && p.ClientCompany.ToLower().Contains(cTerm)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                var idTerm = clientId.Trim();
+                var matchedLead = await _db.Leads.AsNoTracking().FirstOrDefaultAsync(l => l.LeadId == idTerm || l.Id.ToString() == idTerm);
+                if (matchedLead != null)
+                {
+                    var lName = (matchedLead.LeadName ?? "").ToLower();
+                    var cName = (matchedLead.CompanyName ?? "").ToLower();
+                    query = query.Where(p =>
+                        (p.ClientName != null && (p.ClientName.ToLower() == lName || p.ClientName.ToLower() == cName)) ||
+                        (p.ClientCompany != null && (p.ClientCompany.ToLower() == cName || p.ClientCompany.ToLower() == lName)));
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(search))
             {

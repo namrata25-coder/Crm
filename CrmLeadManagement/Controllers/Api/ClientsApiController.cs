@@ -48,6 +48,7 @@ public class ClientsApiController : ControllerBase
                 {
                     clientMap[key] = new ClientLookupDto
                     {
+                        ClientId = !string.IsNullOrWhiteSpace(lead.LeadId) ? lead.LeadId : lead.Id.ToString(),
                         LeadId = lead.LeadId ?? "",
                         ClientName = lead.LeadName ?? "",
                         CompanyName = lead.CompanyName ?? lead.LeadName ?? "",
@@ -72,6 +73,7 @@ public class ClientsApiController : ControllerBase
                 {
                     clientMap[key] = new ClientLookupDto
                     {
+                        ClientId = !string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectCode : $"CLIENT-{p.Id}",
                         LeadId = "",
                         ClientName = p.ClientName ?? "",
                         CompanyName = p.ClientCompany ?? p.ClientName ?? "",
@@ -133,6 +135,7 @@ public class ClientsApiController : ControllerBase
 
 public class ClientLookupDto
 {
+    public string ClientId { get; set; } = "";
     public string LeadId { get; set; } = "";
     public string ClientName { get; set; } = "";
     public string CompanyName { get; set; } = "";

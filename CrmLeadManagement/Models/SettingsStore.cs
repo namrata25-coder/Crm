@@ -1,4 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Microsoft.Extensions.Configuration;
 
 namespace CrmLeadManagement.Models;
@@ -13,10 +17,15 @@ public class UserRoleEntry
     public string? ModulePermissions { get; set; } = ""; // Comma-separated list of permitted module names
 
     // Authentication fields
+    [System.Text.Json.Serialization.JsonIgnore]
     public string? PasswordHash { get; set; }
     public int FailedLoginCount { get; set; } = 0;
     public DateTime? LockoutUntil { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool MustChangePassword { get; set; } = false;
+    public string? CreatedBy { get; set; }
+    public DateTime? LastPasswordChangeAt { get; set; }
 
     public bool HasPermission(string moduleName)
     {
@@ -116,12 +125,84 @@ public static class SettingsStore
         }
     }
 
-    public static void AddUser(UserRoleEntry user)
+    public static string AddUser(UserRoleEntry user, string? customPassword = null)
     {
+        ArgumentNullException.ThrowIfNull(user);
+        if (string.IsNullOrWhiteSpace(user.Name))
+        {
+            throw new ArgumentException("Name is required.", nameof(user));
+        }
+
+        var email = user.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email) || !new EmailAddressAttribute().IsValid(email))
+        {
+            throw new ArgumentException("A valid email address is required.", nameof(user));
+        }
+
         var db = DbAccessor.Db;
+        var normalizedEmail = email.ToLowerInvariant();
+        if (db.Users.Any(existing => existing.Email != null && existing.Email.ToLower() == normalizedEmail))
+        {
+            throw new DuplicateUserEmailException(email);
+        }
+
+        user.Name = user.Name.Trim();
+        user.Id = 0;
+        user.Email = normalizedEmail;
+        user.Role = user.Role?.Trim() ?? "";
+        user.Status = string.IsNullOrWhiteSpace(user.Status) ? "Active" : user.Status.Trim();
+        user.FailedLoginCount = 0;
+        user.LockoutUntil = null;
+        user.LastLoginAt = null;
+        user.CreatedAt = DateTime.UtcNow;
+        user.MustChangePassword = false;
+
+        if (string.IsNullOrWhiteSpace(user.ModulePermissions) && !string.IsNullOrWhiteSpace(user.Role))
+        {
+            var roleMaster = db.RoleMasters.FirstOrDefault(r => r.RoleName == user.Role);
+            if (roleMaster != null)
+            {
+                var perms = roleMaster.GetPermissions();
+                var permittedModules = perms.Where(p => p.View).Select(p => p.Module);
+                user.ModulePermissions = string.Join(",", permittedModules);
+            }
+        }
+
+        var passwordToUse = !string.IsNullOrWhiteSpace(customPassword) ? customPassword.Trim() : CrmLeadManagement.Security.PasswordGenerator.Generate();
+        var hasher = new PasswordHasher<UserRoleEntry>();
+
+        if (!string.IsNullOrWhiteSpace(customPassword) && !string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            var adminUser = db.Users.FirstOrDefault(u => u.Role == "Admin");
+            if (adminUser != null && !string.IsNullOrWhiteSpace(adminUser.PasswordHash) &&
+                hasher.VerifyHashedPassword(adminUser, adminUser.PasswordHash, passwordToUse) == PasswordVerificationResult.Success)
+            {
+                throw new ArgumentException("User password must be different from the administrator password.", nameof(customPassword));
+            }
+        }
+
+        user.PasswordHash = hasher.HashPassword(user, passwordToUse);
+
         db.Users.Add(user);
-        db.SaveChanges();
+        try
+        {
+            db.SaveChanges();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            db.Entry(user).State = EntityState.Detached;
+            if (db.Users.Any(existing => existing.Email != null && existing.Email.ToLower() == normalizedEmail))
+            {
+                throw new DuplicateUserEmailException(email, ex);
+            }
+
+            throw;
+        }
+
+        return passwordToUse;
     }
+
+    private static string GeneratePassword() => CrmLeadManagement.Security.PasswordGenerator.Generate();
 
     public static void RemoveUser(string email)
     {
@@ -129,6 +210,11 @@ public static class SettingsStore
         var existing = db.Users.FirstOrDefault(u => u.Email != null && u.Email.ToLower() == email.ToLower());
         if (existing is not null)
         {
+            if (string.Equals(existing.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(existing.Role, "Super Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Administrator accounts cannot be deleted.");
+            }
             db.Users.Remove(existing);
             db.SaveChanges();
         }
@@ -256,14 +342,32 @@ public static class SettingsStore
                 {
                     existingAdmin.Role = "Admin";
                     existingAdmin.Status = "Active";
-                    existingAdmin.PasswordHash = hasher.HashPassword(existingAdmin, adminPassword);
-                    logger?.LogInformation("Updated credentials for administrator account {AdminEmail}.", adminEmail);
+                    // Requirement 1: Admin ka existing password same rehna chahiye. Admin ke password mein koi change nahi karna hai.
+                    if (string.IsNullOrWhiteSpace(existingAdmin.PasswordHash))
+                    {
+                        existingAdmin.PasswordHash = hasher.HashPassword(existingAdmin, adminPassword);
+                        logger?.LogInformation("Initialized missing password for administrator account {AdminEmail}.", adminEmail);
+                    }
+                    else
+                    {
+                        logger?.LogInformation("Preserved existing password for administrator account {AdminEmail}.", adminEmail);
+                    }
                 }
 
-                // Also initialize default password for other active team members who don't have a password yet
-                foreach (var user in db.Users.Where(u => string.IsNullOrWhiteSpace(u.PasswordHash)))
+                // Initialize individual distinct passwords for sample team members if they don't have a password yet,
+                // or if their password inadvertently matched the administrator's password.
+                // Each user has their own separate password linked to their database record; never sharing admin's password.
+                foreach (var user in db.Users.Where(u => u.Role != "Admin" && u.Role != "Super Admin"))
                 {
-                    user.PasswordHash = hasher.HashPassword(user, adminPassword);
+                    bool isMatchingAdmin = !string.IsNullOrWhiteSpace(user.PasswordHash) &&
+                        hasher.VerifyHashedPassword(user, user.PasswordHash, adminPassword) == PasswordVerificationResult.Success;
+
+                    if (string.IsNullOrWhiteSpace(user.PasswordHash) || isMatchingAdmin)
+                    {
+                        var firstWord = (user.Name ?? "User").Split(' ')[0];
+                        var userDefaultPassword = $"{firstWord}@123!";
+                        user.PasswordHash = hasher.HashPassword(user, userDefaultPassword);
+                    }
                 }
             }
         }

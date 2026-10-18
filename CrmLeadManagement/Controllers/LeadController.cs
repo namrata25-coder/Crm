@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using CrmLeadManagement.Models;
+using CrmLeadManagement.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,26 +9,94 @@ namespace CrmLeadManagement.Controllers;
 [Authorize]
 public class LeadController : Controller
 {
+    private readonly AppDbContext _db;
+
+    public LeadController(AppDbContext db)
+    {
+        _db = db;
+    }
+
     // GET /Lead/List
     public IActionResult List()
     {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Lead List", "View"))
+        {
+            if (PermissionChecker.HasModulePermission(_db, currentUser, "Assigned Leads", "View"))
+            {
+                return RedirectToAction(nameof(Assigned));
+            }
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view the Lead List.";
+            return RedirectToAction("Projects", "Work");
+        }
+
         ViewData["Title"] = "Lead List";
         ViewData["ActivePage"] = "LeadList";
+
+        var roleMaster = currentUser != null ? _db.RoleMasters.FirstOrDefault(r => r.RoleName == currentUser.Role) : null;
+        if (!isAdmin && roleMaster?.DataAccess == "OnlyAssigned" && currentUser != null)
+        {
+            var userLeads = LeadStore.Leads
+                .Where(l => string.Equals(l.AssignedTo, currentUser.Name, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(l.AssignedTo, currentUser.Email, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            return View(userLeads);
+        }
+
         return View(LeadStore.Leads);
     }
 
     // GET /Lead/Assigned
     public IActionResult Assigned()
     {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Assigned Leads", "View"))
+        {
+            if (PermissionChecker.HasModulePermission(_db, currentUser, "Lead List", "View"))
+            {
+                return RedirectToAction(nameof(List));
+            }
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Assigned Leads.";
+            return RedirectToAction("Projects", "Work");
+        }
+
         ViewData["Title"] = "Assigned Leads";
         ViewData["ActivePage"] = "AssignedList";
-        return View(LeadStore.Leads);
+
+        var roleMaster = currentUser != null ? _db.RoleMasters.FirstOrDefault(r => r.RoleName == currentUser.Role) : null;
+        if (!isAdmin && (roleMaster == null || roleMaster.DataAccess == "OnlyAssigned") && currentUser != null)
+        {
+            var userLeads = LeadStore.Leads
+                .Where(l => string.Equals(l.AssignedTo, currentUser.Name, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(l.AssignedTo, currentUser.Email, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            return View(userLeads);
+        }
+
+        return View(LeadStore.Leads.Where(l => !string.IsNullOrWhiteSpace(l.AssignedTo)).ToList());
     }
 
     // GET /Lead/Details?id=LD-1001&tab=call
     // subtab is only relevant when tab=finance (estimation | quotation | proposal)
     public IActionResult Details(string id, string? tab, string? subtab)
     {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Lead List", "View") &&
+            !PermissionChecker.HasModulePermission(_db, currentUser, "Assigned Leads", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view lead details.";
+            return RedirectToAction(nameof(Assigned));
+        }
+
         var lead = LeadStore.GetById(id);
         if (lead is null)
         {
@@ -48,6 +118,18 @@ public class LeadController : Controller
     [HttpPost]
     public IActionResult Save(LeadInputModel Input, string? returnUrl)
     {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        var action = string.IsNullOrWhiteSpace(Input.LeadId) ? "Create" : "Edit";
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Lead List", action) &&
+            !PermissionChecker.HasModulePermission(_db, currentUser, "Assigned Leads", action))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: You do not have permission to {action.ToLower()} leads.";
+            return RedirectToReturnUrl(returnUrl, "List");
+        }
+
         if (string.IsNullOrWhiteSpace(Input.LeadId))
         {
             LeadStore.AddLead(Input.ToLead());
@@ -63,6 +145,17 @@ public class LeadController : Controller
     [HttpPost]
     public IActionResult Delete(string id, string? returnUrl)
     {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Lead List", "Delete") &&
+            !PermissionChecker.HasModulePermission(_db, currentUser, "Assigned Leads", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete leads.";
+            return RedirectToReturnUrl(returnUrl, "List");
+        }
+
         LeadStore.DeleteLead(id);
         return RedirectToReturnUrl(returnUrl, "List");
     }

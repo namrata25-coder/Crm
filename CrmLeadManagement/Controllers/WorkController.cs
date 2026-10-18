@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using CrmLeadManagement.Models;
+using CrmLeadManagement.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,10 +11,27 @@ namespace CrmLeadManagement.Controllers;
 public class WorkController : Controller
 {
     private readonly AppDbContext _db;
+    private readonly IConfiguration? _configuration;
 
-    public WorkController(AppDbContext db)
+    public WorkController(AppDbContext db, IConfiguration? configuration = null)
     {
         _db = db;
+        _configuration = configuration;
+    }
+
+    private bool CheckPermission(string module, string action = "View")
+    {
+        if (User.IsInRole("Admin")) return true;
+
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
+        if (currentUser != null && (string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(currentUser.Role, "Super Admin", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return PermissionChecker.HasModulePermission(_db, currentUser, module, action);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -112,6 +131,12 @@ public class WorkController : Controller
 
     public async Task<IActionResult> Projects()
     {
+        if (!CheckPermission("Project", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Projects.";
+            return RedirectToAction("List", "Lead");
+        }
+
         SetWorkNav("WorkProject");
         ViewData["Title"] = "Projects";
 
@@ -143,6 +168,12 @@ public class WorkController : Controller
 
     public async Task<IActionResult> ProjectDetails(int id, string? tab)
     {
+        if (!CheckPermission("Project", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Project details.";
+            return RedirectToAction(nameof(Projects));
+        }
+
         var project = await _db.WorkProjects
             .Include(p => p.Milestones)
                 .ThenInclude(m => m.Tasks)
@@ -176,6 +207,13 @@ public class WorkController : Controller
         string projectManager, string assignedMembers, decimal budget,
         string priority, string status, string notes)
     {
+        var action = id == 0 ? "Create" : "Edit";
+        if (!CheckPermission("Project", action))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: You do not have permission to {action.ToLower()} projects.";
+            return RedirectToAction(nameof(Projects));
+        }
+
         if (id == 0)
         {
             var p = new WorkProject
@@ -225,6 +263,11 @@ public class WorkController : Controller
     [HttpPost]
     public async Task<IActionResult> DeleteProject(int id)
     {
+        if (!CheckPermission("Project", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete projects.";
+            return RedirectToAction(nameof(Projects));
+        }
         var p = await _db.WorkProjects
             .Include(x => x.Files)
             .Include(x => x.Expenses)
@@ -314,6 +357,12 @@ public class WorkController : Controller
 
     public async Task<IActionResult> Milestones()
     {
+        if (!CheckPermission("Milestone", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Milestones.";
+            return RedirectToAction("List", "Lead");
+        }
+
         SetWorkNav("WorkMilestone");
         ViewData["Title"] = "Milestones";
 
@@ -339,6 +388,13 @@ public class WorkController : Controller
         string assignedMembers, string priority, string status, string notes,
         string? returnAction, string? returnTab)
     {
+        var action = milestoneId == 0 ? "Create" : "Edit";
+        if (!CheckPermission("Milestone", action))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: You do not have permission to {action.ToLower()} milestones.";
+            return RedirectToAction(nameof(Milestones));
+        }
+
         amount = Math.Max(0, amount);
         completedAmount = Math.Max(0, Math.Min(completedAmount, amount > 0 ? amount : decimal.MaxValue));
 
@@ -410,6 +466,12 @@ public class WorkController : Controller
     [HttpPost]
     public async Task<IActionResult> DeleteMilestone(int id, int? projectId, string? returnAction)
     {
+        if (!CheckPermission("Milestone", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete milestones.";
+            return RedirectToAction(nameof(Milestones));
+        }
+
         var m = await _db.WorkMilestones.Include(x => x.Tasks).FirstOrDefaultAsync(x => x.Id == id);
         if (m is not null)
         {
@@ -431,6 +493,12 @@ public class WorkController : Controller
 
     public async Task<IActionResult> Tasks(int? projectId, int? milestoneId)
     {
+        if (!CheckPermission("Task", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Tasks.";
+            return RedirectToAction("List", "Lead");
+        }
+
         SetWorkNav("WorkTask");
         ViewData["Title"] = "Tasks";
 
@@ -463,6 +531,12 @@ public class WorkController : Controller
         decimal completedAmount, string priority, string status, string notes,
         string? returnAction, string? returnTab, bool? hasDependency, int? dependencyTaskId)
     {
+        var action = taskId == 0 ? "Create" : "Edit";
+        if (!CheckPermission("Task", action))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: You do not have permission to {action.ToLower()} tasks.";
+            return RedirectToAction(nameof(Tasks));
+        }
         taskAmount = Math.Max(0, taskAmount);
         completedAmount = Math.Max(0, Math.Min(completedAmount, taskAmount > 0 ? taskAmount : decimal.MaxValue));
         if (milestoneId.HasValue && milestoneId.Value <= 0) milestoneId = null;
@@ -554,6 +628,12 @@ public class WorkController : Controller
     [HttpPost]
     public async Task<IActionResult> DeleteTask(int id, int? projectId, string? returnAction, string? returnTab)
     {
+        if (!CheckPermission("Task", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete tasks.";
+            return RedirectToAction(nameof(Tasks));
+        }
+
         var t = await _db.WorkTasks.FindAsync(id);
         if (t is not null)
         {
@@ -947,6 +1027,12 @@ public class WorkController : Controller
 
     public async Task<IActionResult> Reports(int? projectId)
     {
+        if (!CheckPermission("Report", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Reports.";
+            return RedirectToAction("List", "Lead");
+        }
+
         SetWorkNav("WorkReport");
         ViewData["Title"] = "Work Reports";
 
@@ -983,6 +1069,12 @@ public class WorkController : Controller
 
     public async Task<IActionResult> Members(string? search, string? role, string? status)
     {
+        if (!CheckPermission("Member", "View"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to view Members.";
+            return RedirectToAction("List", "Lead");
+        }
+
         SetWorkNav("WorkMember");
         ViewData["Title"] = "Team Members";
 
@@ -1055,15 +1147,52 @@ public class WorkController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> SaveMember(int id, string name, string email, string role, string status)
+    public async Task<IActionResult> SaveMember(int id, string name, string email, string role, string status, string? password = null, string? returnUrl = null)
     {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        var requiredAction = id == 0 ? "Create" : "Edit";
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Member", requiredAction))
+        {
+            TempData["ErrorMessage"] = $"Access Denied: You do not have permission to {requiredAction.ToLower()} members.";
+            return RedirectToAction(nameof(Members));
+        }
+
+        if (!isAdmin && string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["ErrorMessage"] = "Access Denied: Only administrators can assign the Admin role.";
+            return RedirectToAction(nameof(Members));
+        }
+
+        var adminPassword = _configuration?["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
+        if (!string.IsNullOrWhiteSpace(password) && !string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(password.Trim(), adminPassword, StringComparison.Ordinal))
+        {
+            TempData["ErrorMessage"] = "User password must be different from the administrator password.";
+            return RedirectToAction(nameof(Members));
+        }
+
         name = name?.Trim() ?? "";
-        email = email?.Trim() ?? "";
+        email = email?.Trim().ToLowerInvariant() ?? "";
         role = string.IsNullOrWhiteSpace(role) ? "Team Member" : role.Trim();
         status = string.IsNullOrWhiteSpace(status) ? "Active" : status.Trim();
 
+        if (id != 0)
+        {
+            var targetUser = await _db.Users.FindAsync(id);
+            if (targetUser != null && !isAdmin && (string.Equals(targetUser.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                                                   string.Equals(targetUser.Role, "Super Admin", StringComparison.OrdinalIgnoreCase)))
+            {
+                TempData["ErrorMessage"] = "Access Denied: Only administrators can modify an Admin account.";
+                return RedirectToAction(nameof(Members));
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(name))
         {
+            var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<UserRoleEntry>();
             if (id == 0)
             {
                 var newUser = new UserRoleEntry
@@ -1071,8 +1200,11 @@ public class WorkController : Controller
                     Name = name,
                     Email = email,
                     Role = role,
-                    Status = status
+                    Status = status,
+                    CreatedAt = DateTime.UtcNow
                 };
+                var pw = !string.IsNullOrWhiteSpace(password) ? password.Trim() : CrmLeadManagement.Security.PasswordGenerator.Generate();
+                newUser.PasswordHash = hasher.HashPassword(newUser, pw);
                 _db.Users.Add(newUser);
             }
             else
@@ -1084,9 +1216,25 @@ public class WorkController : Controller
                     user.Email = email;
                     user.Role = role;
                     user.Status = status;
+                    if (!string.IsNullOrWhiteSpace(password))
+                    {
+                        user.PasswordHash = hasher.HashPassword(user, password.Trim());
+                        user.LastPasswordChangeAt = DateTime.UtcNow;
+                    }
                 }
             }
             await _db.SaveChangesAsync();
+        }
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+
+        var referer = Request.Headers["Referer"].ToString();
+        if (!string.IsNullOrWhiteSpace(referer) && referer.Contains("/Team", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction("Index", "Team");
         }
 
         return RedirectToAction(nameof(Members));
@@ -1095,9 +1243,32 @@ public class WorkController : Controller
     [HttpPost]
     public async Task<IActionResult> DeleteMember(int id)
     {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Member", "Delete"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to delete members.";
+            return RedirectToAction(nameof(Members));
+        }
+
         var user = await _db.Users.FindAsync(id);
         if (user is not null)
         {
+            if (!string.IsNullOrEmpty(authEmail) && string.Equals(user.Email, authEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = "You cannot delete your own account while logged in.";
+                return RedirectToAction(nameof(Members));
+            }
+
+            if (string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(user.Role, "Super Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = "Administrator accounts cannot be deleted.";
+                return RedirectToAction(nameof(Members));
+            }
+
             _db.Users.Remove(user);
             await _db.SaveChangesAsync();
         }
@@ -1107,6 +1278,16 @@ public class WorkController : Controller
     [HttpPost]
     public async Task<IActionResult> SaveUserSetup(string userName, List<string>? selectedModules)
     {
+        var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+        var currentUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == authEmail);
+        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+
+        if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Member", "Edit"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: Only administrators can modify user permission setups.";
+            return RedirectToAction(nameof(Members));
+        }
+
         userName = userName?.Trim() ?? "";
         if (string.IsNullOrWhiteSpace(userName))
         {

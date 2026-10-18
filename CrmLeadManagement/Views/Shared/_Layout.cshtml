@@ -27,25 +27,23 @@
     var workActive = activePage.StartsWith("Work");
     var teamActive = activePage.StartsWith("Team");
 
-    var authEmail = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-    var currentLoggedInUser = (!string.IsNullOrEmpty(authEmail) ? LayoutDb.Users.FirstOrDefault(u => u.Email == authEmail) : null)
-        ?? LayoutDb.Users.FirstOrDefault(u => u.Name == "Ananya Sharma")
-        ?? LayoutDb.Users.FirstOrDefault();
+    var currentLoggedInUser = CrmLeadManagement.Security.PermissionChecker.GetCurrentUser(LayoutDb, User);
+    var userName = currentLoggedInUser?.Name ?? User.Identity?.Name ?? "User";
+    var userRole = currentLoggedInUser?.Role ?? (User.IsInRole("Admin") ? "Admin" : "Staff");
 
     var userInitials = "US";
-    if (currentLoggedInUser != null && !string.IsNullOrWhiteSpace(currentLoggedInUser.Name))
+    if (!string.IsNullOrWhiteSpace(userName))
     {
-        var parts = currentLoggedInUser.Name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var parts = userName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         userInitials = parts.Length >= 2 
             ? $"{parts[0][0]}{parts[^1][0]}".ToUpper() 
-            : currentLoggedInUser.Name.Substring(0, Math.Min(2, currentLoggedInUser.Name.Length)).ToUpper();
+            : userName.Substring(0, Math.Min(2, userName.Length)).ToUpper();
     }
 
     bool canViewModule(string moduleName)
     {
-        if (currentLoggedInUser == null || string.IsNullOrWhiteSpace(currentLoggedInUser.ModulePermissions))
-            return true;
-        return currentLoggedInUser.HasPermission(moduleName);
+        if (User.IsInRole("Admin")) return true;
+        return CrmLeadManagement.Security.PermissionChecker.HasModulePermission(LayoutDb, currentLoggedInUser, moduleName, "View");
     }
 }
             <nav class="sidebar-nav">
@@ -152,25 +150,34 @@
                     </div>
                 }
 
-                <div class="sidebar-section-label">TEAM &amp; ACCESS</div>
-                <div class="sidebar-group @(teamActive ? "open" : "")">
-                    <button type="button" class="sidebar-link sidebar-group-toggle @(teamActive ? "active" : "")" aria-expanded="@(teamActive ? "true" : "false")" onclick="toggleSidebarGroup(this)">
-                        <i class="bi bi-people"></i> Team
-                        <i class="bi bi-chevron-down sidebar-caret"></i>
-                    </button>
-                    <div class="sidebar-submenu">
-                        <a class="sidebar-sublink @(activePage == "TeamMembers" ? "active" : "")" asp-controller="Team" asp-action="Index">
-                            <i class="bi bi-person-lines-fill"></i> Members
-                        </a>
-                        <a class="sidebar-sublink @(activePage == "TeamRoles" ? "active" : "")" asp-controller="Team" asp-action="Roles">
-                            <i class="bi bi-shield-lock"></i> Roles &amp; Permissions
-                        </a>
-                    </div>
-                </div>
-
-                <div class="sidebar-section-label">SETTINGS</div>
-                @if (canViewModule("Settings"))
+                @if (canViewModule("Member") || canViewModule("Users & Roles") || canViewModule("Team Members") || canViewModule("Roles & Permissions"))
                 {
+                    <div class="sidebar-section-label">TEAM &amp; ACCESS</div>
+                    <div class="sidebar-group @(teamActive ? "open" : "")">
+                        <button type="button" class="sidebar-link sidebar-group-toggle @(teamActive ? "active" : "")" aria-expanded="@(teamActive ? "true" : "false")" onclick="toggleSidebarGroup(this)">
+                            <i class="bi bi-people"></i> Team
+                            <i class="bi bi-chevron-down sidebar-caret"></i>
+                        </button>
+                        <div class="sidebar-submenu">
+                            @if (canViewModule("Member") || canViewModule("Users & Roles") || canViewModule("Team Members"))
+                            {
+                                <a class="sidebar-sublink @(activePage == "TeamMembers" ? "active" : "")" asp-controller="Team" asp-action="Index">
+                                    <i class="bi bi-person-lines-fill"></i> Members
+                                </a>
+                            }
+                            @if (canViewModule("Roles & Permissions"))
+                            {
+                                <a class="sidebar-sublink @(activePage == "TeamRoles" ? "active" : "")" asp-controller="Team" asp-action="Roles">
+                                    <i class="bi bi-shield-lock"></i> Roles &amp; Permissions
+                                </a>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (canViewModule("Settings") || canViewModule("Lead Status/Source") || canViewModule("Follow-up Settings") || canViewModule("Users & Roles"))
+                {
+                    <div class="sidebar-section-label">SETTINGS</div>
                     <a class="sidebar-link @(activePage == "Settings" ? "active" : "")" asp-controller="Settings" asp-action="Index">
                         <i class="bi bi-gear"></i> Settings
                     </a>
@@ -181,8 +188,8 @@
                 <div style="display:flex;align-items:center;gap:10px;min-width:0;">
                     <div class="avatar">@userInitials</div>
                     <div style="min-width:0;overflow:hidden;text-overflow:ellipsis;">
-                        <div class="who" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@(currentLoggedInUser?.Name ?? "User")</div>
-                        <div class="role" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@(currentLoggedInUser?.Role ?? "Staff")</div>
+                        <div class="who" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@userName</div>
+                        <div class="role" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@userRole</div>
                     </div>
                 </div>
                 <a asp-controller="Auth" asp-action="Logout" title="Sign out" style="color:#8b98b8;font-size:16px;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .15s ease;" onmouseover="this.style.color='#f87171';this.style.background='rgba(255,255,255,0.06)';" onmouseout="this.style.color='#8b98b8';this.style.background='transparent';">

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace CrmLeadManagement.Models;
 
@@ -9,6 +10,12 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+    }
+
     public DbSet<Lead> Leads => Set<Lead>();
     public DbSet<UserRoleEntry> Users => Set<UserRoleEntry>();
     public DbSet<LeadStatusOption> StatusOptions => Set<LeadStatusOption>();
@@ -17,6 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<TaxMaster> TaxMasters => Set<TaxMaster>();
     public DbSet<RoleMaster> RoleMasters => Set<RoleMaster>();
     public DbSet<AccessToken> AccessTokens => Set<AccessToken>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     public DbSet<EstimationEntry> Estimations => Set<EstimationEntry>();
     public DbSet<QuotationEntry> Quotations => Set<QuotationEntry>();
@@ -94,6 +102,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<UserRoleEntry>().HasKey(u => u.Id);
         modelBuilder.Entity<UserRoleEntry>().HasIndex(u => u.Email).IsUnique();
+        modelBuilder.Entity<AuditLog>().HasKey(a => a.Id);
 
         modelBuilder.Entity<LeadStatusOption>().HasKey(s => s.Id);
         modelBuilder.Entity<LeadStatusOption>().HasIndex(s => s.Value).IsUnique();

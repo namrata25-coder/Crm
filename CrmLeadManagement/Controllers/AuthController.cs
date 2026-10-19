@@ -50,22 +50,27 @@ public class AuthController : Controller
     [HttpGet("auth/login")]
     [HttpGet("account/login")]
     [AllowAnonymous]
-    public async Task<IActionResult> Login(string? returnUrl = null)
+    public async Task<IActionResult> Login(string? returnUrl = null, [FromQuery] string? portal = null)
     {
-        // If the user is already authenticated via cookie, redirect directly
+        // If the user is already authenticated via cookie, redirect directly to their dashboard
         if (User.Identity?.IsAuthenticated == true)
         {
             if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
             }
-            return RedirectToAction("List", "Lead");
+            var isAdmin = User.IsInRole("Admin") || User.IsInRole("Super Admin");
+            return Redirect(isAdmin ? "/admin/dashboard" : "/user/dashboard");
         }
+
+        var isTargetAdmin = string.Equals(portal, "admin", StringComparison.OrdinalIgnoreCase) ||
+                            (!string.IsNullOrWhiteSpace(returnUrl) && returnUrl.StartsWith("/admin", StringComparison.OrdinalIgnoreCase));
 
         var model = new LoginViewModel
         {
             ReturnUrl = returnUrl,
-            RememberMe = true
+            RememberMe = true,
+            LoginType = isTargetAdmin ? "admin" : "user"
         };
 
         // Populate dynamic demo users from database for Quick Fill
@@ -85,9 +90,9 @@ public class AuthController : Controller
             ?? demoUsers.FirstOrDefault(u => string.Equals(u.Status, "Active", StringComparison.OrdinalIgnoreCase));
 
         ViewBag.DemoUsers = demoUsers;
-        ViewBag.AdminEmail = _configuration["Seed:AdminEmail"]?.Trim() ?? "admin@nimbuscrm.com";
+        ViewBag.AdminEmail = _configuration["Seed:AdminEmail"]?.Trim() ?? "admin@visioncrm.com";
         ViewBag.AdminPassword = _configuration["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
-        ViewBag.UserEmail = defaultUser?.Email ?? "ananya.sharma@nimbuscrm.com";
+        ViewBag.UserEmail = defaultUser?.Email ?? "ananya.sharma@visioncrm.com";
         var firstWord = (defaultUser?.Name ?? "Ananya").Split(' ')[0];
         ViewBag.UserPassword = $"{firstWord}@123!";
         ViewBag.IsDemoEnabled = _environment.IsDevelopment() || _configuration.GetValue<bool>("Demo:Enabled", true);
@@ -128,7 +133,7 @@ public class AuthController : Controller
         int.TryParse(input, out var numericId);
         var inputLower = input.ToLower();
 
-        var adminEmail = _configuration["Seed:AdminEmail"]?.Trim() ?? "admin@nimbuscrm.com";
+        var adminEmail = _configuration["Seed:AdminEmail"]?.Trim() ?? "admin@visioncrm.com";
         var defaultPassword = _configuration["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
 
         var user = await _db.Users.FirstOrDefaultAsync(u =>
@@ -140,10 +145,12 @@ public class AuthController : Controller
         bool isAdminAccount = user != null &&
             (string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(user.Role, "Super Admin", StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(user.Email, adminEmail, StringComparison.OrdinalIgnoreCase));
+             string.Equals(user.Email, adminEmail, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(user.Email, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(user.Email, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase));
 
         // Auto-seed Administrator account if missing when configured admin credentials are used
-        if (user == null && string.Equals(input, adminEmail, StringComparison.OrdinalIgnoreCase) && password == defaultPassword)
+        if (user == null && (string.Equals(input, adminEmail, StringComparison.OrdinalIgnoreCase) || string.Equals(input, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase) || string.Equals(input, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase)) && password == defaultPassword)
         {
             user = new UserRoleEntry
             {
@@ -280,6 +287,42 @@ public class AuthController : Controller
             return View(model);
         }
 
+        // =========================================================================
+        // STRICT ROLE-BASED LOGIN SEGREGATION
+        // =========================================================================
+        var targetPortal = (model.LoginType ?? "user").Trim().ToLowerInvariant();
+        if (targetPortal == "admin")
+        {
+            if (!user.IsAdminAccount)
+            {
+                _logger.LogWarning("Admin login rejected: non-admin user {Email} ({Role}) from IP {IP}", user.Email, user.Role, ip);
+                await _auditLogService.LogAsync("AdminLoginRejected", user.Email, user.Id, user.Email,
+                    "Access denied: Non-admin account entered credentials on Admin Login page", ip);
+
+                const string deniedMsg = "Access denied. Valid Admin credentials are required.";
+                if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = deniedMsg });
+                model.ErrorMessage = deniedMsg;
+                Response.StatusCode = StatusCodes.Status403Forbidden;
+                return View(model);
+            }
+        }
+        else
+        {
+            // User Portal Login
+            if (!user.IsUserAccount)
+            {
+                _logger.LogWarning("User login rejected: Admin user {Email} ({Role}) from IP {IP}", user.Email, user.Role, ip);
+                await _auditLogService.LogAsync("UserLoginRejected", user.Email, user.Id, user.Email,
+                    "Access denied: Administrator entered credentials on User Login page", ip);
+
+                const string deniedMsg = "Access denied. Valid User credentials are required.";
+                if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = deniedMsg });
+                model.ErrorMessage = deniedMsg;
+                Response.StatusCode = StatusCodes.Status403Forbidden;
+                return View(model);
+            }
+        }
+
         // Login success: reset lockout and update LastLoginAt
         user.FailedLoginCount = 0;
         user.LockoutUntil = null;
@@ -287,15 +330,17 @@ public class AuthController : Controller
         await _db.SaveChangesAsync();
 
         // Issue opaque Bearer token for client-side API calls
-        var (plainToken, tokenExpiresAt) = await _tokenService.IssueTokenAsync(user.Id, "web-browser");
+        var (plainToken, tokenExpiresAt) = await _tokenService.IssueTokenAsync(user.Id, targetPortal == "admin" ? "admin-web" : "user-web");
 
-        // Build Cookie Authentication claims
+        // Build Cookie Authentication claims with session_type
+        var sessionType = targetPortal == "admin" ? "Admin" : "User";
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.Name ?? "User"),
+            new(ClaimTypes.Name, user.Name ?? (targetPortal == "admin" ? "Administrator" : "User")),
             new(ClaimTypes.Email, user.Email ?? ""),
-            new(ClaimTypes.Role, user.Role ?? "Sales Executive"),
+            new(ClaimTypes.Role, targetPortal == "admin" ? "Admin" : (user.Role ?? "User")),
+            new("session_type", sessionType),
             new("token_id", plainToken)
         };
 
@@ -311,8 +356,8 @@ public class AuthController : Controller
             new ClaimsPrincipal(claimsIdentity),
             authProperties);
 
-        _logger.LogInformation("User {Email} logged in successfully via web from IP {IP}", user.Email, ip);
-        await _auditLogService.LogAsync("Login", user.Email, user.Id, user.Email, "Standard login", ip);
+        _logger.LogInformation("User {Email} logged in successfully via web ({Portal}) from IP {IP}", user.Email, targetPortal, ip);
+        await _auditLogService.LogAsync("Login", user.Email, user.Id, user.Email, $"{sessionType} portal login", ip);
 
         if (user.MustChangePassword)
         {
@@ -346,7 +391,7 @@ public class AuthController : Controller
                     id = user.Id,
                     name = user.Name,
                     email = user.Email,
-                    role = user.Role
+                    role = targetPortal == "admin" ? "Admin" : user.Role
                 }
             });
         }
@@ -656,52 +701,29 @@ public class AuthController : Controller
     /// </summary>
     private string DetermineRoleDashboard(UserRoleEntry user, string? returnUrl)
     {
-        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl) && !returnUrl.Contains("/change-password"))
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl) &&
+            !returnUrl.Contains("/change-password") && !returnUrl.Contains("/login"))
         {
-            return returnUrl;
+            if (user.IsAdminAccount && !returnUrl.StartsWith("/user", StringComparison.OrdinalIgnoreCase))
+            {
+                return returnUrl;
+            }
+            if (user.IsUserAccount && !returnUrl.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return returnUrl;
+            }
         }
 
-        var role = (user.Role ?? "").Trim();
-
-        // Admin & Super Admin -> Main Leads Overview / Workspace
-        if (string.Equals(role, "Super Admin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+        if (user.IsAdminAccount)
         {
-            return "/Lead/List";
+            return "/admin/dashboard";
         }
 
-        // Manager -> Lead List
-        if (string.Equals(role, "Sales Manager", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(role, "Manager", StringComparison.OrdinalIgnoreCase))
-        {
-            return "/Lead/List";
-        }
-
-        // Sales Executive -> Assigned Leads if permitted, else Lead List
-        if (string.Equals(role, "Sales Executive", StringComparison.OrdinalIgnoreCase))
-        {
-            return user.HasPermission("Assigned Leads") ? "/Lead/Assigned" : "/Lead/List";
-        }
-
-        // Telecaller -> Lead List
-        if (string.Equals(role, "Telecaller", StringComparison.OrdinalIgnoreCase))
-        {
-            return "/Lead/List";
-        }
-
-        // Custom / Other roles: inspect permitted modules
-        if (user.HasPermission("Lead List")) return "/Lead/List";
-        if (user.HasPermission("Assigned Leads")) return "/Lead/Assigned";
-        if (user.HasPermission("Project")) return "/Work/Projects";
-        if (user.HasPermission("Task")) return "/Work/Tasks";
-        if (user.HasPermission("Estimation")) return "/Finance/EstimationList";
-        if (user.HasPermission("Quotation")) return "/Finance/QuotationList";
-
-        return "/Lead/List";
+        return "/user/dashboard";
     }
 
     /// <summary>
-    /// Signs out the user, clears authentication cookie, and redirects to login page.
+    /// Signs out the user, invalidates active session and bearer tokens in database, and redirects to login page.
     /// Route: /logout
     /// </summary>
     [HttpGet("logout")]
@@ -712,6 +734,12 @@ public class AuthController : Controller
     [HttpPost("account/logout")]
     public async Task<IActionResult> Logout()
     {
+        var tokenId = User.FindFirst("token_id")?.Value;
+        if (!string.IsNullOrWhiteSpace(tokenId))
+        {
+            await _tokenService.RevokeTokenStringAsync(tokenId);
+        }
+
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction("Login", "Auth");
     }

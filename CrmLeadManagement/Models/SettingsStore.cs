@@ -26,6 +26,17 @@ public class UserRoleEntry
     public bool MustChangePassword { get; set; } = false;
     public string? CreatedBy { get; set; }
     public DateTime? LastPasswordChangeAt { get; set; }
+    public bool IsAuthorizedUser { get; set; } = false;
+
+    /// <summary>Identifies if the account possesses Administrator authority.</summary>
+    public bool IsAdminAccount =>
+        string.Equals(Role?.Trim(), "Admin", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Role?.Trim(), "Super Admin", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Role?.Trim(), "Administrator", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Identifies if the account is authorized for User login (non-admin or explicitly authorized user).</summary>
+    public bool IsUserAccount =>
+        !IsAdminAccount || IsAuthorizedUser;
 
     public bool HasPermission(string moduleName)
     {
@@ -306,69 +317,120 @@ public static class SettingsStore
         {
             db.Users.AddRange(new List<UserRoleEntry>
             {
-                new UserRoleEntry{ Name="Ananya Sharma", Email="ananya.sharma@nimbuscrm.com", Role="Sales Manager", Status="Active" },
-                new UserRoleEntry{ Name="Rohit Verma", Email="rohit.verma@nimbuscrm.com", Role="Sales Executive", Status="Active" },
-                new UserRoleEntry{ Name="Priya Nair", Email="priya.nair@nimbuscrm.com", Role="Sales Executive", Status="Active" },
-                new UserRoleEntry{ Name="Karan Mehta", Email="karan.mehta@nimbuscrm.com", Role="Sales Executive", Status="Active" },
-                new UserRoleEntry{ Name="Sneha Kulkarni", Email="sneha.kulkarni@nimbuscrm.com", Role="Telecaller", Status="Active" },
-                new UserRoleEntry{ Name="Arjun Desai", Email="arjun.desai@nimbuscrm.com", Role="Telecaller", Status="Inactive" },
+                new UserRoleEntry{ Name="Ananya Sharma", Email="ananya.sharma@visioncrm.com", Role="Sales Manager", Status="Active" },
+                new UserRoleEntry{ Name="Rohit Verma", Email="rohit.verma@visioncrm.com", Role="Sales Executive", Status="Active" },
+                new UserRoleEntry{ Name="Priya Nair", Email="priya.nair@visioncrm.com", Role="Sales Executive", Status="Active" },
+                new UserRoleEntry{ Name="Karan Mehta", Email="karan.mehta@visioncrm.com", Role="Sales Executive", Status="Active" },
+                new UserRoleEntry{ Name="Sneha Kulkarni", Email="sneha.kulkarni@visioncrm.com", Role="Telecaller", Status="Active" },
+                new UserRoleEntry{ Name="Arjun Desai", Email="arjun.desai@visioncrm.com", Role="Telecaller", Status="Inactive" },
             });
         }
 
         // Seed or update Admin from configuration ("Seed:AdminEmail", "Seed:AdminPassword"), never logging the password.
-        if (config != null)
-        {
-            var adminEmail = config["Seed:AdminEmail"]?.Trim();
-            var adminPassword = config["Seed:AdminPassword"]?.Trim();
+        var hasher = new PasswordHasher<UserRoleEntry>();
+        var adminEmail = config?["Seed:AdminEmail"]?.Trim() ?? "admin@visioncrm.com";
+        var adminPassword = config?["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
 
-            if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
+        var existingAdmin = db.Users.FirstOrDefault(u => u.Email != null && 
+            (u.Email.ToLower() == adminEmail.ToLower() || u.Email.ToLower() == "admin@nimbuscrm.com" || u.Email.ToLower() == "admin@visioncrm.com"));
+        if (existingAdmin == null)
+        {
+            var admin = new UserRoleEntry
             {
-                var existingAdmin = db.Users.FirstOrDefault(u => u.Email != null && u.Email.ToLower() == adminEmail.ToLower());
-                var hasher = new PasswordHasher<UserRoleEntry>();
-                if (existingAdmin == null)
+                Name = "Administrator",
+                Email = adminEmail,
+                Role = "Admin",
+                Status = "Active",
+                IsAuthorizedUser = false
+            };
+            admin.PasswordHash = hasher.HashPassword(admin, adminPassword);
+            db.Users.Add(admin);
+            logger?.LogInformation("Seeded administrator account for {AdminEmail}.", adminEmail);
+        }
+        else
+        {
+            existingAdmin.Email = adminEmail;
+            existingAdmin.Role = "Admin";
+            existingAdmin.Status = "Active";
+            existingAdmin.IsAuthorizedUser = false;
+            if (string.IsNullOrWhiteSpace(existingAdmin.PasswordHash) ||
+                hasher.VerifyHashedPassword(existingAdmin, existingAdmin.PasswordHash, adminPassword) != PasswordVerificationResult.Success)
+            {
+                existingAdmin.PasswordHash = hasher.HashPassword(existingAdmin, adminPassword);
+                existingAdmin.FailedLoginCount = 0;
+                existingAdmin.LockoutUntil = null;
+                logger?.LogInformation("Synchronized password for administrator account {AdminEmail}.", adminEmail);
+            }
+        }
+
+        // Seed or update standard User account with dedicated user role and user credentials
+        var userEmail = "user@visioncrm.com";
+        var userPassword = "UserPassword123!";
+        var existingUser = db.Users.FirstOrDefault(u => u.Email != null && 
+            (u.Email.ToLower() == userEmail.ToLower() || u.Email.ToLower() == "user@nimbuscrm.com"));
+        if (existingUser == null)
+        {
+            var stdUser = new UserRoleEntry
+            {
+                Name = "Standard User",
+                Email = userEmail,
+                Role = "User",
+                Status = "Active",
+                IsAuthorizedUser = true
+            };
+            stdUser.PasswordHash = hasher.HashPassword(stdUser, userPassword);
+            db.Users.Add(stdUser);
+            logger?.LogInformation("Seeded standard user account for {UserEmail}.", userEmail);
+        }
+        else
+        {
+            existingUser.Email = userEmail;
+            existingUser.Role = "User";
+            existingUser.Status = "Active";
+            existingUser.IsAuthorizedUser = true;
+            if (string.IsNullOrWhiteSpace(existingUser.PasswordHash))
+            {
+                existingUser.PasswordHash = hasher.HashPassword(existingUser, userPassword);
+            }
+        }
+
+        // Initialize individual distinct passwords for sample team members if they don't have a password yet,
+        // or if their password inadvertently matched the administrator's password.
+        foreach (var teamMember in db.Users.Where(u => u.Role != "Admin" && u.Role != "Super Admin"))
+        {
+            bool isMatchingAdmin = !string.IsNullOrWhiteSpace(teamMember.PasswordHash) &&
+                hasher.VerifyHashedPassword(teamMember, teamMember.PasswordHash, adminPassword) == PasswordVerificationResult.Success;
+
+            if (string.IsNullOrWhiteSpace(teamMember.PasswordHash) || isMatchingAdmin)
+            {
+                var firstWord = (teamMember.Name ?? "User").Split(' ')[0];
+                var userDefaultPassword = $"{firstWord}@123!";
+                teamMember.PasswordHash = hasher.HashPassword(teamMember, userDefaultPassword);
+            }
+        }
+
+        // Migrate any remaining @nimbuscrm.com emails to @visioncrm.com in existing databases safely
+        var existingEmails = db.Users.Where(u => u.Email != null).Select(u => u.Email!.ToLower()).ToHashSet();
+        foreach (var u in db.Users.Where(u => u.Email != null && u.Email.Contains("@nimbuscrm.com")).ToList())
+        {
+            var newEmail = u.Email.Replace("@nimbuscrm.com", "@visioncrm.com");
+            if (existingEmails.Contains(newEmail.ToLower()))
+            {
+                if (u.Email.ToLower() == "admin@nimbuscrm.com" || u.Email.ToLower() == "user@nimbuscrm.com")
                 {
-                    var admin = new UserRoleEntry
-                    {
-                        Name = "Administrator",
-                        Email = adminEmail,
-                        Role = "Admin",
-                        Status = "Active"
-                    };
-                    admin.PasswordHash = hasher.HashPassword(admin, adminPassword);
-                    db.Users.Add(admin);
-                    logger?.LogInformation("Seeded administrator account for {AdminEmail}.", adminEmail);
+                    db.Users.Remove(u);
                 }
                 else
                 {
-                    existingAdmin.Role = "Admin";
-                    existingAdmin.Status = "Active";
-                    // Requirement 1: Admin ka existing password same rehna chahiye. Admin ke password mein koi change nahi karna hai.
-                    if (string.IsNullOrWhiteSpace(existingAdmin.PasswordHash))
-                    {
-                        existingAdmin.PasswordHash = hasher.HashPassword(existingAdmin, adminPassword);
-                        logger?.LogInformation("Initialized missing password for administrator account {AdminEmail}.", adminEmail);
-                    }
-                    else
-                    {
-                        logger?.LogInformation("Preserved existing password for administrator account {AdminEmail}.", adminEmail);
-                    }
+                    u.Email = u.Email.Replace("@nimbuscrm.com", $"_{u.Id}@visioncrm.com");
+                    existingEmails.Add(u.Email.ToLower());
                 }
-
-                // Initialize individual distinct passwords for sample team members if they don't have a password yet,
-                // or if their password inadvertently matched the administrator's password.
-                // Each user has their own separate password linked to their database record; never sharing admin's password.
-                foreach (var user in db.Users.Where(u => u.Role != "Admin" && u.Role != "Super Admin"))
-                {
-                    bool isMatchingAdmin = !string.IsNullOrWhiteSpace(user.PasswordHash) &&
-                        hasher.VerifyHashedPassword(user, user.PasswordHash, adminPassword) == PasswordVerificationResult.Success;
-
-                    if (string.IsNullOrWhiteSpace(user.PasswordHash) || isMatchingAdmin)
-                    {
-                        var firstWord = (user.Name ?? "User").Split(' ')[0];
-                        var userDefaultPassword = $"{firstWord}@123!";
-                        user.PasswordHash = hasher.HashPassword(user, userDefaultPassword);
-                    }
-                }
+            }
+            else
+            {
+                existingEmails.Remove(u.Email.ToLower());
+                u.Email = newEmail;
+                existingEmails.Add(newEmail.ToLower());
             }
         }
 

@@ -4,7 +4,7 @@ using CrmLeadManagement.Models;
 namespace CrmLeadManagement.Security;
 
 /// <summary>
-/// Centralized authorization and permission checker for NimbusCRM.
+/// Centralized authorization and permission checker for VisionCRM.
 /// Evaluates module permissions based on RoleMaster definitions and user assignments.
 /// </summary>
 public static class PermissionChecker
@@ -27,29 +27,28 @@ public static class PermissionChecker
             if (user != null) return user;
         }
 
-        // If user is Admin authenticated principal, construct admin entry
-        if (userPrincipal.IsInRole("Admin"))
-        {
-            return new UserRoleEntry
-            {
-                Name = userPrincipal.Identity?.Name ?? "Administrator",
-                Email = email ?? "admin@nimbuscrm.com",
-                Role = "Admin"
-            };
-        }
-
         return null;
     }
 
     public static bool IsAdmin(ClaimsPrincipal? userPrincipal, UserRoleEntry? user = null)
     {
-        if (userPrincipal?.IsInRole("Admin") == true) return true;
-        if (user != null && (string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(user.Role, "Super Admin", StringComparison.OrdinalIgnoreCase)))
+        if (user != null)
         {
-            return true;
+            return user.IsAdminAccount;
         }
-        return false;
+        return userPrincipal?.IsInRole("Admin") == true;
+    }
+
+    public static bool IsAdmin(AppDbContext db, ClaimsPrincipal? userPrincipal)
+    {
+        var user = GetCurrentUser(db, userPrincipal);
+        return user != null && user.IsAdminAccount;
+    }
+
+    public static bool IsUser(AppDbContext db, ClaimsPrincipal? userPrincipal)
+    {
+        var user = GetCurrentUser(db, userPrincipal);
+        return user != null && user.IsUserAccount;
     }
 
     public static bool CanViewModule(AppDbContext db, ClaimsPrincipal? userPrincipal, string moduleName)

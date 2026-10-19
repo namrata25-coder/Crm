@@ -3,9 +3,27 @@ namespace CrmLeadManagement.Models.Dtos.App;
 /// <summary>Request payload for mobile app login</summary>
 public class AppLoginRequest
 {
-    public string Email { get; set; } = "";
+    private string _email = "";
+
+    public string Email
+    {
+        get => _email;
+        set => _email = value ?? "";
+    }
+
+    /// <summary>Alias for Email to accept UserId as well</summary>
+    public string? UserId
+    {
+        get => _email;
+        set => _email = value ?? _email;
+    }
+
     public string Password { get; set; } = "";
     public string? DeviceId { get; set; }
+
+    /// <summary>'admin' for Admin login verification, 'user' for User login verification.</summary>
+    public string? Role { get; set; }
+    public string? Portal { get; set; }
 }
 
 /// <summary>Response payload for mobile app login</summary>
@@ -39,6 +57,7 @@ public class AppRegisterRequest
     public string Name { get; set; } = "";
     public string Email { get; set; } = "";
     public string Password { get; set; } = "";
+    public string? Role { get; set; }
 }
 
 /// <summary>Error payload for mobile app API failures</summary>

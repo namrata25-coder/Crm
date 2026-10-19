@@ -113,6 +113,7 @@ public static class DatabaseSchemaSync
             ""MustChangePassword"" boolean NOT NULL DEFAULT false,
             ""CreatedBy"" text,
             ""LastPasswordChangeAt"" timestamp with time zone,
+            ""IsAuthorizedUser"" boolean NOT NULL DEFAULT false,
             CONSTRAINT ""PK_Users"" PRIMARY KEY (""Id"")
         );
 
@@ -645,6 +646,7 @@ public static class DatabaseSchemaSync
         ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""MustChangePassword"" boolean NOT NULL DEFAULT false;
         ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""CreatedBy"" text;
         ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""LastPasswordChangeAt"" timestamp with time zone;
+        ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""IsAuthorizedUser"" boolean NOT NULL DEFAULT false;
 
         ALTER TABLE ""WorkInvoices"" ADD COLUMN IF NOT EXISTS ""ClientId"" text;
 

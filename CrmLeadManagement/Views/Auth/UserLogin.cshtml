@@ -1,0 +1,532 @@
+@model CrmLeadManagement.Models.LoginViewModel
+@{
+    Layout = null;
+    ViewData["Title"] = "User Sign In · VisionCRM";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>@ViewData["Title"]</title>
+    <meta name="description" content="Sign in to your VisionCRM user workspace to manage leads, tasks, and project activities." />
+    
+    <!-- Modern Typography: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --crm-navy-dark: #0f172a;
+            --crm-navy-subtle: #1e293b;
+            --crm-blue-primary: #1d4ed8;
+            --crm-blue-hover: #1e40af;
+            --crm-blue-accent: #2563eb;
+            --crm-blue-tint: #f0f6ff;
+            --crm-blue-border: #bfdbfe;
+            
+            --crm-bg-left: #f8fafc;
+            --crm-bg-right: #ffffff;
+            --crm-border-color: #e2e8f0;
+            --crm-border-input: #cbd5e1;
+            --crm-text-muted: #64748b;
+            --crm-text-light: #94a3b8;
+            
+            --crm-danger: #dc2626;
+            --crm-danger-bg: #fef2f2;
+            --crm-danger-border: #fecaca;
+            --crm-success: #16a34a;
+            --crm-success-bg: #f0fdf4;
+            --crm-success-border: #bbf7d0;
+
+            --radius-input: 8px;
+            --radius-btn: 8px;
+            --radius-card: 14px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--crm-bg-left);
+            color: var(--crm-navy-dark);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .user-auth-card {
+            background: #ffffff;
+            border: 1px solid var(--crm-border-color);
+            border-radius: var(--radius-card);
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+            width: 100%;
+            max-width: 440px;
+            padding: 40px 36px;
+        }
+
+        .brand-badge-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .brand-logo-mark {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo-icon {
+            width: 38px;
+            height: 38px;
+            background: var(--crm-navy-dark);
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #38bdf8;
+            font-size: 19px;
+        }
+
+        .brand-logo-title {
+            font-size: 19px;
+            font-weight: 700;
+            color: var(--crm-navy-dark);
+            letter-spacing: -0.4px;
+        }
+
+        .user-shield-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--crm-blue-tint);
+            color: var(--crm-blue-primary);
+            border: 1px solid var(--crm-blue-border);
+            border-radius: 20px;
+            padding: 4px 10px;
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-header {
+            margin-bottom: 24px;
+        }
+
+        .form-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--crm-navy-dark);
+            margin-bottom: 6px;
+        }
+
+        .form-subtitle {
+            font-size: 13.5px;
+            color: var(--crm-text-muted);
+            line-height: 1.5;
+        }
+
+        .quick-fill-bar {
+            background: var(--crm-bg-left);
+            border: 1px solid var(--crm-border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .quick-fill-btn {
+            background: #ffffff;
+            border: 1px solid var(--crm-border-input);
+            color: var(--crm-navy-dark);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .quick-fill-btn:hover {
+            border-color: var(--crm-blue-primary);
+            color: var(--crm-blue-primary);
+            background-color: var(--crm-blue-tint);
+        }
+
+        .auth-alert {
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 20px;
+            line-height: 1.45;
+        }
+
+        .auth-alert-danger {
+            background-color: var(--crm-danger-bg);
+            color: var(--crm-danger);
+            border: 1px solid var(--crm-danger-border);
+        }
+
+        .auth-alert-success {
+            background-color: var(--crm-success-bg);
+            color: var(--crm-success);
+            border: 1px solid var(--crm-success-border);
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--crm-navy-subtle);
+            margin-bottom: 6px;
+        }
+
+        .input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 44px;
+            padding: 0 14px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--crm-navy-dark);
+            background-color: #ffffff;
+            border: 1px solid var(--crm-border-input);
+            border-radius: var(--radius-input);
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .form-input::placeholder {
+            color: var(--crm-text-light);
+        }
+
+        .form-input:focus {
+            border-color: var(--crm-blue-accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        .form-input.has-toggle {
+            padding-right: 44px;
+        }
+
+        .btn-password-toggle {
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--crm-text-muted);
+            width: 34px;
+            height: 34px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .btn-password-toggle:hover {
+            color: var(--crm-navy-dark);
+        }
+
+        .form-actions-aux {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            font-size: 13px;
+        }
+
+        .remember-checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: var(--crm-navy-subtle);
+        }
+
+        .remember-checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--crm-blue-primary);
+        }
+
+        .btn-sign-in {
+            width: 100%;
+            height: 46px;
+            background-color: var(--crm-blue-primary);
+            border: 1px solid var(--crm-blue-primary);
+            border-radius: var(--radius-input);
+            color: #ffffff;
+            font-size: 14.5px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 4px rgba(29, 78, 216, 0.2);
+        }
+
+        .btn-sign-in:hover {
+            background-color: var(--crm-blue-hover);
+        }
+
+        .btn-sign-in:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        .spinner-icon {
+            display: none;
+            animation: spin 0.85s linear infinite;
+        }
+
+        @@keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .form-footer {
+            margin-top: 26px;
+            padding-top: 20px;
+            border-top: 1px solid var(--crm-border-color);
+            text-align: center;
+            font-size: 13px;
+            color: var(--crm-text-muted);
+        }
+
+        .form-footer a {
+            color: var(--crm-blue-primary);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <main class="user-auth-card" role="main">
+        <header class="brand-badge-row">
+            <div class="brand-logo-mark">
+                <div class="brand-logo-icon" aria-hidden="true">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <span class="brand-logo-title">VisionCRM</span>
+            </div>
+            <span class="user-shield-badge">
+                <i class="bi bi-person-badge-fill"></i> User Portal
+            </span>
+        </header>
+
+        <section class="form-header">
+            <h1 class="form-title">User Workspace Sign In</h1>
+            <p class="form-subtitle">Welcome back. Enter your User credentials to access your assigned leads and projects.</p>
+        </section>
+
+
+        <!-- Alert Notification -->
+        <div id="authAlert" class="auth-alert auth-alert-danger" style="@(string.IsNullOrEmpty(Model?.ErrorMessage) ? "display:none;" : "")" role="alert">
+            <i class="bi bi-exclamation-circle-fill" style="margin-top:2px;" aria-hidden="true"></i>
+            <span id="authAlertText">@(Model?.ErrorMessage ?? "")</span>
+        </div>
+
+        <!-- User Login Form -->
+        <form id="userLoginForm" method="post" action="/user/login" onsubmit="handleUserLogin(event)" novalidate>
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ReturnUrl" value="@Model?.ReturnUrl" />
+            <input type="hidden" name="LoginType" value="user" />
+
+            <div class="form-group">
+                <label class="form-label" for="userUserIdInput">User ID or Work Email</label>
+                <div class="input-container">
+                    <input type="text"
+                           id="userUserIdInput"
+                           name="UserId"
+                           class="form-input"
+                           placeholder="e.g. user@visioncrm.com"
+                           value="@(Model?.UserId ?? Model?.Email ?? "")"
+                           required
+                           autocomplete="username"
+                           autofocus />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="userPasswordInput">User Password</label>
+                <div class="input-container">
+                    <input type="password"
+                           id="userPasswordInput"
+                           name="Password"
+                           class="form-input has-toggle"
+                           placeholder="Enter your user password"
+                           required
+                           autocomplete="current-password" />
+                    <button type="button"
+                            class="btn-password-toggle"
+                            onclick="toggleUserPwdVisibility()"
+                            aria-label="Toggle password visibility">
+                        <i class="bi bi-eye" id="userPwdToggleIcon"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-actions-aux">
+                <label class="remember-checkbox-group" for="userRememberMe">
+                    <input type="checkbox" id="userRememberMe" name="RememberMe" value="true" @(Model?.RememberMe == true ? "checked" : "") />
+                    <span>Remember me</span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn-sign-in" id="userSubmitBtn">
+                <i class="bi bi-arrow-repeat spinner-icon" id="userSubmitSpinner" aria-hidden="true"></i>
+                <span id="userSubmitBtnText">Sign In to User Workspace</span>
+            </button>
+        </form>
+
+        <footer class="form-footer">
+            <span>System Administrator? <a href="/admin/login">Go to Admin Login &rarr;</a></span>
+        </footer>
+    </main>
+
+    <script>
+        function fillUserCreds(email, pwd) {
+            document.getElementById('userUserIdInput').value = email;
+            document.getElementById('userPasswordInput').value = pwd;
+            hideAlert();
+        }
+
+        function toggleUserPwdVisibility() {
+            const pwd = document.getElementById('userPasswordInput');
+            const icon = document.getElementById('userPwdToggleIcon');
+            if (!pwd || !icon) return;
+            if (pwd.type === 'password') {
+                pwd.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                pwd.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        }
+
+        function showAlert(msg, isSuccess = false) {
+            const box = document.getElementById('authAlert');
+            const text = document.getElementById('authAlertText');
+            if (box && text) {
+                text.textContent = msg;
+                box.className = isSuccess ? 'auth-alert auth-alert-success' : 'auth-alert auth-alert-danger';
+                box.style.display = 'flex';
+            }
+        }
+
+        function hideAlert() {
+            const box = document.getElementById('authAlert');
+            if (box) box.style.display = 'none';
+        }
+
+        async function handleUserLogin(event) {
+            event.preventDefault();
+            hideAlert();
+
+            const form = document.getElementById('userLoginForm');
+            const userInput = document.getElementById('userUserIdInput');
+            const pwdInput = document.getElementById('userPasswordInput');
+            const submitBtn = document.getElementById('userSubmitBtn');
+            const spinner = document.getElementById('userSubmitSpinner');
+            const btnText = document.getElementById('userSubmitBtnText');
+
+            const userId = (userInput?.value || '').trim();
+            const password = pwdInput?.value || '';
+
+            if (!userId || !password) {
+                showAlert('Please enter both User ID and Password.');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.textContent = 'Verifying credentials...';
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch('/user/login', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                let result = null;
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType.includes('application/json')) {
+                    result = await response.json();
+                }
+
+                if (response.ok && result && result.success) {
+                    if (result.token) {
+                        try {
+                            localStorage.setItem('crm_user_token', result.token);
+                            localStorage.setItem('crm_user', JSON.stringify(result.user));
+                        } catch (e) {}
+                    }
+                    btnText.textContent = 'Signed in. Redirecting...';
+                    showAlert('Signed in successfully! Redirecting...', true);
+                    const dest = result.redirectUrl || '/user/dashboard';
+                    setTimeout(() => { window.location.href = dest; }, 300);
+                } else {
+                    const errorMsg = result?.message || 
+                        (response.status === 403 ? 'Access denied. Valid User credentials are required.' :
+                         response.status === 423 ? 'Account temporarily locked due to failed login attempts.' : 
+                         'Invalid User ID or Password.');
+                    showAlert(errorMsg);
+                    resetButton();
+                }
+            } catch (err) {
+                console.warn('Fallback to standard submit on network error:', err);
+                form.submit();
+            }
+        }
+
+        function resetButton() {
+            const submitBtn = document.getElementById('userSubmitBtn');
+            const spinner = document.getElementById('userSubmitSpinner');
+            const btnText = document.getElementById('userSubmitBtnText');
+            if (submitBtn) submitBtn.disabled = false;
+            if (spinner) spinner.style.display = 'none';
+            if (btnText) btnText.textContent = 'Sign In to User Workspace';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+@model CrmLeadManagement.Controllers.AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Admin Security & Operations Dashboard";
+    ViewData["ActivePage"] = "AdminDashboard";
+}
+
+<div class="page-content" style="padding: 24px 32px;">
+    <!-- Header Banner -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 28px; flex-wrap:wrap; gap:16px;">
+        <div>
+            <div style="display:inline-flex; align-items:center; gap:8px; padding:4px 10px; background:rgba(37,99,235,0.1); border:1px solid rgba(37,99,235,0.25); border-radius:6px; font-size:12px; font-weight:600; color:#2563eb; margin-bottom:8px;">
+                <i class="bi bi-shield-lock-fill"></i> STRICT ADMIN PORTAL
+            </div>
+            <h1 style="font-size:26px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px; margin:0;">
+                Administrator Control Center
+            </h1>
+            <p style="font-size:14px; color:var(--ink-500, #64748b); margin:4px 0 0 0;">
+                System-wide overview, security audits, and administrative governance. Verified via database-backed role enforcement.
+            </p>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center;">
+            <a href="/Team" class="btn" style="background:#ffffff; border:1px solid var(--line, #e2e8f0); color:var(--ink-700, #334155); padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                <i class="bi bi-people"></i> Manage Team
+            </a>
+            <a href="/Team/Roles" class="btn" style="background:#ffffff; border:1px solid var(--line, #e2e8f0); color:var(--ink-700, #334155); padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                <i class="bi bi-shield-check"></i> Roles &amp; Permissions
+            </a>
+            <a href="/admin/logout" class="btn" style="background:#dc2626; color:#ffffff; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; border:none; box-shadow:0 1px 2px rgba(220,38,38,0.2);">
+                <i class="bi bi-box-arrow-right"></i> Admin Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- Security & Status Alert -->
+    <div style="background:linear-gradient(135deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98)); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:18px 24px; margin-bottom:28px; display:flex; align-items:center; justify-content:space-between; gap:20px; color:#ffffff; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+        <div style="display:flex; align-items:center; gap:16px;">
+            <div style="width:44px; height:44px; border-radius:10px; background:rgba(37,99,235,0.2); border:1px solid rgba(59,130,246,0.3); display:flex; align-items:center; justify-content:center; color:#60a5fa; font-size:22px;">
+                <i class="bi bi-shield-check"></i>
+            </div>
+            <div>
+                <div style="font-weight:700; font-size:15px; color:#f8fafc;">Active Session: Administrator Privileges Enforced</div>
+                <div style="font-size:13px; color:#94a3b8; margin-top:2px;">Role verified from PostgreSQL database record. Non-admin users are strictly rejected at authentication and middleware boundary.</div>
+            </div>
+        </div>
+        <div style="text-align:right;">
+            <span style="display:inline-block; padding:4px 12px; background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.3); color:#4ade80; border-radius:20px; font-size:12px; font-weight:700;">
+                <i class="bi bi-record-fill" style="font-size:9px;"></i> ENFORCING
+            </span>
+        </div>
+    </div>
+
+    <!-- KPI Metric Cards Grid -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:20px; margin-bottom:28px;">
+        <!-- Card 1: Total Accounts -->
+        <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:600; color:var(--ink-500, #64748b);">Total Accounts</span>
+                <div style="width:36px; height:36px; border-radius:8px; background:rgba(59,130,246,0.1); color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+            </div>
+            <div style="font-size:28px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px;">@Model.TotalUsers</div>
+            <div style="font-size:12px; color:#16a34a; margin-top:4px; font-weight:500;">
+                <i class="bi bi-shield-shaded"></i> Database verified
+            </div>
+        </div>
+
+        <!-- Card 2: Active Admins -->
+        <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:600; color:var(--ink-500, #64748b);">Active Admins</span>
+                <div style="width:36px; height:36px; border-radius:8px; background:rgba(234,179,8,0.1); color:#d97706; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                    <i class="bi bi-person-fill-lock"></i>
+                </div>
+            </div>
+            <div style="font-size:28px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px;">@Model.ActiveAdmins</div>
+            <div style="font-size:12px; color:var(--ink-500, #64748b); margin-top:4px;">
+                Full administrative rights
+            </div>
+        </div>
+
+        <!-- Card 3: Total Leads -->
+        <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:600; color:var(--ink-500, #64748b);">System Leads</span>
+                <div style="width:36px; height:36px; border-radius:8px; background:rgba(16,185,129,0.1); color:#059669; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                    <i class="bi bi-funnel-fill"></i>
+                </div>
+            </div>
+            <div style="font-size:28px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px;">@Model.TotalLeads</div>
+            <div style="font-size:12px; color:var(--ink-500, #64748b); margin-top:4px;">
+                Across all pipelines
+            </div>
+        </div>
+
+        <!-- Card 4: Total Projects -->
+        <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:600; color:var(--ink-500, #64748b);">Work Projects</span>
+                <div style="width:36px; height:36px; border-radius:8px; background:rgba(99,102,241,0.1); color:#4f46e5; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                    <i class="bi bi-kanban-fill"></i>
+                </div>
+            </div>
+            <div style="font-size:28px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px;">@Model.TotalProjects</div>
+            <div style="font-size:12px; color:var(--ink-500, #64748b); margin-top:4px;">
+                Active client workspaces
+            </div>
+        </div>
+
+        <!-- Card 5: Invoices -->
+        <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:600; color:var(--ink-500, #64748b);">Invoices Issued</span>
+                <div style="width:36px; height:36px; border-radius:8px; background:rgba(168,85,247,0.1); color:#9333ea; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                    <i class="bi bi-receipt"></i>
+                </div>
+            </div>
+            <div style="font-size:28px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px;">@Model.TotalInvoices</div>
+            <div style="font-size:12px; color:var(--ink-500, #64748b); margin-top:4px;">
+                Financial records
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Log & Security Events Section -->
+    <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:24px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+            <div>
+                <h2 style="font-size:17px; font-weight:700; color:var(--ink-900, #0f172a); margin:0;">
+                    Recent Security &amp; Audit Logs
+                </h2>
+                <p style="font-size:13px; color:var(--ink-500, #64748b); margin:3px 0 0 0;">
+                    Real-time monitoring of authentication attempts, role checks, and administrative activities.
+                </p>
+            </div>
+            <button type="button" class="btn" onclick="fetchAdminStats()" style="background:var(--canvas, #f8fafc); border:1px solid var(--line, #e2e8f0); font-size:12px; font-weight:600; color:var(--ink-700, #334155); padding:6px 12px; border-radius:6px; cursor:pointer;">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Stats
+            </button>
+        </div>
+
+        @if (Model.RecentAuditLogs == null || !Model.RecentAuditLogs.Any())
+        {
+            <div style="text-align:center; padding:36px; color:var(--ink-400, #94a3b8);">
+                <i class="bi bi-shield-check" style="font-size:32px; display:block; margin-bottom:8px;"></i>
+                <span>No audit events recorded yet. Clean security audit status.</span>
+            </div>
+        }
+        else
+        {
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+                    <thead>
+                        <tr style="border-bottom:1px solid var(--line, #e2e8f0); background:var(--canvas, #f8fafc); color:var(--ink-600, #475569); font-weight:600;">
+                            <th style="padding:10px 14px;">Timestamp (UTC)</th>
+                            <th style="padding:10px 14px;">Action</th>
+                            <th style="padding:10px 14px;">Performed By</th>
+                            <th style="padding:10px 14px;">Target User</th>
+                            <th style="padding:10px 14px;">Details</th>
+                            <th style="padding:10px 14px;">IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in Model.RecentAuditLogs)
+                        {
+                            var isSecurityAlert = log.Action.Contains("Reject", StringComparison.OrdinalIgnoreCase) || 
+                                                  log.Action.Contains("Fail", StringComparison.OrdinalIgnoreCase);
+                            <tr style="border-bottom:1px solid var(--line, #f1f5f9); transition:background 0.15s ease;" onmouseover="this.style.background='#f8fafc';" onmouseout="this.style.background='transparent';">
+                                <td style="padding:12px 14px; color:var(--ink-500, #64748b); white-space:nowrap;">
+                                    @log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")
+                                </td>
+                                <td style="padding:12px 14px; font-weight:600;">
+                                    @if (isSecurityAlert)
+                                    {
+                                        <span style="color:#dc2626; background:#fef2f2; padding:3px 8px; border-radius:6px; border:1px solid #fecaca; font-size:12px;">
+                                            <i class="bi bi-shield-slash"></i> @log.Action
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:#059669; background:#ecfdf5; padding:3px 8px; border-radius:6px; border:1px solid #a7f3d0; font-size:12px;">
+                                            <i class="bi bi-shield-check"></i> @log.Action
+                                        </span>
+                                    }
+                                </td>
+                                <td style="padding:12px 14px; color:var(--ink-800, #1e293b);">@log.PerformedBy</td>
+                                <td style="padding:12px 14px; color:var(--ink-600, #475569);">@(log.TargetUserEmail ?? "-")</td>
+                                <td style="padding:12px 14px; color:var(--ink-600, #475569); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="@log.Details">
+                                    @log.Details
+                                </td>
+                                <td style="padding:12px 14px; color:var(--ink-500, #64748b); font-family:monospace; font-size:12px;">
+                                    @(log.IpAddress ?? "-")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        async function fetchAdminStats() {
+            try {
+                const res = await fetch('/api/admin/dashboard/stats', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('Admin API Stats:', data);
+                    alert(`Admin API Status: OK\nTotal Users: ${data.totalUsers}\nActive Admins: ${data.activeAdmins}\nTotal Leads: ${data.totalLeads}`);
+                } else {
+                    alert('Failed to fetch stats: ' + res.status);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error fetching stats: ' + err.message);
+            }
+        }
+    </script>
+}

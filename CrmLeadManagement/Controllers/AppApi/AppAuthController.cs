@@ -40,6 +40,38 @@ public class AppAuthController : ControllerBase
     }
 
     /// <summary>
+    /// Dedicated Admin Login API endpoint.
+    /// Strictly verifies that the credentials belong to an actual Admin or Super Admin account in the database.
+    /// Rejects regular users with HTTP 403 Forbidden.
+    /// </summary>
+    [HttpPost("admin-login")]
+    [HttpPost("/api/auth/admin-login")]
+    [Consumes("application/json")]
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthRateLimit")]
+    public async Task<IActionResult> AdminLogin([FromBody] AppLoginRequest request)
+    {
+        request.Role = "admin";
+        return await ExecuteLogin(request, requiredRole: "admin");
+    }
+
+    /// <summary>
+    /// Dedicated User Login API endpoint.
+    /// Strictly verifies that the credentials belong to an authorized User account in the database.
+    /// Rejects Admin accounts with HTTP 403 Forbidden.
+    /// </summary>
+    [HttpPost("user-login")]
+    [HttpPost("/api/auth/user-login")]
+    [Consumes("application/json")]
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthRateLimit")]
+    public async Task<IActionResult> UserLogin([FromBody] AppLoginRequest request)
+    {
+        request.Role = "user";
+        return await ExecuteLogin(request, requiredRole: "user");
+    }
+
+    /// <summary>
     /// Authenticates a user with email and password, returning an opaque Bearer token.
     /// Rate-limited to 10 requests per minute per IP.
     /// Supports /api/v1/app/auth/login, /api/auth/login, /auth/login, and /login for JSON requests.
@@ -52,8 +84,14 @@ public class AppAuthController : ControllerBase
     [EnableRateLimiting("AuthRateLimit")]
     public async Task<IActionResult> Login([FromBody] AppLoginRequest request)
     {
+        var targetRole = request.Role ?? request.Portal;
+        return await ExecuteLogin(request, requiredRole: targetRole);
+    }
+
+    private async Task<IActionResult> ExecuteLogin(AppLoginRequest request, string? requiredRole)
+    {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-        var email = request.Email?.Trim() ?? "";
+        var email = (request.Email ?? request.UserId ?? "").Trim();
 
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.Password))
         {
@@ -71,15 +109,42 @@ public class AppAuthController : ControllerBase
             return Unauthorized(new AppApiError { Message = "Invalid email or password." });
         }
 
-        // Role check: The mobile app API is only for field and operational team roles (e.g. Sales Manager, Sales Executive, Telecaller), NOT for Admin.
-        var isAppApi = Request.Path.Value?.Contains("/app", StringComparison.OrdinalIgnoreCase) == true;
-        if (isAppApi && string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        // Role check: The mobile app API is only for field and operational team roles, NOT for Admin.
+        var isAppApi = Request.Path.Value?.Contains("/app", StringComparison.OrdinalIgnoreCase) == true &&
+                       !Request.Path.Value.Contains("admin-login", StringComparison.OrdinalIgnoreCase);
+        if (isAppApi && user.IsAdminAccount && !string.Equals(requiredRole, "admin", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Admin login rejected on mobile app API for user {UserId} ({Email}) from IP: {IP}", user.Id, user.Email, ip);
             return StatusCode(StatusCodes.Status403Forbidden, new AppApiError
             {
                 Message = "Admin is not allowed to log in to the mobile app. This app is for Sales Manager and other team roles only. Please use the web portal."
             });
+        }
+
+        // =====================================================================
+        // STRICT ROLE-BASED LOGIN SEGREGATION
+        // =====================================================================
+        if (string.Equals(requiredRole, "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!user.IsAdminAccount)
+            {
+                _logger.LogWarning("Admin login rejected for non-admin user {Email} ({Role}) from IP: {IP}", user.Email, user.Role, ip);
+                return StatusCode(StatusCodes.Status403Forbidden, new AppApiError
+                {
+                    Message = "Access denied. Valid Admin credentials are required."
+                });
+            }
+        }
+        else if (string.Equals(requiredRole, "user", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!user.IsUserAccount)
+            {
+                _logger.LogWarning("User login rejected for Admin user {Email} ({Role}) from IP: {IP}", user.Email, user.Role, ip);
+                return StatusCode(StatusCodes.Status403Forbidden, new AppApiError
+                {
+                    Message = "Access denied. Valid User credentials are required."
+                });
+            }
         }
 
         var now = DateTime.UtcNow;
@@ -329,6 +394,17 @@ public class AppAuthController : ControllerBase
             });
         }
 
+        // Prevent self-escalation: End-users can NEVER register as Admin
+        if (!string.IsNullOrWhiteSpace(request.Role) &&
+            (string.Equals(request.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(request.Role, "Super Admin", StringComparison.OrdinalIgnoreCase)))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new AppApiError
+            {
+                Message = "Access denied: Users cannot register or assign themselves the Admin role."
+            });
+        }
+
         var status = string.Equals(registrationMode, "ApprovalRequired", StringComparison.OrdinalIgnoreCase)
             ? "Inactive"
             : "Active";
@@ -338,7 +414,8 @@ public class AppAuthController : ControllerBase
             Name = name,
             Email = email,
             Role = "Sales Executive",
-            Status = status
+            Status = status,
+            IsAuthorizedUser = true
         };
 
         newUser.PasswordHash = _passwordHasher.HashPassword(newUser, request.Password);

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewData["Title"] · NimbusCRM</title>
+    <title>@ViewData["Title"] · VisionCRM</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -13,9 +13,9 @@
     <div class="app-shell">
         <aside class="sidebar">
             <div class="sidebar-brand">
-                <div class="mark">N</div>
+                <div class="mark">V</div>
                 <div>
-                    <div class="name">NimbusCRM</div>
+                    <div class="name">VisionCRM</div>
                     <div class="sub">Lead Management</div>
                 </div>
             </div>
@@ -45,8 +45,24 @@
         if (User.IsInRole("Admin")) return true;
         return CrmLeadManagement.Security.PermissionChecker.HasModulePermission(LayoutDb, currentLoggedInUser, moduleName, "View");
     }
+
+    var logoutUrl = (currentLoggedInUser?.IsAdminAccount == true || User.IsInRole("Admin")) ? "/admin/logout" : "/user/logout";
 }
             <nav class="sidebar-nav">
+                <div class="sidebar-section-label">DASHBOARD</div>
+                @if (currentLoggedInUser?.IsAdminAccount == true || User.IsInRole("Admin"))
+                {
+                    <a class="sidebar-link @(activePage == "AdminDashboard" ? "active" : "")" href="/admin/dashboard">
+                        <i class="bi bi-speedometer2"></i> Admin Dashboard
+                    </a>
+                }
+                else
+                {
+                    <a class="sidebar-link @(activePage == "UserDashboard" ? "active" : "")" href="/user/dashboard">
+                        <i class="bi bi-speedometer2"></i> User Dashboard
+                    </a>
+                }
+
                 @if (canViewModule("Lead List") || canViewModule("Assigned Leads"))
                 {
                     <div class="sidebar-section-label">LEADS</div>
@@ -192,7 +208,7 @@
                         <div class="role" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@userRole</div>
                     </div>
                 </div>
-                <a asp-controller="Auth" asp-action="Logout" title="Sign out" style="color:#8b98b8;font-size:16px;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .15s ease;" onmouseover="this.style.color='#f87171';this.style.background='rgba(255,255,255,0.06)';" onmouseout="this.style.color='#8b98b8';this.style.background='transparent';">
+                <a href="@logoutUrl" title="Sign out" style="color:#8b98b8;font-size:16px;padding:6px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .15s ease;" onmouseover="this.style.color='#f87171';this.style.background='rgba(255,255,255,0.06)';" onmouseout="this.style.color='#8b98b8';this.style.background='transparent';">
                     <i class="bi bi-box-arrow-right"></i>
                 </a>
             </div>
@@ -224,12 +240,12 @@
                                 <i class="bi bi-gear"></i> Settings
                             </a>
                             <div style="height:1px;background:var(--line);margin:4px 0;"></div>
-                            <a asp-controller="Auth" asp-action="Logout" style="display:flex;align-items:center;gap:10px;padding:9px 14px;font-size:13px;color:#dc2626;text-decoration:none;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='transparent';">
+                            <a href="@logoutUrl" style="display:flex;align-items:center;gap:10px;padding:9px 14px;font-size:13px;color:#dc2626;text-decoration:none;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='transparent';">
                                 <i class="bi bi-box-arrow-right"></i> Logout
                             </a>
                         </div>
                     </div>
-                    <a asp-controller="Auth" asp-action="Logout" class="btn-logout-topbar" title="Logout from NimbusCRM" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#dc2626;border-radius:8px;background:rgba(220,38,38,0.08);text-decoration:none;transition:all 0.15s ease;" onmouseover="this.style.background='rgba(220,38,38,0.16)';" onmouseout="this.style.background='rgba(220,38,38,0.08)';">
+                    <a href="@logoutUrl" class="btn-logout-topbar" title="Logout from VisionCRM" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#dc2626;border-radius:8px;background:rgba(220,38,38,0.08);text-decoration:none;transition:all 0.15s ease;" onmouseover="this.style.background='rgba(220,38,38,0.16)';" onmouseout="this.style.background='rgba(220,38,38,0.08)';">
                         <i class="bi bi-box-arrow-right"></i>
                         <span>Logout</span>
                     </a>

@@ -412,21 +412,51 @@ public static class RoleStore
             };
             superAdmin.SetPermissions(GetAdminPermissions());
 
-            db.RoleMasters.AddRange(superAdmin, salesExec, salesMgr, admin, telecaller);
+            var userRole = new RoleMaster
+            {
+                RoleName = "User",
+                Description = "Standard CRM user with access to assigned leads and user workspace.",
+                IsSystem = true,
+                DataAccess = "OnlyAssigned"
+            };
+            userRole.SetPermissions(GetSalesExecutivePermissions());
+
+            db.RoleMasters.AddRange(superAdmin, admin, userRole, salesExec, salesMgr, telecaller);
             db.SaveChanges();
         }
-        else if (!db.RoleMasters.Any(r => r.RoleName == "Super Admin"))
+        else
         {
-            var superAdmin = new RoleMaster
+            bool changesNeeded = false;
+            if (!db.RoleMasters.Any(r => r.RoleName == "Super Admin"))
             {
-                RoleName = "Super Admin",
-                Description = "Primary administrative authority with complete system, user, and security management privileges.",
-                IsSystem = true,
-                DataAccess = "All"
-            };
-            superAdmin.SetPermissions(GetAdminPermissions());
-            db.RoleMasters.Add(superAdmin);
-            db.SaveChanges();
+                var superAdmin = new RoleMaster
+                {
+                    RoleName = "Super Admin",
+                    Description = "Primary administrative authority with complete system, user, and security management privileges.",
+                    IsSystem = true,
+                    DataAccess = "All"
+                };
+                superAdmin.SetPermissions(GetAdminPermissions());
+                db.RoleMasters.Add(superAdmin);
+                changesNeeded = true;
+            }
+            if (!db.RoleMasters.Any(r => r.RoleName == "User"))
+            {
+                var userRole = new RoleMaster
+                {
+                    RoleName = "User",
+                    Description = "Standard CRM user with access to assigned leads and user workspace.",
+                    IsSystem = true,
+                    DataAccess = "OnlyAssigned"
+                };
+                userRole.SetPermissions(GetSalesExecutivePermissions());
+                db.RoleMasters.Add(userRole);
+                changesNeeded = true;
+            }
+            if (changesNeeded)
+            {
+                db.SaveChanges();
+            }
         }
     }
 }

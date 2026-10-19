@@ -115,6 +115,16 @@ public static class LeadStore
         if (string.IsNullOrWhiteSpace(lead.AssignedDate))
             lead.AssignedDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
+        if (!string.IsNullOrWhiteSpace(lead.AssignedTo) && lead.AssignmentHistory.Count == 0)
+        {
+            lead.AssignmentHistory.Add(new AssignmentEntry
+            {
+                AssignedEmployee = lead.AssignedTo,
+                AssignmentDate = lead.AssignedDate,
+                Remarks = "Initial lead assignment upon creation"
+            });
+        }
+
         DbAccessor.Db.Leads.Add(lead);
         DbAccessor.Db.SaveChanges();
         return lead;

@@ -1,0 +1,384 @@
+{
+  "info": {
+    "_postman_id": "b3e0c7a1-2d9f-4e89-b1d5-visioncrmappapi",
+    "name": "VisionCRM App API Collection",
+    "description": "Complete collection of VisionCRM App REST APIs with headers, bodies, and responses.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "User Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@visioncrm.com\",\n  \"password\": \"UserPassword123!\",\n  \"deviceId\": \"Pixel-8-Pro\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@visioncrm.com\",\n  \"password\": \"AdminPassword123!\",\n  \"deviceId\": \"Admin-Chrome\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/auth/admin-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "auth", "admin-login"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile (/me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Leads",
+      "item": [
+        {
+          "name": "List Leads",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/leads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "leads"]
+            }
+          }
+        },
+        {
+          "name": "Get Lead Counts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/leads/count",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "leads", "count"]
+            }
+          }
+        },
+        {
+          "name": "Create Lead",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leadName\": \"Vikram Malhotra\",\n  \"companyName\": \"Solaris Energy Ltd\",\n  \"mobileNumber\": \"+91 99887 76655\",\n  \"email\": \"vikram@solarisenergy.com\",\n  \"designation\": \"Director of Operations\",\n  \"location\": \"Bengaluru\",\n  \"source\": \"LinkedIn\",\n  \"leadStatus\": \"New\",\n  \"assignedTo\": \"Ananya Sharma\",\n  \"priority\": \"High\",\n  \"followUpDate\": \"2026-10-25\",\n  \"remarks\": \"Met at Tech Expo. Requested demo.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/leads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "leads"]
+            }
+          }
+        },
+        {
+          "name": "Update Lead",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"leadName\": \"Vikram Malhotra\",\n  \"companyName\": \"Solaris Energy Ltd\",\n  \"mobileNumber\": \"+91 99887 76655\",\n  \"email\": \"vikram@solarisenergy.com\",\n  \"designation\": \"Managing Director\",\n  \"location\": \"Bengaluru\",\n  \"source\": \"LinkedIn\",\n  \"leadStatus\": \"In Progress\",\n  \"assignedTo\": \"Rohan Verma\",\n  \"priority\": \"High\",\n  \"followUpDate\": \"2026-10-28\",\n  \"remarks\": \"Proposal in review.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/leads/LD-1001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "leads", "LD-1001"]
+            }
+          }
+        },
+        {
+          "name": "Delete Lead",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/leads/LD-1005",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "leads", "LD-1005"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Projects",
+      "item": [
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/projects?page=1&pageSize=20&status=Active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "projects"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" },
+                { "key": "status", "value": "Active" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectName\": \"ERP Cloud Migration\",\n  \"clientName\": \"Apex Logistics\",\n  \"clientCompany\": \"Apex Global Ltd\",\n  \"projectType\": \"Direct Project\",\n  \"description\": \"Migration from on-premise ERP to cloud infrastructure.\",\n  \"startDate\": \"2026-11-01\",\n  \"deadline\": \"2027-02-28\",\n  \"projectManager\": \"Ananya Sharma\",\n  \"assignedMembers\": \"Ananya Sharma, Vikram Malhotra\",\n  \"budget\": 500000.00,\n  \"priority\": \"High\",\n  \"status\": \"Active\",\n  \"notes\": \"Kick-off meeting scheduled.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "projects"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Milestones",
+      "item": [
+        {
+          "name": "List Milestones",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/milestones?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "milestones"]
+            }
+          }
+        },
+        {
+          "name": "Project Dependencies",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/milestones/project-dependency/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "milestones", "project-dependency", "1"]
+            }
+          }
+        },
+        {
+          "name": "Create Milestone",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectId\": 1,\n  \"milestoneName\": \"Backend API Integration\",\n  \"description\": \"REST API integration.\",\n  \"startDate\": \"2026-10-20\",\n  \"dueDate\": \"2026-11-10\",\n  \"amount\": 100000.00,\n  \"completedAmount\": 0.00,\n  \"assignedMembers\": \"Rohan Verma\",\n  \"priority\": \"High\",\n  \"status\": \"Pending\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/milestones",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "milestones"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Work Dashboard & Reports",
+      "item": [
+        {
+          "name": "Work Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/work/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "work", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Work Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/work/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "work", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Work Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/work/reports?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "work", "reports"]
+            }
+          }
+        },
+        {
+          "name": "Work Tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/work/tasks?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "work", "tasks"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Team Roles & Settings",
+      "item": [
+        {
+          "name": "Get Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/team/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "team", "roles"]
+            }
+          }
+        },
+        {
+          "name": "Get Full Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/app/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "app", "settings"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

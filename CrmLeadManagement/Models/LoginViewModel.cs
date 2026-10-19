@@ -38,4 +38,7 @@ public class LoginViewModel
     public string? ErrorMessage { get; set; }
 
     public string? SuccessMessage { get; set; }
+
+    /// <summary>Target authentication portal: 'admin' for Admin Login, 'user' for User Login.</summary>
+    public string? LoginType { get; set; } = "user";
 }

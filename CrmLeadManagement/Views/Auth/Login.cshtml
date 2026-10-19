@@ -1,7 +1,8 @@
 @model CrmLeadManagement.Models.LoginViewModel
 @{
     Layout = null;
-    ViewData["Title"] = "Sign In · NimbusCRM";
+    var isInitialAdmin = string.Equals(Model?.LoginType, "admin", StringComparison.OrdinalIgnoreCase);
+    ViewData["Title"] = (isInitialAdmin ? "Admin Portal Sign In" : "User Portal Sign In") + " · VisionCRM";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -9,12 +10,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>@ViewData["Title"]</title>
-    <meta name="description" content="Sign in to your NimbusCRM account to manage leads, projects, finances, and team workflows." />
+    <meta name="description" content="Sign in to VisionCRM with separate Admin and User Portals. Manage leads, projects, finances, and team workflows." />
     
     <!-- Modern Typography: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -46,7 +47,7 @@
 
             --radius-input: 8px;
             --radius-btn: 8px;
-            --radius-card: 12px;
+            --radius-card: 14px;
         }
 
         * {
@@ -88,7 +89,6 @@
             justify-content: space-between;
         }
 
-        /* Logo Brand Mark */
         .brand-header {
             display: flex;
             align-items: center;
@@ -120,42 +120,40 @@
             gap: 4px;
         }
 
-        .brand-logo-text .brand-badge {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--crm-blue-primary);
-            background: var(--crm-blue-tint);
-            border: 1px solid var(--crm-blue-border);
-            padding: 1px 6px;
-            border-radius: 4px;
+        .brand-badge {
+            font-size: 10.5px;
             text-transform: uppercase;
+            font-weight: 700;
             letter-spacing: 0.5px;
+            padding: 2px 7px;
+            border-radius: 6px;
+            background-color: #e2e8f0;
+            color: var(--crm-navy-subtle);
             margin-left: 4px;
         }
 
-        /* Brand Pitch & Features */
         .brand-body {
-            max-width: 480px;
-            margin: 48px 0;
+            margin: auto 0;
+            max-width: 520px;
+            padding: 48px 0;
         }
 
         .brand-heading {
             font-size: 32px;
-            font-weight: 700;
-            color: var(--crm-navy-dark);
+            font-weight: 800;
             line-height: 1.25;
+            color: var(--crm-navy-dark);
             letter-spacing: -0.6px;
             margin-bottom: 16px;
         }
 
         .brand-description {
-            font-size: 15px;
-            color: var(--crm-text-muted);
+            font-size: 15.5px;
             line-height: 1.6;
-            margin-bottom: 40px;
+            color: var(--crm-text-muted);
+            margin-bottom: 36px;
         }
 
-        /* Three Simple SaaS Features */
         .features-list {
             list-style: none;
             display: flex;
@@ -170,23 +168,23 @@
         }
 
         .feature-icon-box {
+            flex-shrink: 0;
             width: 34px;
             height: 34px;
-            flex-shrink: 0;
             border-radius: 8px;
-            background-color: var(--crm-blue-tint);
-            border: 1px solid var(--crm-blue-border);
-            color: var(--crm-blue-primary);
+            background-color: #ffffff;
+            border: 1px solid var(--crm-border-color);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 15px;
+            color: var(--crm-blue-accent);
+            font-size: 16px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
         }
 
         .feature-text {
             display: flex;
             flex-direction: column;
-            padding-top: 1px;
         }
 
         .feature-title {
@@ -202,80 +200,239 @@
             line-height: 1.45;
         }
 
-        /* Brand Footer / Trust Indicators */
         .brand-footer {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            font-size: 12.5px;
+            color: var(--crm-text-light);
             border-top: 1px solid var(--crm-border-color);
             padding-top: 24px;
-            font-size: 12.5px;
-            color: var(--crm-text-muted);
         }
 
         .trust-indicator {
-            display: inline-flex;
+            display: flex;
             align-items: center;
             gap: 6px;
-            color: var(--crm-text-muted);
             font-weight: 500;
-        }
-
-        .trust-indicator i {
-            color: #059669; /* Subtle green lock */
-            font-size: 13px;
+            color: var(--crm-text-muted);
         }
 
         /* =========================================================
-           RIGHT SECTION: Clean Enterprise Sign In Card
+           RIGHT SECTION: Dual Portal Login Form Column
            ========================================================= */
         .auth-form-column {
             flex: 1 1 50%;
             background-color: var(--crm-bg-right);
-            padding: 64px 72px;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 48px;
         }
 
         .auth-form-container {
             width: 100%;
-            max-width: 420px;
+            max-width: 440px;
         }
 
-        /* Mobile-Only Header */
         .mobile-brand-header {
             display: none;
             align-items: center;
             gap: 10px;
-            margin-bottom: 32px;
+            margin-bottom: 24px;
+        }
+
+        /* =========================================================
+           PORTAL SELECTION COMPONENT (ADMIN vs USER)
+           ========================================================= */
+        .portal-selector-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--crm-text-muted);
+            margin-bottom: 10px;
+        }
+
+        .portal-switcher {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 26px;
+        }
+
+        .portal-btn {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 14px 16px;
+            background: #ffffff;
+            border: 2px solid var(--crm-border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+
+        .portal-btn:hover {
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* User Portal Active State */
+        .portal-btn.active.user-portal {
+            border-color: #2563eb;
+            background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Admin Portal Active State */
+        .portal-btn.active.admin-portal {
+            border-color: #0f172a;
+            background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+            box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.18), 0 4px 6px -1px rgba(15, 23, 42, 0.1);
+        }
+
+        .portal-btn-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+
+        .portal-icon-box {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .user-portal .portal-icon-box {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .admin-portal .portal-icon-box {
+            background: #f8fafc;
+            color: #475569;
+        }
+
+        .portal-btn.active.user-portal .portal-icon-box {
+            background: #2563eb;
+            color: #ffffff;
+        }
+
+        .portal-btn.active.admin-portal .portal-icon-box {
+            background: #0f172a;
+            color: #fbbf24;
+        }
+
+        .portal-badge {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .user-portal .portal-badge {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .admin-portal .portal-badge {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .portal-btn.active.user-portal .portal-badge {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .portal-btn.active.admin-portal .portal-badge {
+            background: #0f172a;
+            color: #fbbf24;
+        }
+
+        .portal-name {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: var(--crm-navy-dark);
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .portal-desc {
+            font-size: 11.5px;
+            color: var(--crm-text-muted);
+            line-height: 1.35;
         }
 
         /* Form Header */
         .form-header {
-            margin-bottom: 28px;
+            margin-bottom: 22px;
+        }
+
+        .portal-security-notice {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 16px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .notice-user {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+
+        .notice-admin {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
         }
 
         .form-title {
             font-size: 24px;
-            font-weight: 700;
+            font-weight: 800;
             color: var(--crm-navy-dark);
-            letter-spacing: -0.4px;
-            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+            transition: color 0.2s ease;
         }
 
         .form-subtitle {
-            font-size: 14px;
+            font-size: 13.5px;
             color: var(--crm-text-muted);
+            line-height: 1.45;
         }
 
-        /* Demo Sandbox Credentials Bar (Subtle & Professional) */
+        /* Demo Sandbox Credentials Bar */
         .demo-bar {
             background-color: var(--crm-bg-left);
             border: 1px solid var(--crm-border-color);
             border-radius: 8px;
             padding: 10px 12px;
-            margin-bottom: 24px;
+            margin-bottom: 22px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -299,7 +456,7 @@
             background: #ffffff;
             border: 1px solid var(--crm-border-input);
             border-radius: 6px;
-            padding: 3px 9px;
+            padding: 4px 10px;
             font-size: 11.5px;
             font-weight: 600;
             color: var(--crm-navy-dark);
@@ -313,11 +470,23 @@
             background-color: var(--crm-blue-tint);
         }
 
+        .demo-pill.pill-admin {
+            background: #fef3c7;
+            border-color: #fde68a;
+            color: #92400e;
+        }
+
+        .demo-pill.pill-admin:hover {
+            background: #fde68a;
+            border-color: #f59e0b;
+            color: #78350f;
+        }
+
         /* Alert Notification */
         .auth-alert {
             padding: 12px 14px;
             border-radius: 8px;
-            font-size: 13.5px;
+            font-size: 13px;
             display: flex;
             align-items: flex-start;
             gap: 10px;
@@ -339,7 +508,7 @@
 
         /* Form Controls */
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .form-label {
@@ -416,7 +585,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 24px;
+            margin-bottom: 22px;
             font-size: 13px;
         }
 
@@ -451,14 +620,14 @@
         }
 
         /* Primary Submit Button */
-        .btn-sign-in {
+        .btn-primary-action {
             width: 100%;
             height: 44px;
             background-color: var(--crm-blue-primary);
-            border: 1px solid var(--crm-blue-primary);
+            border: 1px solid transparent;
             border-radius: var(--radius-btn);
             color: #ffffff;
-            font-size: 14px;
+            font-size: 14.5px;
             font-weight: 600;
             font-family: inherit;
             cursor: pointer;
@@ -466,24 +635,36 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
         }
 
-        .btn-sign-in:hover {
+        .btn-primary-action:hover {
             background-color: var(--crm-blue-hover);
-            border-color: var(--crm-blue-hover);
+            box-shadow: 0 4px 10px rgba(29, 78, 216, 0.25);
+            transform: translateY(-1px);
         }
 
-        .btn-sign-in:focus {
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+        .btn-primary-action:active {
+            transform: translateY(0);
         }
 
-        .btn-sign-in:disabled {
-            background-color: #93c5fd;
-            border-color: #93c5fd;
+        .btn-primary-action:disabled {
+            opacity: 0.65;
             cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Admin Portal Submit Button Styling */
+        .btn-primary-action.btn-admin {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            border-color: #334155;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+        }
+
+        .btn-primary-action.btn-admin:hover {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.35);
         }
 
         .spinner-icon {
@@ -496,9 +677,8 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Form Footer */
         .form-footer {
-            margin-top: 28px;
+            margin-top: 26px;
             padding-top: 20px;
             border-top: 1px solid var(--crm-border-color);
             text-align: center;
@@ -535,7 +715,7 @@
             }
 
             .auth-form-container {
-                background-color: #bc7eda;
+                background-color: #ffffff;
                 border: 1px solid var(--crm-border-color);
                 border-radius: var(--radius-card);
                 padding: 36px 28px;
@@ -553,7 +733,12 @@
             }
 
             .auth-form-container {
-                padding: 28px 20px;
+                padding: 24px 18px;
+            }
+
+            .portal-switcher {
+                grid-template-columns: 1fr;
+                gap: 8px;
             }
 
             .demo-bar {
@@ -566,8 +751,6 @@
                 width: 100%;
                 flex-wrap: wrap;
             }
-
-
         }
     </style>
 </head>
@@ -576,18 +759,19 @@
         <!-- =====================================================
              LEFT SECTION: Enterprise Branding & Core Capabilities
              ===================================================== -->
-        <aside class="auth-brand-column" aria-label="NimbusCRM Overview">
+        <aside class="auth-brand-column" aria-label="VisionCRM Overview">
             <div>
-                <!-- NimbusCRM Logo Mark -->
+                <!-- VisionCRM Logo Mark -->
                 <header class="brand-header">
                     <div class="brand-logo-mark" aria-hidden="true">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4C9.11 4 6.6 5.64 5.35 8.04C2.34 8.36 0 10.91 0 14C0 17.31 2.69 20 6 20H19C21.76 20 24 17.76 24 15C24 12.36 21.95 10.22 19.35 10.04Z" fill="#3b82f6" fill-opacity="0.25"/>
-                            <path d="M19 18H6C3.79 18 2 16.21 2 14C2 11.95 3.53 10.28 5.56 10.03L6.63 9.9L7.13 8.95C8.08 7.14 9.94 6 12 6C14.7 6 17.01 7.94 17.47 10.6L17.65 11.66L18.72 11.75C20.58 11.91 22 13.49 22 15C22 16.65 20.65 18 19 18Z" fill="#ffffff"/>
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
                     <div class="brand-logo-text">
-                        <span>NimbusCRM</span>
+                        <span>VisionCRM</span>
                         <span class="brand-badge">Enterprise</span>
                     </div>
                 </header>
@@ -599,15 +783,24 @@
                         Manage leads, track sales activities, organize projects, and grow your business from one centralized workspace.
                     </p>
 
-                    <!-- Three Simple Features with Small Icons -->
                     <ul class="features-list">
+                        <li class="feature-item">
+                            <div class="feature-icon-box" aria-hidden="true">
+                                <i class="bi bi-shield-lock"></i>
+                            </div>
+                            <div class="feature-text">
+                                <span class="feature-title">Separate Admin &amp; User Portals</span>
+                                <span class="feature-subtitle">Database-verified RBAC segregation preventing privilege escalation across workflows.</span>
+                            </div>
+                        </li>
+
                         <li class="feature-item">
                             <div class="feature-icon-box" aria-hidden="true">
                                 <i class="bi bi-funnel"></i>
                             </div>
                             <div class="feature-text">
                                 <span class="feature-title">Lead &amp; Pipeline Tracking</span>
-                                <span class="feature-subtitle">Capture, qualify, and track prospective opportunities through customized conversion stages.</span>
+                                <span class="feature-subtitle">Capture, qualify, and track prospective opportunities through conversion stages.</span>
                             </div>
                         </li>
 
@@ -617,17 +810,7 @@
                             </div>
                             <div class="feature-text">
                                 <span class="feature-title">Project &amp; Milestone Workspaces</span>
-                                <span class="feature-subtitle">Coordinate client deliverables, sprint tasks, and dependencies with team visibility.</span>
-                            </div>
-                        </li>
-
-                        <li class="feature-item">
-                            <div class="feature-icon-box" aria-hidden="true">
-                                <i class="bi bi-shield-check"></i>
-                            </div>
-                            <div class="feature-text">
-                                <span class="feature-title">Enterprise Security &amp; Invoicing</span>
-                                <span class="feature-subtitle">Enforce role-based access controls alongside automated quotations, invoices, and audit logs.</span>
+                                <span class="feature-subtitle">Coordinate client deliverables, sprint tasks, and finance invoices with team visibility.</span>
                             </div>
                         </li>
                     </ul>
@@ -636,7 +819,7 @@
 
             <!-- Trust & Encryption Footer -->
             <footer class="brand-footer">
-                <span>&copy; @DateTime.UtcNow.Year NimbusCRM Inc.</span>
+                <span>&copy; @DateTime.UtcNow.Year VisionCRM Inc.</span>
                 <span class="trust-indicator">
                     <i class="bi bi-lock-fill" aria-hidden="true"></i> 256-bit TLS Encrypted
                 </span>
@@ -644,7 +827,7 @@
         </aside>
 
         <!-- =====================================================
-             RIGHT SECTION: Modern Professional Authentication Form
+             RIGHT SECTION: Dual Portal Authentication Form
              ===================================================== -->
         <main class="auth-form-column" role="main">
             <div class="auth-form-container">
@@ -652,37 +835,74 @@
                 <header class="mobile-brand-header">
                     <div class="brand-logo-mark" aria-hidden="true">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M19 18H6C3.79 18 2 16.21 2 14C2 11.95 3.53 10.28 5.56 10.03L6.63 9.9L7.13 8.95C8.08 7.14 9.94 6 12 6C14.7 6 17.01 7.94 17.47 10.6L17.65 11.66L18.72 11.75C20.58 11.91 22 13.49 22 15C22 16.65 20.65 18 19 18Z" fill="#ffffff"/>
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
                     <div class="brand-logo-text">
-                        <span>NimbusCRM</span>
+                        <span>VisionCRM</span>
                     </div>
                 </header>
 
+                <!-- PORTAL SELECTION (ADMIN vs USER) -->
+                <span class="portal-selector-label">Choose Login Portal</span>
+                <div class="portal-switcher" role="tablist" aria-label="Choose Login Portal">
+                    <!-- User Portal Option -->
+                    <button type="button"
+                            id="userPortalBtn"
+                            class="portal-btn user-portal @(isInitialAdmin ? "" : "active")"
+                            role="tab"
+                            aria-selected="@(isInitialAdmin ? "false" : "true")"
+                            onclick="switchPortal('user')"
+                            title="Select User Portal for standard users and staff">
+                        <div class="portal-btn-top">
+                            <div class="portal-icon-box">
+                                <i class="bi bi-person-badge-fill"></i>
+                            </div>
+                            <span class="portal-badge">User</span>
+                        </div>
+                        <div class="portal-name">User Portal</div>
+                        <div class="portal-desc">For registered users &amp; staff</div>
+                    </button>
+
+                    <!-- Admin Portal Option -->
+                    <button type="button"
+                            id="adminPortalBtn"
+                            class="portal-btn admin-portal @(isInitialAdmin ? "active" : "")"
+                            role="tab"
+                            aria-selected="@(isInitialAdmin ? "true" : "false")"
+                            onclick="switchPortal('admin')"
+                            title="Select Admin Portal for authorized administrators">
+                        <div class="portal-btn-top">
+                            <div class="portal-icon-box">
+                                <i class="bi bi-shield-lock-fill"></i>
+                            </div>
+                            <span class="portal-badge">Admin</span>
+                        </div>
+                        <div class="portal-name">Admin Portal</div>
+                        <div class="portal-desc">For authorized administrators</div>
+                    </button>
+                </div>
+
+                <!-- Form Header -->
                 <header class="form-header">
-                    <h2 class="form-title" id="loginTitle">Sign in to your account</h2>
-                    <p class="form-subtitle">Welcome back. Enter your credentials to access your workspace.</p>
+                    <div id="portalSecurityNotice" class="portal-security-notice @(isInitialAdmin ? "notice-admin" : "notice-user")">
+                        <i class="bi @(isInitialAdmin ? "bi-shield-check" : "bi-person-check-fill")" id="portalNoticeIcon"></i>
+                        <span id="portalNoticeText">@(isInitialAdmin ? "Admin Portal · Restricted Access" : "User Portal · Standard Access")</span>
+                    </div>
+                    <h2 class="form-title" id="loginTitle">@(isInitialAdmin ? "Admin Portal Sign In" : "User Portal Sign In")</h2>
+                    <p class="form-subtitle" id="loginSubtitle">
+                        @(isInitialAdmin 
+                            ? "Enter your Administrator ID & password to access the Admin Dashboard." 
+                            : "Enter your User ID & password to access your User Dashboard.")
+                    </p>
                 </header>
 
-                <!-- Subtle Demo Credentials Filler -->
-                <aside class="demo-bar" aria-label="Demo login options">
-                    <span class="demo-bar-label">
-                        <i class="bi bi-lightning-charge" style="color: #2563eb;"></i> Quick Fill:
-                    </span>
-                    <div class="demo-bar-pills">
-                        <button type="button" class="demo-pill" onclick="fillCredentials('@(ViewBag.AdminEmail ?? "admin@nimbuscrm.com")', '@(ViewBag.AdminPassword ?? "AdminPassword123!")')" title="Load Administrator credentials">
-                            Admin
-                        </button>
-                        <button type="button" class="demo-pill" id="userOptionBtn" onclick="fillCredentials('@(ViewBag.UserEmail ?? "ananya.sharma@nimbuscrm.com")', '@(ViewBag.UserPassword ?? "Ananya@123!")')" title="Load User credentials">
-                            User
-                        </button>
-                    </div>
-                </aside>
 
                 <!-- Alert Message Banner -->
                 <div id="authAlert" class="auth-alert auth-alert-danger" style="@(string.IsNullOrEmpty(Model?.ErrorMessage) ? "display:none;" : "")" role="alert">
-                    <i class="bi bi-exclamation-circle-fill" style="margin-top:2px;" aria-hidden="true"></i>
+                    <i class="bi bi-exclamation-triangle-fill" style="margin-top:2px;" aria-hidden="true"></i>
                     <span id="authAlertText">@(Model?.ErrorMessage ?? "")</span>
                 </div>
 
@@ -690,16 +910,19 @@
                 <form id="loginForm" method="post" action="/login" onsubmit="handleLoginSubmit(event)" novalidate>
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="ReturnUrl" id="returnUrlInput" value="@Model?.ReturnUrl" />
+                    <input type="hidden" name="LoginType" id="loginTypeInput" value="@(isInitialAdmin ? "admin" : "user")" />
 
-                    <!-- User ID / Email Input -->
+                    <!-- User ID / Admin ID / Email Input -->
                     <div class="form-group">
-                        <label class="form-label" for="userIdInput">User ID or Work Email</label>
+                        <label class="form-label" for="userIdInput" id="userIdLabel">
+                            @(isInitialAdmin ? "Administrator ID or Admin Email" : "User ID or Work Email")
+                        </label>
                         <div class="input-container">
                             <input type="text"
                                    id="userIdInput"
                                    name="UserId"
                                    class="form-input"
-                                   placeholder="e.g. admin@nimbuscrm.com or User ID"
+                                   placeholder="@(isInitialAdmin ? "e.g. admin@visioncrm.com or Admin ID" : "e.g. ananya.sharma@visioncrm.com or User ID")"
                                    value="@(Model?.UserId ?? Model?.Email ?? "")"
                                    required
                                    autocomplete="username"
@@ -707,10 +930,11 @@
                         </div>
                     </div>
 
-
                     <!-- Password Input with Eye Visibility Toggle -->
                     <div class="form-group">
-                        <label class="form-label" for="passwordInput">Password</label>
+                        <label class="form-label" for="passwordInput" id="passwordLabel">
+                            @(isInitialAdmin ? "Admin Password" : "Password")
+                        </label>
                         <div class="input-container">
                             <input type="password"
                                    id="passwordInput"
@@ -738,48 +962,168 @@
                                    name="RememberMe"
                                    value="true"
                                    @(Model?.RememberMe == true ? "checked" : "") />
-                            <span>Remember me</span>
+                            <span id="rememberMeText">@(isInitialAdmin ? "Keep admin session" : "Keep me signed in")</span>
                         </label>
-                        <a href="javascript:void(0)" class="link-forgot-password" onclick="handleForgotPassword()" id="forgotPasswordLink">
-                            Forgot password?
-                        </a>
+                        <a href="javascript:void(0)" class="link-forgot-password" onclick="handleForgotPassword()">Need help?</a>
                     </div>
 
-                    <!-- Primary Action Button -->
-                    <button type="submit" class="btn-sign-in" id="submitBtn">
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn-primary-action @(isInitialAdmin ? "btn-admin" : "")" id="submitBtn">
                         <i class="bi bi-arrow-repeat spinner-icon" id="submitSpinner" aria-hidden="true"></i>
-                        <span id="submitBtnText">Sign In</span>
+                        <i class="bi @(isInitialAdmin ? "bi-shield-lock-fill" : "bi-box-arrow-in-right")" id="submitBtnIcon" aria-hidden="true"></i>
+                        <span id="submitBtnText">@(isInitialAdmin ? "Sign In to Admin Portal" : "Sign In to User Portal")</span>
                     </button>
                 </form>
 
-                <!-- Help Footer -->
                 <footer class="form-footer">
-                    <span>Having trouble logging in? <a href="javascript:void(0)" onclick="handleForgotPassword()">Contact Administrator</a></span>
+                    <span>Direct portal URLs: <a href="/admin/login">Admin Portal</a> · <a href="/user/login">User Portal</a></span>
                 </footer>
             </div>
         </main>
     </div>
 
-    <!-- =========================================================
-         Client Logic & Asynchronous Authentication Handler
-         ========================================================= -->
+    <!-- Interactive Portal Logic and Scripting -->
     <script>
-        // 1-Click Demo Credentials Autofill
-        function fillCredentials(userId, password) {
-            const userInput = document.getElementById('userIdInput');
-            const passwordInput = document.getElementById('passwordInput');
-            if (userInput) userInput.value = userId;
-            if (passwordInput) passwordInput.value = password;
+        const adminEmail = '@(ViewBag.AdminEmail ?? "admin@visioncrm.com")';
+        const adminPassword = '@(ViewBag.AdminPassword ?? "AdminPassword123!")';
+        const userEmail = '@(ViewBag.UserEmail ?? "ananya.sharma@visioncrm.com")';
+        const userPassword = '@(ViewBag.UserPassword ?? "Ananya@123!")';
+
+        let currentPortal = '@(isInitialAdmin ? "admin" : "user")';
+
+        // Check URL parameter for initial portal selection
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const portalParam = urlParams.get('portal');
+            if (portalParam === 'admin' || window.location.pathname.includes('/admin')) {
+                switchPortal('admin', false);
+            } else if (portalParam === 'user' || window.location.pathname.includes('/user')) {
+                switchPortal('user', false);
+            }
+        });
+
+        // Switch between Admin and User Portals dynamically
+        function switchPortal(portal, updateUrl = true) {
+            currentPortal = portal;
             hideAlert();
-            if (passwordInput) passwordInput.focus();
+
+            const userBtn = document.getElementById('userPortalBtn');
+            const adminBtn = document.getElementById('adminPortalBtn');
+            const loginTypeInput = document.getElementById('loginTypeInput');
+            const notice = document.getElementById('portalSecurityNotice');
+            const noticeIcon = document.getElementById('portalNoticeIcon');
+            const noticeText = document.getElementById('portalNoticeText');
+            const title = document.getElementById('loginTitle');
+            const subtitle = document.getElementById('loginSubtitle');
+            const quickFillIcon = document.getElementById('quickFillIcon');
+            const primaryDemoPill = document.getElementById('primaryDemoPill');
+            const userIdLabel = document.getElementById('userIdLabel');
+            const userIdInput = document.getElementById('userIdInput');
+            const passwordLabel = document.getElementById('passwordLabel');
+            const submitBtn = document.getElementById('submitBtn');
+            const submitBtnIcon = document.getElementById('submitBtnIcon');
+            const submitBtnText = document.getElementById('submitBtnText');
+            const rememberMeText = document.getElementById('rememberMeText');
+
+            if (portal === 'admin') {
+                // Activate Admin Portal UI
+                userBtn.classList.remove('active');
+                userBtn.setAttribute('aria-selected', 'false');
+                adminBtn.classList.add('active');
+                adminBtn.setAttribute('aria-selected', 'true');
+
+                loginTypeInput.value = 'admin';
+
+                notice.className = 'portal-security-notice notice-admin';
+                noticeIcon.className = 'bi bi-shield-check';
+                noticeText.textContent = 'Admin Portal · Restricted Access';
+
+                title.textContent = 'Admin Portal Sign In';
+                subtitle.textContent = 'Enter your Administrator ID & password to access the Admin Dashboard.';
+
+                quickFillIcon.style.color = '#d97706';
+                primaryDemoPill.className = 'demo-pill pill-admin';
+                primaryDemoPill.textContent = 'Load Admin Credentials';
+
+                userIdLabel.textContent = 'Administrator ID or Admin Email';
+                userIdInput.placeholder = 'e.g. admin@visioncrm.com or Admin ID';
+                passwordLabel.textContent = 'Admin Password';
+
+                rememberMeText.textContent = 'Keep admin session';
+
+                submitBtn.className = 'btn-primary-action btn-admin';
+                submitBtnIcon.className = 'bi bi-shield-lock-fill';
+                submitBtnText.textContent = 'Sign In to Admin Portal';
+
+                document.title = 'Admin Portal Sign In · VisionCRM';
+
+                if (updateUrl && window.history && window.history.replaceState) {
+                    const currentUrl = new URL(window.location);
+                    currentUrl.searchParams.set('portal', 'admin');
+                    window.history.replaceState({}, '', currentUrl);
+                }
+            } else {
+                // Activate User Portal UI
+                adminBtn.classList.remove('active');
+                adminBtn.setAttribute('aria-selected', 'false');
+                userBtn.classList.add('active');
+                userBtn.setAttribute('aria-selected', 'true');
+
+                loginTypeInput.value = 'user';
+
+                notice.className = 'portal-security-notice notice-user';
+                noticeIcon.className = 'bi bi-person-check-fill';
+                noticeText.textContent = 'User Portal · Standard Access';
+
+                title.textContent = 'User Portal Sign In';
+                subtitle.textContent = 'Enter your User ID & password to access your User Dashboard.';
+
+                quickFillIcon.style.color = '#2563eb';
+                primaryDemoPill.className = 'demo-pill';
+                primaryDemoPill.textContent = 'Load User Credentials';
+
+                userIdLabel.textContent = 'User ID or Work Email';
+                userIdInput.placeholder = 'e.g. ananya.sharma@visioncrm.com or User ID';
+                passwordLabel.textContent = 'Password';
+
+                rememberMeText.textContent = 'Keep me signed in';
+
+                submitBtn.className = 'btn-primary-action';
+                submitBtnIcon.className = 'bi bi-box-arrow-in-right';
+                submitBtnText.textContent = 'Sign In to User Portal';
+
+                document.title = 'User Portal Sign In · VisionCRM';
+
+                if (updateUrl && window.history && window.history.replaceState) {
+                    const currentUrl = new URL(window.location);
+                    currentUrl.searchParams.set('portal', 'user');
+                    window.history.replaceState({}, '', currentUrl);
+                }
+            }
         }
 
-        // Toggle Password Visibility
+        // Fill credentials based on the currently active portal
+        function fillActiveDemoCredentials() {
+            if (currentPortal === 'admin') {
+                fillCredentials(adminEmail, adminPassword);
+            } else {
+                fillCredentials(userEmail, userPassword);
+            }
+        }
+
+        function fillCredentials(userId, pwd) {
+            const userInput = document.getElementById('userIdInput');
+            const pwdInput = document.getElementById('passwordInput');
+            if (userInput) userInput.value = userId;
+            if (pwdInput) pwdInput.value = pwd;
+            hideAlert();
+        }
+
         function togglePasswordVisibility() {
             const pwd = document.getElementById('passwordInput');
             const icon = document.getElementById('togglePasswordIcon');
             const btn = document.getElementById('togglePasswordBtn');
-            if (!pwd || !icon || !btn) return;
+            if (!pwd || !icon) return;
 
             if (pwd.type === 'password') {
                 pwd.type = 'text';
@@ -794,7 +1138,6 @@
             }
         }
 
-        // Display user notifications
         function showAlert(message, isSuccess = false) {
             const alertBox = document.getElementById('authAlert');
             const alertText = document.getElementById('authAlertText');
@@ -810,12 +1153,11 @@
             if (alertBox) alertBox.style.display = 'none';
         }
 
-        // Forgot password prompt
         function handleForgotPassword() {
-            showAlert('Please reach out to your system administrator (admin@nimbuscrm.com) to reset credentials or verify account permissions.', false);
+            showAlert('Please reach out to your system administrator (admin@visioncrm.com) to reset credentials or verify account permissions.', false);
         }
 
-        // Asynchronous form submission preserving bearer token caching & fallback
+        // Handle AJAX form submission with backend role enforcement and token preservation
         async function handleLoginSubmit(event) {
             event.preventDefault();
             hideAlert();
@@ -826,12 +1168,13 @@
             const submitBtn = document.getElementById('submitBtn');
             const submitSpinner = document.getElementById('submitSpinner');
             const submitBtnText = document.getElementById('submitBtnText');
+            const submitBtnIcon = document.getElementById('submitBtnIcon');
 
             const userId = (userInput?.value || '').trim();
             const password = passwordInput?.value || '';
 
             if (!userId && !password) {
-                showAlert('Please enter both User ID / Email and Password.');
+                showAlert('Please enter both User ID and Password.');
                 userInput?.focus();
                 return;
             }
@@ -848,10 +1191,11 @@
                 return;
             }
 
-            // Enter loading state
+            // Loading state
             submitBtn.disabled = true;
-            submitSpinner.style.display = 'inline-block';
-            submitBtnText.textContent = 'Signing in...';
+            if (submitSpinner) submitSpinner.style.display = 'inline-block';
+            if (submitBtnIcon) submitBtnIcon.style.display = 'none';
+            if (submitBtnText) submitBtnText.textContent = 'Verifying credentials...';
 
             try {
                 const formData = new FormData(form);
@@ -872,7 +1216,7 @@
                 }
 
                 if (response.ok && result && result.success) {
-                    // Cache Bearer access token and user metadata for client API calls
+                    // Cache Bearer token and user info
                     if (result.token) {
                         try {
                             localStorage.setItem('crm_token', result.token);
@@ -884,19 +1228,25 @@
                         }
                     }
 
-                    submitBtnText.textContent = 'Redirecting...';
+                    if (submitBtnText) submitBtnText.textContent = 'Redirecting...';
                     showAlert('Signed in successfully! Redirecting...', true);
 
-                    const target = result.redirectUrl || '/Lead/List';
+                    const target = result.redirectUrl || (currentPortal === 'admin' ? '/admin/dashboard' : '/user/dashboard');
                     setTimeout(() => {
                         window.location.href = target;
                     }, 350);
                 } else {
+                    // Extract exact error message from backend
                     const errorMsg = result?.message || 
-                        (response.status === 423 ? 'Account temporarily locked due to failed login attempts.' : 
-                         response.status === 403 ? 'Account is inactive. Please contact your administrator.' : 
-                         'Invalid User ID or Password.');
-                    showAlert(errorMsg);
+                        (response.status === 403 
+                            ? (currentPortal === 'admin' 
+                                ? 'Access denied. Valid Admin credentials are required.' 
+                                : 'Access denied. Valid User credentials are required.')
+                            : (response.status === 423 
+                                ? 'Account temporarily locked due to multiple failed login attempts.' 
+                                : 'Invalid User ID or Password.'));
+
+                    showAlert(errorMsg, false);
                     resetSubmitButton();
                 }
             } catch (err) {
@@ -909,9 +1259,16 @@
             const submitBtn = document.getElementById('submitBtn');
             const submitSpinner = document.getElementById('submitSpinner');
             const submitBtnText = document.getElementById('submitBtnText');
+            const submitBtnIcon = document.getElementById('submitBtnIcon');
+
             if (submitBtn) submitBtn.disabled = false;
             if (submitSpinner) submitSpinner.style.display = 'none';
-            if (submitBtnText) submitBtnText.textContent = 'Sign In';
+            if (submitBtnIcon) submitBtnIcon.style.display = 'inline-block';
+            if (submitBtnText) {
+                submitBtnText.textContent = currentPortal === 'admin' 
+                    ? 'Sign In to Admin Portal' 
+                    : 'Sign In to User Portal';
+            }
         }
     </script>
 </body>

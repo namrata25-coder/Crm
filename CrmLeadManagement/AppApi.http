@@ -1,0 +1,514 @@
+### VisionCRM App API - Interactive HTTP Request Collection
+### Run directly in VS Code (REST Client extension) or Visual Studio 2022+
+
+@baseUrl = http://localhost:5000
+@adminEmail = admin@visioncrm.com
+@adminPassword = AdminPassword123!
+@userEmail = user@visioncrm.com
+@userPassword = UserPassword123!
+
+###############################################################################
+# 1. AUTHENTICATION MODULE (/api/v1/app/auth)
+###############################################################################
+
+### 1.1 User Login
+# @name userLogin
+POST {{baseUrl}}/api/v1/app/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}",
+  "deviceId": "Pixel-8-Pro-Android-14",
+  "role": "user"
+}
+
+### Capture user token from response
+@authToken = {{userLogin.response.body.token}}
+
+
+### 1.2 Admin Login
+# @name adminLogin
+POST {{baseUrl}}/api/v1/app/auth/admin-login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}",
+  "deviceId": "Admin-Workstation-Chrome"
+}
+
+### Capture admin token from response
+@adminToken = {{adminLogin.response.body.token}}
+
+
+### 1.3 Dedicated User Login
+POST {{baseUrl}}/api/v1/app/auth/user-login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}",
+  "deviceId": "Samsung-Galaxy-S24"
+}
+
+
+### 1.4 Get Current User Profile (/me)
+GET {{baseUrl}}/api/v1/app/auth/me
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 1.5 Change Password
+POST {{baseUrl}}/api/v1/app/auth/change-password
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "oldPassword": "UserPassword123!",
+  "newPassword": "NewStrongUserPassword456!"
+}
+
+
+### 1.6 Logout
+POST {{baseUrl}}/api/v1/app/auth/logout
+Authorization: Bearer {{authToken}}
+
+
+### 1.7 Logout All Devices
+POST {{baseUrl}}/api/v1/app/auth/logout-all
+Authorization: Bearer {{authToken}}
+
+
+###############################################################################
+# 2. LEADS MODULE (/api/v1/app/leads)
+###############################################################################
+
+### 2.1 Get All Leads
+GET {{baseUrl}}/api/v1/app/leads
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 2.2 Get Lead Counts Summary
+GET {{baseUrl}}/api/v1/app/leads/count
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 2.3 Get Lead by ID
+GET {{baseUrl}}/api/v1/app/leads/LD-1001
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 2.4 Create New Lead
+POST {{baseUrl}}/api/v1/app/leads
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "leadName": "Vikram Malhotra",
+  "companyName": "Solaris Energy Ltd",
+  "mobileNumber": "+91 99887 76655",
+  "email": "vikram@solarisenergy.com",
+  "designation": "Director of Operations",
+  "location": "Bengaluru",
+  "source": "LinkedIn",
+  "leadStatus": "New",
+  "assignedTo": "Ananya Sharma",
+  "priority": "High",
+  "followUpDate": "2026-10-25",
+  "remarks": "Met at Tech Expo. Requested demo."
+}
+
+
+### 2.5 Update Lead
+PUT {{baseUrl}}/api/v1/app/leads/LD-1001
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "leadName": "Rajesh Kumar",
+  "companyName": "Acme Infotech",
+  "mobileNumber": "+91 98765 43210",
+  "email": "rajesh@acmeinfo.com",
+  "designation": "CTO",
+  "location": "Mumbai",
+  "source": "Website",
+  "leadStatus": "In Progress",
+  "assignedTo": "Ananya Sharma",
+  "priority": "High",
+  "followUpDate": "2026-10-28",
+  "remarks": "Discussion on contract terms in progress."
+}
+
+
+### 2.6 Delete Lead
+DELETE {{baseUrl}}/api/v1/app/leads/LD-1005
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+###############################################################################
+# 3. PROJECTS MODULE (/api/v1/app/projects)
+###############################################################################
+
+### 3.1 List Projects (Paginated & Filterable)
+GET {{baseUrl}}/api/v1/app/projects?page=1&pageSize=20&status=Active
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 3.2 Get Project by ID
+GET {{baseUrl}}/api/v1/app/projects/1
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 3.3 Create New Project
+POST {{baseUrl}}/api/v1/app/projects
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "projectName": "ERP Cloud Migration",
+  "clientName": "Apex Logistics",
+  "clientCompany": "Apex Global Ltd",
+  "projectType": "Direct Project",
+  "description": "Migration from on-premise ERP to cloud infrastructure.",
+  "startDate": "2026-11-01",
+  "deadline": "2027-02-28",
+  "projectManager": "Ananya Sharma",
+  "assignedMembers": "Ananya Sharma, Vikram Malhotra",
+  "budget": 500000.00,
+  "priority": "High",
+  "status": "Active",
+  "notes": "Kick-off meeting scheduled for next week."
+}
+
+
+### 3.4 Update Project
+PUT {{baseUrl}}/api/v1/app/projects/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "projectName": "Mobile App Redesign - Phase 2",
+  "clientName": "Acme Infotech",
+  "clientCompany": "Acme Corp",
+  "projectType": "Direct Project",
+  "description": "Updated scope for push notifications.",
+  "startDate": "2026-10-01",
+  "deadline": "2026-12-15",
+  "projectManager": "Ananya Sharma",
+  "assignedMembers": "Ananya Sharma, Rohan Verma",
+  "budget": 275000.00,
+  "priority": "High",
+  "status": "Active",
+  "notes": "Scope extension approved."
+}
+
+
+### 3.5 Delete Project
+DELETE {{baseUrl}}/api/v1/app/projects/2
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+###############################################################################
+# 4. MILESTONES MODULE (/api/v1/app/milestones)
+###############################################################################
+
+### 4.1 List Milestones
+GET {{baseUrl}}/api/v1/app/milestones?page=1&pageSize=20
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 4.2 Get Project Sequential Milestone Dependencies
+GET {{baseUrl}}/api/v1/app/milestones/project-dependency/1
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 4.3 Get Milestone by ID
+GET {{baseUrl}}/api/v1/app/milestones/1
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 4.4 Create Milestone
+POST {{baseUrl}}/api/v1/app/milestones
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "projectId": 1,
+  "milestoneName": "Backend API Integration",
+  "description": "REST API connectivity and validation.",
+  "startDate": "2026-10-20",
+  "dueDate": "2026-11-10",
+  "amount": 100000.00,
+  "completedAmount": 0.00,
+  "assignedMembers": "Rohan Verma",
+  "priority": "High",
+  "status": "Pending",
+  "notes": "Requires database migration completion."
+}
+
+
+### 4.5 Update Milestone
+PUT {{baseUrl}}/api/v1/app/milestones/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "projectId": 1,
+  "milestoneName": "UI/UX Prototype Design",
+  "description": "Design wireframes and interactive prototypes.",
+  "startDate": "2026-10-01",
+  "dueDate": "2026-10-15",
+  "amount": 75000.00,
+  "completedAmount": 75000.00,
+  "assignedMembers": "Ananya Sharma",
+  "priority": "High",
+  "status": "Completed",
+  "notes": "Approved by client."
+}
+
+
+### 4.6 Quick Status Update
+PATCH {{baseUrl}}/api/v1/app/milestones/1/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "status": "Completed"
+}
+
+
+### 4.7 Delete Milestone
+DELETE {{baseUrl}}/api/v1/app/milestones/2
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+###############################################################################
+# 5. WORK DASHBOARD, STATISTICS & TASKS (/api/v1/app/work)
+###############################################################################
+
+### 5.1 Get Work Summary Metrics
+GET {{baseUrl}}/api/v1/app/work/summary
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 5.2 Get Work Statistics & Distributions
+GET {{baseUrl}}/api/v1/app/work/stats
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 5.3 Get Comprehensive Work Reports
+GET {{baseUrl}}/api/v1/app/work/reports?page=1&pageSize=20
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 5.4 Get Work Tasks List
+GET {{baseUrl}}/api/v1/app/work/tasks?page=1&pageSize=20
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 5.5 Get Work Task by ID
+GET {{baseUrl}}/api/v1/app/work/tasks/1
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+###############################################################################
+# 6. TEAM ROLES & PERMISSIONS (/api/v1/app/team/roles)
+###############################################################################
+
+### 6.1 List All Roles
+GET {{baseUrl}}/api/v1/app/team/roles
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 6.2 Get Role Details & Permissions Matrix
+GET {{baseUrl}}/api/v1/app/team/roles/Sales%20Executive
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 6.3 Save Role & Permissions Matrix
+POST {{baseUrl}}/api/v1/app/team/roles/save
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "roleName": "Field Sales Agent",
+  "dataAccess": "OnlyAssigned",
+  "permissions": [
+    {
+      "module": "Lead",
+      "view": true,
+      "create": true,
+      "edit": true,
+      "delete": false
+    },
+    {
+      "module": "Task",
+      "view": true,
+      "create": true,
+      "edit": true,
+      "delete": false
+    }
+  ]
+}
+
+
+###############################################################################
+# 7. SYSTEM SETTINGS MODULE (/api/v1/app/settings)
+###############################################################################
+
+### 7.1 Get Full Settings Aggregate
+GET {{baseUrl}}/api/v1/app/settings
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 7.2 Get Lead Statuses
+GET {{baseUrl}}/api/v1/app/settings/statuses
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 7.3 Add Lead Status
+POST {{baseUrl}}/api/v1/app/settings/statuses
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "Under Negotiation"
+}
+
+
+### 7.4 Delete Lead Status
+DELETE {{baseUrl}}/api/v1/app/settings/statuses/Under%20Negotiation
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 7.5 Get Lead Sources
+GET {{baseUrl}}/api/v1/app/settings/sources
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 7.6 Add Lead Source
+POST {{baseUrl}}/api/v1/app/settings/sources
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "Trade Show 2026"
+}
+
+
+### 7.7 Delete Lead Source
+DELETE {{baseUrl}}/api/v1/app/settings/sources/Trade%20Show%202026
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 7.8 Get Settings Users
+GET {{baseUrl}}/api/v1/app/settings/users
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 7.9 Create Settings User
+POST {{baseUrl}}/api/v1/app/settings/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Kavita Singhania",
+  "email": "kavita@visioncrm.com",
+  "role": "Sales Executive",
+  "password": "KavitaPassword123!",
+  "status": "Active",
+  "modulePermissions": "Lead,Project,Task"
+}
+
+
+### 7.10 Update Settings User Status
+PATCH {{baseUrl}}/api/v1/app/settings/users/kavita@visioncrm.com/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "status": "Active"
+}
+
+
+### 7.11 Get Tax Masters
+GET {{baseUrl}}/api/v1/app/settings/taxes
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 7.12 Add Tax Master
+POST {{baseUrl}}/api/v1/app/settings/taxes
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "taxName": "Custom Cess 2%",
+  "taxType": "Cess",
+  "taxRate": 2.00,
+  "description": "Clean energy cess for green initiatives",
+  "status": "Active"
+}
+
+
+### 7.13 Get Follow-Up Settings
+GET {{baseUrl}}/api/v1/app/settings/followup
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 7.14 Update Follow-Up Settings
+PUT {{baseUrl}}/api/v1/app/settings/followup
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "defaultReminderDaysBefore": 2,
+  "enableEmailReminders": true,
+  "enableSmsReminders": true,
+  "defaultFollowUpType": "Meeting",
+  "autoEscalateAfterDaysOverdue": 4
+}

@@ -237,6 +237,48 @@ public class FollowUpSettingsInputDto
 }
 
 /// <summary>
+/// Lead creation/update input DTO for /api/v1/app/leads.
+/// </summary>
+public class AppLeadInputDto
+{
+    [JsonPropertyName("leadName")]
+    public string LeadName { get; set; } = "";
+
+    [JsonPropertyName("companyName")]
+    public string? CompanyName { get; set; } = "";
+
+    [JsonPropertyName("mobileNumber")]
+    public string? MobileNumber { get; set; } = "";
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; } = "";
+
+    [JsonPropertyName("designation")]
+    public string? Designation { get; set; } = "";
+
+    [JsonPropertyName("location")]
+    public string? Location { get; set; } = "";
+
+    [JsonPropertyName("source")]
+    public string? Source { get; set; } = "";
+
+    [JsonPropertyName("leadStatus")]
+    public string? LeadStatus { get; set; } = "New";
+
+    [JsonPropertyName("assignedTo")]
+    public string? AssignedTo { get; set; } = "";
+
+    [JsonPropertyName("priority")]
+    public string? Priority { get; set; } = "Medium";
+
+    [JsonPropertyName("followUpDate")]
+    public string? FollowUpDate { get; set; } = "";
+
+    [JsonPropertyName("remarks")]
+    public string? Remarks { get; set; }
+}
+
+/// <summary>
 /// Project creation/update DTO for /api/v1/app/projects.
 /// </summary>
 public class AppProjectInputDto

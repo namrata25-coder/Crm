@@ -131,7 +131,11 @@ public class LeadsApiController : ControllerBase
     }
 
     // POST /api/leads
+    // POST /api/leads/add
+    // POST /api/leads/create
     [HttpPost]
+    [HttpPost("add")]
+    [HttpPost("create")]
     public ActionResult<Lead> Create([FromBody] LeadInputModel input)
     {
         if (string.IsNullOrWhiteSpace(input.LeadName))

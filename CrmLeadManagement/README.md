@@ -1,4 +1,4 @@
-# NimbusCRM — Lead Management (ASP.NET Core MVC)
+# VisionCRM — Lead Management (ASP.NET Core MVC)
 
 A production-styled ASP.NET Core **MVC** CRM Lead Management module (migrated
 from Razor Pages — there is no `Pages/` folder or `PageModel` anywhere in the
@@ -174,7 +174,7 @@ The REST API is secured with plain opaque Bearer token authentication (no JWT). 
 
 | Key | Default | Description |
 |---|---|---|
-| `Seed:AdminEmail` | `"admin@nimbuscrm.com"` | Initial administrator email address. |
+| `Seed:AdminEmail` | `"admin@visioncrm.com"` | Initial administrator email address. |
 | `Seed:AdminPassword` | `"AdminPassword123!"` | Initial administrator password hashed with `PasswordHasher<UserRoleEntry>`. |
 | `BearerAuth:TokenHours` | `12` | Base lifetime of issued access tokens in hours. |
 | `BearerAuth:SlidingExpiration` | `true` | If true, extends token expiry when used and less than half of lifetime remains. |
@@ -216,7 +216,7 @@ dotnet ef migrations remove
 2. Log in by calling `POST /api/auth/login` with your credentials:
    ```json
    {
-     "email": "admin@nimbuscrm.com",
+     "email": "admin@visioncrm.com",
      "password": "AdminPassword123!"
    }
    ```

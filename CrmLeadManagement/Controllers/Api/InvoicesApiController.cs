@@ -718,13 +718,13 @@ public class InvoicesApiController : ControllerBase
 
             var pdfDto = new InvoicePdfDto
             {
-                CompanyName              = "Nimbus CRM Technologies Pvt. Ltd.",
+                CompanyName              = "Vision CRM Technologies Pvt. Ltd.",
                 CompanyAddress           = "Level 5, Tower B, Cyber City, Bangalore - 560103, Karnataka, India",
-                CompanyEmail             = "billing@nimbuscrm.com",
+                CompanyEmail             = "billing@visioncrm.com",
                 CompanyPhone             = "+91 80 4123 4567",
                 CompanyGstin             = "29AABCN1234F1Z5",
                 CompanyPan               = "AABCN1234F",
-                CompanyWebsite           = "www.nimbuscrm.com",
+                CompanyWebsite           = "www.visioncrm.com",
                 InvoiceNumber            = dto.InvoiceNumber,
                 InvoiceDate              = dto.InvoiceDate,
                 DueDate                  = dto.DueDate,
@@ -756,11 +756,11 @@ public class InvoicesApiController : ControllerBase
                 RemainingAmount          = dto.RemainingAmount,
                 PaymentStatus            = dto.PaymentStatus,
                 BankName                 = "HDFC Bank Ltd.",
-                BankAccountName          = "Nimbus CRM Technologies Pvt. Ltd.",
+                BankAccountName          = "Vision CRM Technologies Pvt. Ltd.",
                 BankAccountNumber        = "50200012345678",
                 BankIfsc                 = "HDFC0000123",
                 BankBranch               = "Koramangala, Bangalore - 560034",
-                UpiId                    = "nimbuscrm@hdfcbank",
+                UpiId                    = "visioncrm@hdfcbank",
                 PaymentHistory           = dto.Payments,
                 Notes                    = dto.Notes
             };

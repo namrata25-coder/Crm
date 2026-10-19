@@ -1,0 +1,180 @@
+@model CrmLeadManagement.Controllers.UserDashboardViewModel
+@{
+    ViewData["Title"] = "User Workspace Dashboard";
+    ViewData["ActivePage"] = "UserDashboard";
+}
+
+<div class="page-content" style="padding: 24px 32px;">
+    <!-- Header Banner -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 28px; flex-wrap:wrap; gap:16px;">
+        <div>
+            <div style="display:inline-flex; align-items:center; gap:8px; padding:4px 10px; background:rgba(37,99,235,0.1); border:1px solid rgba(37,99,235,0.25); border-radius:6px; font-size:12px; font-weight:600; color:#2563eb; margin-bottom:8px;">
+                <i class="bi bi-person-badge-fill"></i> USER WORKSPACE PORTAL
+            </div>
+            <h1 style="font-size:26px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px; margin:0;">
+                Welcome back, @Model.UserName
+            </h1>
+            <p style="font-size:14px; color:var(--ink-500, #64748b); margin:4px 0 0 0;">
+                Role: <strong>@Model.UserRole</strong> &bull; Email: <strong>@Model.UserEmail</strong> &bull; Workspace operational dashboard.
+            </p>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center;">
+            <a href="/Lead/Assigned" class="btn" style="background:#ffffff; border:1px solid var(--line, #e2e8f0); color:var(--ink-700, #334155); padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                <i class="bi bi-diagram-3"></i> My Assigned Leads
+            </a>
+            <a href="/Work/Tasks" class="btn" style="background:#ffffff; border:1px solid var(--line, #e2e8f0); color:var(--ink-700, #334155); padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                <i class="bi bi-check2-square"></i> My Tasks
+            </a>
+            <a href="/user/logout" class="btn" style="background:var(--canvas, #f1f5f9); border:1px solid var(--line, #cbd5e1); color:#dc2626; padding:8px 16px; border-radius:8px; font-weight:600; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                <i class="bi bi-box-arrow-right"></i> User Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- User Notice Banner -->
+    <div style="background:linear-gradient(135deg, #f0fdf4, #ecfdf5); border:1px solid #bbf7d0; border-radius:12px; padding:16px 20px; margin-bottom:28px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:36px; height:36px; border-radius:8px; background:#16a34a; color:#ffffff; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="bi bi-check-circle-fill"></i>
+            </div>
+            <div>
+                <div style="font-weight:700; font-size:14px; color:#14532d;">Authenticated User Session Active</div>
+                <div style="font-size:12.5px; color:#166534;">You have access to leads and workflow modules assigned to your profile. Administrative APIs and configuration are restricted.</div>
+            </div>
+        </div>
+        <div>
+            <button type="button" onclick="testUserApi()" style="background:#ffffff; border:1px solid #86efac; color:#15803d; font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;">
+                <i class="bi bi-arrow-repeat"></i> Verify User API
+            </button>
+        </div>
+    </div>
+
+    <!-- User KPI Metrics Grid -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px; margin-bottom:28px;">
+        <!-- Card 1: Assigned Leads -->
+        <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:600; color:var(--ink-500, #64748b);">Assigned Leads</span>
+                <div style="width:36px; height:36px; border-radius:8px; background:rgba(37,99,235,0.1); color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                    <i class="bi bi-funnel"></i>
+                </div>
+            </div>
+            <div style="font-size:28px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px;">@Model.AssignedLeadsCount</div>
+            <div style="font-size:12px; color:var(--ink-500, #64748b); margin-top:4px;">
+                Directly assigned to you
+            </div>
+        </div>
+
+        <!-- Card 2: Pending Tasks -->
+        <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:600; color:var(--ink-500, #64748b);">Pending Tasks</span>
+                <div style="width:36px; height:36px; border-radius:8px; background:rgba(234,179,8,0.1); color:#d97706; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                    <i class="bi bi-check2-circle"></i>
+                </div>
+            </div>
+            <div style="font-size:28px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px;">@Model.PendingTasksCount</div>
+            <div style="font-size:12px; color:var(--ink-500, #64748b); margin-top:4px;">
+                Awaiting completion
+            </div>
+        </div>
+
+        <!-- Card 3: Active Projects -->
+        <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13px; font-weight:600; color:var(--ink-500, #64748b);">Active Work Projects</span>
+                <div style="width:36px; height:36px; border-radius:8px; background:rgba(99,102,241,0.1); color:#4f46e5; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                    <i class="bi bi-folder2-open"></i>
+                </div>
+            </div>
+            <div style="font-size:28px; font-weight:800; color:var(--ink-900, #0f172a); letter-spacing:-0.5px;">@Model.ActiveProjectsCount</div>
+            <div style="font-size:12px; color:var(--ink-500, #64748b); margin-top:4px;">
+                Open project workspaces
+            </div>
+        </div>
+    </div>
+
+    <!-- Assigned Leads Table Section -->
+    <div style="background:#ffffff; border:1px solid var(--line, #e2e8f0); border-radius:12px; padding:24px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+            <div>
+                <h2 style="font-size:17px; font-weight:700; color:var(--ink-900, #0f172a); margin:0;">
+                    Your Assigned Opportunities &amp; Leads
+                </h2>
+                <p style="font-size:13px; color:var(--ink-500, #64748b); margin:3px 0 0 0;">
+                    Manage prospective clients, progress stages, and update communication logs.
+                </p>
+            </div>
+            <a href="/Lead/List" style="font-size:13px; font-weight:600; color:#2563eb; text-decoration:none;">
+                View All Leads &rarr;
+            </a>
+        </div>
+
+        @if (Model.AssignedLeads == null || !Model.AssignedLeads.Any())
+        {
+            <div style="text-align:center; padding:48px 24px; color:var(--ink-400, #94a3b8);">
+                <i class="bi bi-inbox" style="font-size:36px; display:block; margin-bottom:10px; color:#cbd5e1;"></i>
+                <div style="font-weight:600; color:var(--ink-700, #334155); margin-bottom:4px;">No Assigned Leads Right Now</div>
+                <div style="font-size:13px;">New leads assigned to you by administrators or team leads will appear here.</div>
+            </div>
+        }
+        else
+        {
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+                    <thead>
+                        <tr style="border-bottom:1px solid var(--line, #e2e8f0); background:var(--canvas, #f8fafc); color:var(--ink-600, #475569); font-weight:600;">
+                            <th style="padding:10px 14px;">Lead ID</th>
+                            <th style="padding:10px 14px;">Contact Name</th>
+                            <th style="padding:10px 14px;">Company</th>
+                            <th style="padding:10px 14px;">Email</th>
+                            <th style="padding:10px 14px;">Status</th>
+                            <th style="padding:10px 14px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var lead in Model.AssignedLeads)
+                        {
+                            <tr style="border-bottom:1px solid var(--line, #f1f5f9); transition:background 0.15s ease;" onmouseover="this.style.background='#f8fafc';" onmouseout="this.style.background='transparent';">
+                                <td style="padding:12px 14px; font-weight:600; color:var(--ink-800, #1e293b);">@lead.LeadId</td>
+                                <td style="padding:12px 14px; font-weight:600; color:var(--ink-900, #0f172a);">@lead.LeadName</td>
+                                <td style="padding:12px 14px; color:var(--ink-600, #475569);">@(lead.CompanyName ?? "-")</td>
+                                <td style="padding:12px 14px; color:var(--ink-600, #475569);">@(lead.Email ?? "-")</td>
+                                <td style="padding:12px 14px;">
+                                    <span style="display:inline-block; padding:3px 8px; border-radius:6px; font-size:11.5px; font-weight:600; background:rgba(37,99,235,0.1); color:#2563eb;">
+                                        @(lead.LeadStatus ?? "New")
+                                    </span>
+                                </td>
+                                <td style="padding:12px 14px;">
+                                    <a href="/Lead/List" style="display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; color:#2563eb; text-decoration:none; padding:4px 8px; border-radius:4px; background:#eff6ff;">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        async function testUserApi() {
+            try {
+                const res = await fetch('/api/user/dashboard/stats', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(`User API Status: OK\nUser: ${data.userName}\nRole: ${data.userRole}\nAssigned Leads: ${data.assignedLeadsCount}`);
+                } else {
+                    alert('User API check failed with HTTP ' + res.status);
+                }
+            } catch (err) {
+                alert('User API request error: ' + err.message);
+            }
+        }
+    </script>
+}

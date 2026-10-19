@@ -1,0 +1,164 @@
+@{
+    Layout = null;
+    var message = ViewData["Message"] as string ?? "Access denied. You do not have permission to view this resource.";
+    var title = ViewData["Title"] as string ?? "Access Denied · VisionCRM";
+    var requiredRole = ViewData["RequiredRole"] as string ?? "Authorized Role";
+    var loginUrl = ViewData["LoginUrl"] as string ?? "/login";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@title</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --crm-bg: #f8fafc;
+            --crm-navy-dark: #0f172a;
+            --crm-text-muted: #64748b;
+            --crm-border: #e2e8f0;
+            --crm-danger: #dc2626;
+            --crm-danger-bg: #fef2f2;
+            --crm-blue: #1d4ed8;
+            --crm-blue-hover: #1e40af;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--crm-bg);
+            color: var(--crm-navy-dark);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .error-card {
+            background: #ffffff;
+            border: 1px solid var(--crm-border);
+            border-radius: 14px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            max-width: 480px;
+            width: 100%;
+            padding: 40px 32px;
+            text-align: center;
+        }
+        .icon-circle {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            background-color: var(--crm-danger-bg);
+            border: 1px solid #fecaca;
+            color: var(--crm-danger);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: 0 auto 20px;
+        }
+        .status-badge {
+            display: inline-block;
+            background: #fee2e2;
+            color: #b91c1c;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        .error-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--crm-navy-dark);
+            margin-bottom: 10px;
+        }
+        .error-message {
+            font-size: 14.5px;
+            color: var(--crm-text-muted);
+            line-height: 1.55;
+            margin-bottom: 24px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-weight: 500;
+        }
+        .role-notice {
+            font-size: 13px;
+            color: var(--crm-text-muted);
+            margin-bottom: 28px;
+            line-height: 1.5;
+        }
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background-color: var(--crm-blue);
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: background 0.15s ease;
+        }
+        .btn-primary:hover {
+            background-color: var(--crm-blue-hover);
+        }
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: #ffffff;
+            border: 1px solid var(--crm-border);
+            color: var(--crm-navy-dark);
+            font-size: 14px;
+            font-weight: 600;
+            padding: 11px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+        .btn-secondary:hover {
+            background: #f1f5f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-card" role="alert">
+        <div class="icon-circle" aria-hidden="true">
+            <i class="bi bi-shield-x"></i>
+        </div>
+        <span class="status-badge">403 Forbidden</span>
+        <h1 class="error-title">Access Denied</h1>
+        <div class="error-message">
+            @message
+        </div>
+        <p class="role-notice">
+            Your account does not possess the required <strong>@requiredRole</strong> authorization to access this dashboard or API.
+            Strict role-based segregation is enforced on all protected endpoints.
+        </p>
+        <div class="action-buttons">
+            <a href="@loginUrl" class="btn-primary">
+                <i class="bi bi-box-arrow-in-right"></i> Sign In to @requiredRole Portal
+            </a>
+            <a href="javascript:history.back()" class="btn-secondary">
+                <i class="bi bi-arrow-left"></i> Return to Previous Page
+            </a>
+        </div>
+    </div>
+</body>
+</html>

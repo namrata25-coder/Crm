@@ -10,6 +10,7 @@ public interface ITokenService
 {
     Task<(string PlainToken, DateTime ExpiresAt)> IssueTokenAsync(int userId, string? deviceId, CancellationToken cancellationToken = default);
     Task<bool> RevokeTokenAsync(int tokenId, CancellationToken cancellationToken = default);
+    Task<bool> RevokeTokenStringAsync(string tokenOrId, CancellationToken cancellationToken = default);
     Task<int> RevokeAllUserTokensAsync(int userId, CancellationToken cancellationToken = default);
     Task<int> RevokeOtherUserTokensAsync(int userId, int currentTokenId, CancellationToken cancellationToken = default);
     Task<AccessToken?> ValidateTokenAsync(string plainToken, CancellationToken cancellationToken = default);
@@ -64,6 +65,25 @@ public class TokenService : ITokenService
     {
         var affected = await _db.AccessTokens
             .Where(t => t.Id == tokenId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow), cancellationToken);
+
+        return affected > 0;
+    }
+
+    public async Task<bool> RevokeTokenStringAsync(string tokenOrId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(tokenOrId)) return false;
+
+        if (int.TryParse(tokenOrId, out var tokenId))
+        {
+            return await RevokeTokenAsync(tokenId, cancellationToken);
+        }
+
+        var tokenHashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(tokenOrId));
+        var tokenHashHex = Convert.ToHexString(tokenHashBytes);
+
+        var affected = await _db.AccessTokens
+            .Where(t => t.TokenHash == tokenHashHex && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTime.UtcNow), cancellationToken);
 
         return affected > 0;

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -134,9 +135,67 @@ builder.Services.AddAuthentication(options =>
         options.AccessDeniedPath = "/login";
         options.ExpireTimeSpan = TimeSpan.FromHours(12);
         options.SlidingExpiration = true;
-        options.Cookie.Name = "NimbusCRM.Auth";
+        options.Cookie.Name = "VisionCRM.Auth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var userPrincipal = context.Principal;
+            if (userPrincipal == null)
+            {
+                context.RejectPrincipal();
+                return;
+            }
+
+            var userIdStr = userPrincipal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdStr, out var userId))
+            {
+                context.RejectPrincipal();
+                return;
+            }
+
+            var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+            var dbUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            if (dbUser == null || !string.Equals(dbUser.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            if (dbUser.LockoutUntil.HasValue && dbUser.LockoutUntil.Value > DateTime.UtcNow)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            var tokenId = userPrincipal.FindFirst("token_id")?.Value;
+            if (!string.IsNullOrWhiteSpace(tokenId))
+            {
+                var tokenService = context.HttpContext.RequestServices.GetRequiredService<ITokenService>();
+                var token = await tokenService.ValidateTokenAsync(tokenId);
+                if (token == null)
+                {
+                    if (int.TryParse(tokenId, out var numId))
+                    {
+                        var isRevoked = await db.AccessTokens.AnyAsync(t => t.Id == numId && t.RevokedAt != null);
+                        if (isRevoked)
+                        {
+                            context.RejectPrincipal();
+                            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        return;
+                    }
+                }
+            }
+        };
         options.Events.OnRedirectToLogin = context =>
         {
             if (context.Request.Path.StartsWithSegments("/api"))
@@ -144,6 +203,16 @@ builder.Services.AddAuthentication(options =>
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 context.Response.ContentType = "application/json";
                 return context.Response.WriteAsync("{\"Message\":\"Unauthorized\"}");
+            }
+            if (context.Request.Path.StartsWithSegments("/admin"))
+            {
+                context.Response.Redirect("/admin/login?returnUrl=" + Uri.EscapeDataString(context.Request.Path + context.Request.QueryString));
+                return Task.CompletedTask;
+            }
+            if (context.Request.Path.StartsWithSegments("/user"))
+            {
+                context.Response.Redirect("/user/login?returnUrl=" + Uri.EscapeDataString(context.Request.Path + context.Request.QueryString));
+                return Task.CompletedTask;
             }
             context.Response.Redirect(context.RedirectUri);
             return Task.CompletedTask;
@@ -156,11 +225,47 @@ builder.Services.AddAuthentication(options =>
                 context.Response.ContentType = "application/json";
                 return context.Response.WriteAsync("{\"Message\":\"Forbidden\"}");
             }
+            if (context.Request.Path.StartsWithSegments("/admin"))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.Redirect("/admin/login?error=access_denied");
+                return Task.CompletedTask;
+            }
+            if (context.Request.Path.StartsWithSegments("/user"))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.Redirect("/user/login?error=access_denied");
+                return Task.CompletedTask;
+            }
             context.Response.Redirect(context.RedirectUri);
             return Task.CompletedTask;
         };
     })
     .AddScheme<AuthenticationSchemeOptions, BearerTokenAuthenticationHandler>(BearerTokenAuthenticationHandler.SchemeName, null);
+
+// Strict role authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireAssertion(ctx =>
+        {
+            var role = ctx.User.FindFirst(ClaimTypes.Role)?.Value;
+            var sessionType = ctx.User.FindFirst("session_type")?.Value;
+            bool isAdmin = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(role, "Super Admin", StringComparison.OrdinalIgnoreCase);
+            return isAdmin && (sessionType == null || sessionType == "Admin");
+        }));
+
+    options.AddPolicy("UserOnly", policy =>
+        policy.RequireAssertion(ctx =>
+        {
+            var role = ctx.User.FindFirst(ClaimTypes.Role)?.Value;
+            var sessionType = ctx.User.FindFirst("session_type")?.Value;
+            bool isAdmin = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(role, "Super Admin", StringComparison.OrdinalIgnoreCase);
+            return !isAdmin && (sessionType == null || sessionType == "User");
+        }));
+});
 
 // Cleanup expired/revoked access tokens older than 7 days daily
 builder.Services.AddHostedService<TokenCleanupBackgroundService>();

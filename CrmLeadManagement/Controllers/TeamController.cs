@@ -72,19 +72,42 @@ public class TeamController : Controller
     public async Task<IActionResult> SaveMember(int id, string name, string email, string role, string status, string? password = null)
     {
         var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
-        var currentUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == authEmail);
-        bool isAdmin = User.IsInRole("Admin") || (currentUser != null && string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase));
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int.TryParse(userIdStr, out var currentUserId);
+
+        var currentUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == currentUserId || (u.Email != null && u.Email == authEmail));
+        bool isAdmin = currentUser != null && currentUser.IsAdminAccount;
         var requiredAction = id == 0 ? "Create" : "Edit";
+
+        var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest" ||
+                     Request.Headers["Accept"].ToString().Contains("application/json");
 
         if (!isAdmin && !PermissionChecker.HasModulePermission(_db, currentUser, "Member", requiredAction))
         {
-            TempData["ErrorMessage"] = $"Access Denied: You do not have permission to {requiredAction.ToLower()} team members.";
+            var msg = $"Access Denied: You do not have permission to {requiredAction.ToLower()} team members.";
+            if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = msg });
+            TempData["ErrorMessage"] = msg;
+            Response.StatusCode = StatusCodes.Status403Forbidden;
             return RedirectToAction(nameof(Index));
         }
 
-        if (!isAdmin && string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+        // Prevent non-admins from assigning Admin role
+        if (!isAdmin && (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(role, "Super Admin", StringComparison.OrdinalIgnoreCase)))
         {
-            TempData["ErrorMessage"] = "Access Denied: Only administrators can assign the Admin role.";
+            var msg = "Access Denied: Only administrators can assign the Admin role.";
+            if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = msg });
+            TempData["ErrorMessage"] = msg;
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            return RedirectToAction(nameof(Index));
+        }
+
+        // Prevent users from changing their own role to Admin or modifying their own role
+        if (!isAdmin && currentUser != null && id == currentUser.Id && !string.Equals(currentUser.Role, role, StringComparison.OrdinalIgnoreCase))
+        {
+            var msg = "Access Denied: Users cannot modify their own role.";
+            if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = msg });
+            TempData["ErrorMessage"] = msg;
+            Response.StatusCode = StatusCodes.Status403Forbidden;
             return RedirectToAction(nameof(Index));
         }
 
@@ -92,7 +115,9 @@ public class TeamController : Controller
         if (!string.IsNullOrWhiteSpace(password) && !string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(password.Trim(), adminPassword, StringComparison.Ordinal))
         {
-            TempData["ErrorMessage"] = "User password must be different from the administrator password.";
+            var msg = "User password must be different from the administrator password.";
+            if (isAjax) return BadRequest(new { success = false, message = msg });
+            TempData["ErrorMessage"] = msg;
             return RedirectToAction(nameof(Index));
         }
 

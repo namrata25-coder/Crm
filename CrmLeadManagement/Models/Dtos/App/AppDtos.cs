@@ -371,44 +371,6 @@ public class AppVisitInputDto
     public string? Remark { get; set; }
 }
 
-/// <summary>
-/// Requirement entry input DTO for /api/v1/app/leads/{id}/requirements.
-/// </summary>
-public class AppRequirementInputDto
-{
-    [JsonPropertyName("title")]
-    public string? Title { get; set; }
-
-    [JsonPropertyName("description")]
-    public string? Description { get; set; }
-
-    [JsonPropertyName("priority")]
-    public string? Priority { get; set; } = "Medium";
-
-    [JsonPropertyName("expectedDate")]
-    public string? ExpectedDate { get; set; }
-
-    [JsonPropertyName("budget")]
-    public string? Budget { get; set; }
-
-    [JsonPropertyName("status")]
-    public string? Status { get; set; } = "New";
-
-    [JsonPropertyName("requirementType")]
-    public string? RequirementType { get; set; }
-
-    [JsonPropertyName("itemName")]
-    public string? ItemName { get; set; }
-
-    [JsonPropertyName("quantity")]
-    public string? Quantity { get; set; }
-
-    [JsonPropertyName("details")]
-    public string? Details { get; set; }
-
-    [JsonPropertyName("remarks")]
-    public string? Remarks { get; set; }
-}
 
 /// <summary>
 /// Lead statistics response DTO for /api/v1/app/leads/stats.

@@ -807,15 +807,20 @@ public class AppLeadsController : ControllerBase
             return NotFound(AppApiErrorResponse.Fail($"Lead '{id}' not found."));
         }
 
-        return Ok(AppApiResponse<List<RequirementEntry>>.Ok(
-            lead.Requirements.OrderByDescending(r => r.Id).ToList(),
+        var dtoList = lead.Requirements
+            .OrderByDescending(r => r.Id)
+            .Select(AppRequirementResponseDto.FromEntity)
+            .ToList();
+
+        return Ok(AppApiResponse<List<AppRequirementResponseDto>>.Ok(
+            dtoList,
             "Requirements retrieved successfully."));
     }
 
     /// <summary>
     /// Records requirement(s) against a lead.
     /// Route: POST /api/v1/app/leads/{id}/requirements
-    /// If "Items" is supplied, one RequirementEntry is created per item (same as the web form).
+    /// If "Items" is supplied, one RequirementEntry is created per item with distinct parameters matching the web panel.
     /// Otherwise the legacy single-requirement payload is used.
     /// </summary>
     [HttpPost("{id}/requirements")]
@@ -835,6 +840,8 @@ public class AppLeadsController : ControllerBase
             var status = !string.IsNullOrWhiteSpace(input?.Status) ? input.Status.Trim() : "New";
             var expectedDate = input?.ExpectedDate?.Trim() ?? "";
             var budget = input?.Budget?.Trim() ?? "";
+            var mainTitle = input?.Title?.Trim() ?? "";
+            var mainDescription = input?.Description?.Trim() ?? "";
 
             // ---------- NEW: item specification rows ----------
             var rows = input?.Items?.Where(i => i != null).ToList();
@@ -865,6 +872,7 @@ public class AppLeadsController : ControllerBase
                     }
 
                     string itemTitle =
+                        !string.IsNullOrWhiteSpace(mainTitle) ? mainTitle :
                         !string.IsNullOrWhiteSpace(cat) && !string.IsNullOrWhiteSpace(itm) ? $"{cat} — {itm}" :
                         !string.IsNullOrWhiteSpace(itm) ? itm :
                         !string.IsNullOrWhiteSpace(cat) ? cat :
@@ -894,17 +902,33 @@ public class AppLeadsController : ControllerBase
                     var entry = new RequirementEntry
                     {
                         Title = itemTitle,
-                        Description = string.Join(" | ", descParts),
+                        Description = mainDescription,
                         Priority = priority,
                         ExpectedDate = expectedDate,
                         Budget = budget,
                         Status = status,
                         ImagePath = imagePath,
+
+                        // Same params as web panel
+                        Category = cat,
+                        Item = itm,
+                        Location = loc,
+                        H1 = h1,
+                        H2 = h2,
+                        H3 = h3,
+                        W1 = w1,
+                        W2 = w2,
+                        W3 = w3,
+                        Types = typ,
+                        Topology = top,
+                        Glass = gls,
+
+                        // Legacy fields
                         ItemName = itm,
                         RequirementType = cat,
                         Quantity = "1",
-                        Details = T(input?.Title),            // general title kept for reference
-                        Remarks = T(input?.Description)       // general notes from the form
+                        Details = string.Join(" | ", descParts),
+                        Remarks = mainDescription
                     };
 
                     lead.Requirements.Add(entry);
@@ -918,8 +942,10 @@ public class AppLeadsController : ControllerBase
 
                 await _db.SaveChangesAsync();
 
+                var dtoList = created.Select(AppRequirementResponseDto.FromEntity).ToList();
+
                 return StatusCode(StatusCodes.Status201Created,
-                    AppApiResponse<List<RequirementEntry>>.Ok(created,
+                    AppApiResponse<List<AppRequirementResponseDto>>.Ok(dtoList,
                         $"{created.Count} requirement item(s) added successfully."));
             }
 
@@ -942,8 +968,10 @@ public class AppLeadsController : ControllerBase
             lead.Requirements.Add(single);
             await _db.SaveChangesAsync();
 
+            var singleDto = AppRequirementResponseDto.FromEntity(single);
+
             return StatusCode(StatusCodes.Status201Created,
-                AppApiResponse<RequirementEntry>.Ok(single, "Requirement added successfully."));
+                AppApiResponse<AppRequirementResponseDto>.Ok(singleDto, "Requirement added successfully."));
         }
         catch (Exception ex)
         {

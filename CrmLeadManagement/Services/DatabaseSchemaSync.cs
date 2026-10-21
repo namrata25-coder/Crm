@@ -634,6 +634,18 @@ public static class DatabaseSchemaSync
         ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Quantity"" text;
         ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Details"" text;
         ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Remarks"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Category"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Item"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Location"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""H1"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""H2"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""H3"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""W1"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""W2"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""W3"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Types"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Topology"" text;
+        ALTER TABLE ""RequirementEntry"" ADD COLUMN IF NOT EXISTS ""Glass"" text;
 
         ALTER TABLE ""VisitEntry"" ADD COLUMN IF NOT EXISTS ""VisitDate"" text;
         ALTER TABLE ""VisitEntry"" ADD COLUMN IF NOT EXISTS ""VisitTime"" text;

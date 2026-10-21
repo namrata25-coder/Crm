@@ -94,6 +94,20 @@ public class RequirementEntry
     public string? Status { get; set; } = "New";
     public string? ImagePath { get; set; } = ""; // relative path under wwwroot, e.g. /uploads/requirements/xyz.jpg
 
+    // Item specifications (same parameters as web panel table)
+    public string? Category { get; set; } = "";
+    public string? Item { get; set; } = "";
+    public string? Location { get; set; } = "";
+    public string? H1 { get; set; } = "";
+    public string? H2 { get; set; } = "";
+    public string? H3 { get; set; } = "";
+    public string? W1 { get; set; } = "";
+    public string? W2 { get; set; } = "";
+    public string? W3 { get; set; } = "";
+    public string? Types { get; set; } = "";
+    public string? Topology { get; set; } = "";
+    public string? Glass { get; set; } = "";
+
     // Kept for backward compatibility with older seeded data / existing screens.
     public string? RequirementType { get; set; } = "";
     public string? ItemName { get; set; } = "";

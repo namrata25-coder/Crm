@@ -396,7 +396,21 @@ public class LeadController : Controller
                     Status = status ?? "New",
                     ImagePath = imagePath,
                     ItemName = itm,
-                    RequirementType = cat
+                    RequirementType = cat,
+                    Category = cat,
+                    Item = itm,
+                    Location = loc,
+                    H1 = _h1,
+                    H2 = _h2,
+                    H3 = _h3,
+                    W1 = _w1,
+                    W2 = _w2,
+                    W3 = _w3,
+                    Types = typ,
+                    Topology = top,
+                    Glass = gls,
+                    Details = title ?? "",
+                    Remarks = description ?? ""
                 });
             }
 

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using CrmLeadManagement.Models;
 using CrmLeadManagement.Models.Dtos.App;
 using CrmLeadManagement.Services;
 using Microsoft.AspNetCore.Authentication;
@@ -50,6 +51,16 @@ public class BearerTokenAuthenticationHandler : AuthenticationHandler<Authentica
         }
 
         var token = authHeader.Substring("Bearer ".Length).Trim();
+        if (token.Contains('{'))
+        {
+            token = token.Substring(0, token.IndexOf('{')).Trim();
+        }
+        var firstSpace = token.IndexOfAny(new[] { ' ', '\t', '\r', '\n' });
+        if (firstSpace > 0)
+        {
+            token = token.Substring(0, firstSpace).Trim();
+        }
+
         if (string.IsNullOrWhiteSpace(token))
         {
             return AuthenticateResult.Fail("Invalid or expired token");
@@ -59,7 +70,17 @@ public class BearerTokenAuthenticationHandler : AuthenticationHandler<Authentica
         using var scope = _serviceProvider.CreateScope();
         var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
 
-        var accessToken = await tokenService.ValidateTokenAsync(token);
+        AccessToken? accessToken;
+        try
+        {
+            accessToken = await tokenService.ValidateTokenAsync(token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to validate bearer token due to database or connection timeout.");
+            return AuthenticateResult.Fail("Authentication service temporarily unavailable.");
+        }
+
         if (accessToken == null)
         {
             return AuthenticateResult.Fail("Invalid or expired token");

@@ -18,6 +18,20 @@ public class AppLoginRequest
         set => _email = value ?? _email;
     }
 
+    /// <summary>Alias for Email to accept AdminId as well</summary>
+    public string? AdminId
+    {
+        get => _email;
+        set => _email = value ?? _email;
+    }
+
+    /// <summary>Alias for Email to accept Username as well</summary>
+    public string? Username
+    {
+        get => _email;
+        set => _email = value ?? _email;
+    }
+
     public string Password { get; set; } = "";
     public string? DeviceId { get; set; }
 

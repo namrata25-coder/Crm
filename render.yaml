@@ -25,7 +25,7 @@ services:
       - key: Cors__AllowedOrigins__0
         value: https://your-frontend-domain.com # Placeholder: set your frontend domain in the Render dashboard
       - key: Seed__AdminEmail
-        value: admin@nimbuscrm.com # Set your admin email address
+        value: admin@visioncrm.com # Set your admin email address
       - key: Seed__AdminPassword
         sync: false # Set manually in the Render dashboard (never commit production passwords)
 

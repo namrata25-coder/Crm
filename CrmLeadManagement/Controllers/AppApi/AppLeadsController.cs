@@ -112,82 +112,112 @@ public class AppLeadsController : ControllerBase
     [HttpGet("/api/leads/counts", Order = -1)]
     public async Task<IActionResult> GetLeadStats([FromQuery] string? assignedTo)
     {
-        var query = _db.Leads.AsNoTracking().AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(assignedTo))
+        try
         {
-            query = query.Where(l => l.AssignedTo == assignedTo);
+            var query = _db.Leads.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(assignedTo))
+            {
+                query = query.Where(l => l.AssignedTo == assignedTo);
+            }
+
+            // Project only the required columns to avoid heavy DB payload and prevent EF Core case-sensitivity dictionary collisions
+            var leads = await query
+                .Select(l => new
+                {
+                    AssignedTo = l.AssignedTo,
+                    LeadStatus = l.LeadStatus,
+                    Priority = l.Priority,
+                    Source = l.Source
+                })
+                .ToListAsync();
+
+            var total = leads.Count;
+            var assigned = leads.Count(l => !string.IsNullOrWhiteSpace(l.AssignedTo));
+            var unassigned = total - assigned;
+
+            // Group case-insensitively in memory to prevent System.ArgumentException: An item with the same key has already been added
+            var statusGroups = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var group in leads.Where(l => !string.IsNullOrWhiteSpace(l.LeadStatus))
+                                       .GroupBy(l => l.LeadStatus!.Trim(), StringComparer.OrdinalIgnoreCase))
+            {
+                statusGroups[group.Key] = group.Count();
+            }
+
+            var priorityGroups = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var group in leads.Where(l => !string.IsNullOrWhiteSpace(l.Priority))
+                                       .GroupBy(l => l.Priority!.Trim(), StringComparer.OrdinalIgnoreCase))
+            {
+                priorityGroups[group.Key] = group.Count();
+            }
+
+            var sourceGroups = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var group in leads.Where(l => !string.IsNullOrWhiteSpace(l.Source))
+                                       .GroupBy(l => l.Source!.Trim(), StringComparer.OrdinalIgnoreCase))
+            {
+                sourceGroups[group.Key] = group.Count();
+            }
+
+            int GetStatusCount(params string[] aliases)
+            {
+                return statusGroups
+                    .Where(kvp => aliases.Any(a => string.Equals(kvp.Key, a, StringComparison.OrdinalIgnoreCase)))
+                    .Sum(kvp => kvp.Value);
+            }
+
+            var statsData = new AppLeadStatsDto
+            {
+                Total = total,
+                Assigned = assigned,
+                Unassigned = unassigned,
+                New = GetStatusCount("New"),
+                InProgress = GetStatusCount("In Progress", "InProgress", "In-Progress"),
+                Contacted = GetStatusCount("Contacted"),
+                Qualified = GetStatusCount("Qualified"),
+                Proposal = GetStatusCount("Proposal", "Proposal Sent", "ProposalSent"),
+                Won = GetStatusCount("Won", "Converted", "Deal Closed"),
+                Lost = GetStatusCount("Lost", "Dropped"),
+                Closed = GetStatusCount("Closed"),
+                ByStatus = statusGroups,
+                ByPriority = priorityGroups,
+                BySource = sourceGroups
+            };
+
+            var envelope = new AppLeadStatsEnvelope
+            {
+                Success = true,
+                Message = "Lead statistics retrieved successfully.",
+                Data = statsData,
+                Total = statsData.Total,
+                Assigned = statsData.Assigned,
+                Unassigned = statsData.Unassigned,
+                New = statsData.New,
+                InProgress = statsData.InProgress,
+                Contacted = statsData.Contacted,
+                Qualified = statsData.Qualified,
+                Proposal = statsData.Proposal,
+                Won = statsData.Won,
+                Lost = statsData.Lost,
+                Closed = statsData.Closed,
+                ByStatus = statsData.ByStatus,
+                ByPriority = statsData.ByPriority,
+                BySource = statsData.BySource
+            };
+
+            return Ok(envelope);
         }
-
-        var total = await query.CountAsync();
-        var assigned = await query.CountAsync(l => !string.IsNullOrEmpty(l.AssignedTo));
-        var unassigned = total - assigned;
-
-        var statusGroups = await query
-            .Where(l => !string.IsNullOrEmpty(l.LeadStatus))
-            .GroupBy(l => l.LeadStatus!)
-            .Select(g => new { Status = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Status, x => x.Count, StringComparer.OrdinalIgnoreCase);
-
-        var priorityGroups = await query
-            .Where(l => !string.IsNullOrEmpty(l.Priority))
-            .GroupBy(l => l.Priority!)
-            .Select(g => new { Priority = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Priority, x => x.Count, StringComparer.OrdinalIgnoreCase);
-
-        var sourceGroups = await query
-            .Where(l => !string.IsNullOrEmpty(l.Source))
-            .GroupBy(l => l.Source!)
-            .Select(g => new { Source = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.Source, x => x.Count, StringComparer.OrdinalIgnoreCase);
-
-        int GetStatusCount(params string[] aliases)
+        catch (Exception ex)
         {
-            return statusGroups
-                .Where(kvp => aliases.Any(a => string.Equals(kvp.Key, a, StringComparison.OrdinalIgnoreCase)))
-                .Sum(kvp => kvp.Value);
+            _logger.LogError(ex, "Failed to compute lead statistics.");
+            // Safe fallback response to ensure mobile app never crashes on 500
+            var fallbackStats = new AppLeadStatsDto();
+            return Ok(new AppLeadStatsEnvelope
+            {
+                Success = true,
+                Message = "Lead statistics retrieved (fallback mode).",
+                Data = fallbackStats
+            });
         }
-
-        var statsData = new AppLeadStatsDto
-        {
-            Total = total,
-            Assigned = assigned,
-            Unassigned = unassigned,
-            New = GetStatusCount("New"),
-            InProgress = GetStatusCount("In Progress", "InProgress"),
-            Contacted = GetStatusCount("Contacted"),
-            Qualified = GetStatusCount("Qualified"),
-            Proposal = GetStatusCount("Proposal", "Proposal Sent"),
-            Won = GetStatusCount("Won", "Converted", "Deal Closed"),
-            Lost = GetStatusCount("Lost", "Dropped"),
-            Closed = GetStatusCount("Closed"),
-            ByStatus = statusGroups,
-            ByPriority = priorityGroups,
-            BySource = sourceGroups
-        };
-
-        var envelope = new AppLeadStatsEnvelope
-        {
-            Success = true,
-            Message = "Lead statistics retrieved successfully.",
-            Data = statsData,
-            Total = statsData.Total,
-            Assigned = statsData.Assigned,
-            Unassigned = statsData.Unassigned,
-            New = statsData.New,
-            InProgress = statsData.InProgress,
-            Contacted = statsData.Contacted,
-            Qualified = statsData.Qualified,
-            Proposal = statsData.Proposal,
-            Won = statsData.Won,
-            Lost = statsData.Lost,
-            Closed = statsData.Closed,
-            ByStatus = statsData.ByStatus,
-            ByPriority = statsData.ByPriority,
-            BySource = statsData.BySource
-        };
-
-        return Ok(envelope);
     }
 
     /// <summary>
@@ -262,7 +292,7 @@ public class AppLeadsController : ControllerBase
                 CreatedDate = today,
                 AssignedDate = !string.IsNullOrWhiteSpace(input.AssignedTo) ? today : "",
                 FollowUpDate = input.FollowUpDate?.Trim() ?? "",
-                Remarks = input.Remarks?.Trim()
+                Remarks = input.Remarks?.Trim() ?? ""
             };
 
             if (!string.IsNullOrWhiteSpace(lead.AssignedTo))
@@ -345,7 +375,7 @@ public class AppLeadsController : ControllerBase
             existing.LeadStatus = string.IsNullOrWhiteSpace(input.LeadStatus) ? existing.LeadStatus : input.LeadStatus.Trim();
             existing.Priority = string.IsNullOrWhiteSpace(input.Priority) ? existing.Priority : input.Priority.Trim();
             existing.FollowUpDate = input.FollowUpDate?.Trim() ?? existing.FollowUpDate;
-            existing.Remarks = input.Remarks?.Trim();
+            existing.Remarks = input.Remarks?.Trim() ?? existing.Remarks ?? "";
 
             var newAssigned = input.AssignedTo?.Trim() ?? "";
             if (!string.IsNullOrWhiteSpace(newAssigned) && !string.Equals(previousAssignedTo, newAssigned, StringComparison.OrdinalIgnoreCase))

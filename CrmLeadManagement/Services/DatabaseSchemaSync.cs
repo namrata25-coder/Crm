@@ -660,7 +660,7 @@ public static class DatabaseSchemaSync
                 SELECT table_name, column_name
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
-                  AND table_name IN ('Estimations', 'Quotations', 'Proposals', 'FinanceLineItems', 'AssignmentEntry', 'CallHistoryEntry', 'FollowUpEntry', 'RequirementEntry', 'VisitEntry')
+                  AND table_name IN ('Leads', 'Estimations', 'Quotations', 'Proposals', 'FinanceLineItems', 'AssignmentEntry', 'CallHistoryEntry', 'FollowUpEntry', 'RequirementEntry', 'VisitEntry')
                   AND column_name NOT IN ('Id', 'LeadId_FK')
                   AND is_nullable = 'NO'
             LOOP

@@ -45,7 +45,6 @@ public class AppAuthController : ControllerBase
     /// Rejects regular users with HTTP 403 Forbidden.
     /// </summary>
     [HttpPost("admin-login")]
-    [HttpPost("/api/auth/admin-login")]
     [Consumes("application/json")]
     [AllowAnonymous]
     [EnableRateLimiting("AuthRateLimit")]
@@ -61,7 +60,6 @@ public class AppAuthController : ControllerBase
     /// Rejects Admin accounts with HTTP 403 Forbidden.
     /// </summary>
     [HttpPost("user-login")]
-    [HttpPost("/api/auth/user-login")]
     [Consumes("application/json")]
     [AllowAnonymous]
     [EnableRateLimiting("AuthRateLimit")]

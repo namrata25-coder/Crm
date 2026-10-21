@@ -367,13 +367,13 @@
             <input type="hidden" name="LoginType" value="admin" />
 
             <div class="form-group">
-                <label class="form-label" for="adminUserIdInput">Admin ID or Email</label>
+                <label class="form-label" for="adminUserIdInput">Admin ID</label>
                 <div class="input-container">
                     <input type="text"
                            id="adminUserIdInput"
                            name="UserId"
                            class="form-input"
-                           placeholder="e.g. admin@visioncrm.com"
+                           placeholder="e.g. admin"
                            value="@(Model?.UserId ?? Model?.Email ?? "")"
                            required
                            autocomplete="username"

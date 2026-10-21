@@ -98,20 +98,17 @@ public class AdminController : Controller
             LoginType = "admin"
         };
 
-        var adminEmail = _configuration["Seed:AdminEmail"]?.Trim() ?? "admin@visioncrm.com";
-        var adminPassword = _configuration["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
-
-        ViewBag.AdminEmail = adminEmail;
-        ViewBag.AdminPassword = adminPassword;
+        ViewBag.AdminEmail = "admin";
+        ViewBag.AdminPassword = "admin123";
 
         return View("~/Views/Auth/AdminLogin.cshtml", model);
     }
 
     /// <summary>
     /// Handles Admin Login submission.
-    /// ONLY authorized Admin credentials (verified against database) can log in.
-    /// Even if a User enters valid User credentials, the login MUST be rejected.
-    /// Display: "Access denied. Valid Admin credentials are required."
+    /// ONLY authorized Admin credentials (Admin ID: admin, Password: admin123) can log in.
+    /// Regular user credentials must NEVER allow access to the Admin Portal.
+    /// If incorrect admin credentials, display: "Invalid Admin ID or Password."
     /// Route: /admin/login
     /// </summary>
     [HttpPost("admin/login")]
@@ -136,89 +133,64 @@ public class AdminController : Controller
             return View("~/Views/Auth/AdminLogin.cshtml", model);
         }
 
-        int.TryParse(input, out var numericId);
-        var inputLower = input.ToLower();
+        // =========================================================================
+        // STRICT ADMIN AUTHENTICATION
+        // Admin login must work ONLY with credentials:
+        // Admin ID: admin
+        // Password: admin123
+        // Regular user credentials must NEVER allow access to the Admin Portal.
+        // =========================================================================
+        bool isAdminId = string.Equals(input, "admin", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(input, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(input, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase);
 
-        // Query database for the target user record
+        if (!isAdminId || password != "admin123")
+        {
+            _logger.LogWarning("Admin login failed for input '{Input}' from IP {IP}", input, ip);
+            var msg = "Invalid Admin ID or Password.";
+            if (isAjax) return Unauthorized(new { success = false, message = msg });
+            model.ErrorMessage = msg;
+            Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return View("~/Views/Auth/AdminLogin.cshtml", model);
+        }
+
+        // Query database for admin record
         var user = await _db.Users.FirstOrDefaultAsync(u =>
-            (u.Email != null && u.Email.ToLower() == inputLower) ||
-            (u.Name != null && u.Name.ToLower() == inputLower) ||
-            (numericId > 0 && u.Id == numericId));
+            (u.UserId != null && u.UserId.ToLower() == "admin") ||
+            (u.Email != null && (u.Email.ToLower() == "admin" || u.Email.ToLower() == "admin@visioncrm.com" || u.Email.ToLower() == "admin@nimbuscrm.com")) ||
+            u.Role == "Admin");
 
-        var adminConfigEmail = _configuration["Seed:AdminEmail"]?.Trim() ?? "admin@visioncrm.com";
-        var adminConfigPassword = _configuration["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
-
-        // Auto-seed missing administrator if configured credentials are supplied
-        if (user == null && (string.Equals(input, adminConfigEmail, StringComparison.OrdinalIgnoreCase) || string.Equals(input, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase) || string.Equals(input, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase)) && password == adminConfigPassword)
+        if (user == null)
         {
             user = new UserRoleEntry
             {
+                UserId = "admin",
                 Name = "Administrator",
-                Email = adminConfigEmail,
+                Email = "admin@visioncrm.com",
                 Role = "Admin",
                 Status = "Active",
                 IsAuthorizedUser = false
             };
-            user.PasswordHash = _passwordHasher.HashPassword(user, password);
+            user.PasswordHash = _passwordHasher.HashPassword(user, "admin123");
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
-            _logger.LogInformation("Auto-seeded missing Administrator account for {AdminEmail}.", adminConfigEmail);
+            _logger.LogInformation("Provisioned Admin account for Admin ID: admin.");
         }
-
-        if (user == null)
+        else
         {
-            _logger.LogWarning("Admin login failed: unknown account '{Input}' from IP {IP}", input, ip);
-            var msg = "Invalid Admin ID or Password.";
-            if (isAjax) return Unauthorized(new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return View("~/Views/Auth/AdminLogin.cshtml", model);
+            user.UserId = "admin";
+            user.Role = "Admin";
+            user.Status = "Active";
+            user.IsAuthorizedUser = false;
+            if (string.IsNullOrWhiteSpace(user.PasswordHash) ||
+                _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, "admin123") != PasswordVerificationResult.Success)
+            {
+                user.PasswordHash = _passwordHasher.HashPassword(user, "admin123");
+                await _db.SaveChangesAsync();
+            }
         }
-
-        // =========================================================================
-        // STRICT ROLE VERIFICATION: Verify credentials first, then enforce role.
-        // Even if a User enters valid User credentials on Admin Login, REJECT!
-        // Display: "Access denied. Valid Admin credentials are required."
-        // =========================================================================
 
         var now = DateTime.UtcNow;
-
-        // Verify password
-        bool passwordValid = false;
-        if (!string.IsNullOrWhiteSpace(user.PasswordHash))
-        {
-            var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
-            passwordValid = verifyResult == PasswordVerificationResult.Success ||
-                            verifyResult == PasswordVerificationResult.SuccessRehashNeeded;
-        }
-
-        _logger.LogInformation("ADMIN LOGIN DIAG: input='{Input}', password='{Password}', adminConfigPassword='{AdminPass}', match={Match}, userRole='{Role}', userEmail='{Email}', isAdminAccount={IsAdmin}, passwordValidBefore={Valid}",
-            input, password, adminConfigPassword, password == adminConfigPassword, user.Role, user.Email, user.IsAdminAccount, passwordValid);
-
-        // Default admin password fallback if hash was not initialized or configured password matches
-        if (!passwordValid && (user.IsAdminAccount || string.Equals(user.Email, adminConfigEmail, StringComparison.OrdinalIgnoreCase)) && (password == adminConfigPassword || password == "AdminPassword123!"))
-        {
-            passwordValid = true;
-            user.Role = "Admin";
-            user.PasswordHash = _passwordHasher.HashPassword(user, password);
-        }
-
-        if (!passwordValid)
-        {
-            user.FailedLoginCount++;
-            if (user.FailedLoginCount >= 5)
-            {
-                user.LockoutUntil = now.AddMinutes(15);
-                _logger.LogWarning("Account {Email} locked out due to failed attempts from IP {IP}", user.Email, ip);
-            }
-            await _db.SaveChangesAsync();
-
-            var msg = "Invalid Admin ID or Password.";
-            if (isAjax) return Unauthorized(new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return View("~/Views/Auth/AdminLogin.cshtml", model);
-        }
 
         // Check account active status
         if (!string.Equals(user.Status, "Active", StringComparison.OrdinalIgnoreCase))
@@ -230,48 +202,8 @@ public class AdminController : Controller
             return View("~/Views/Auth/AdminLogin.cshtml", model);
         }
 
-        // Admin credentials clear lockout
-        if (user.IsAdminAccount || string.Equals(user.Email, adminConfigEmail, StringComparison.OrdinalIgnoreCase))
-        {
-            user.LockoutUntil = null;
-            user.FailedLoginCount = 0;
-        }
-
-        // Check lockout
-        if (user.LockoutUntil.HasValue && user.LockoutUntil.Value > now)
-        {
-            var remaining = Math.Ceiling((user.LockoutUntil.Value - now).TotalMinutes);
-            var msg = $"Account is temporarily locked. Please try again in {remaining} minute(s).";
-            if (isAjax) return StatusCode(StatusCodes.Status423Locked, new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status423Locked;
-            return View("~/Views/Auth/AdminLogin.cshtml", model);
-        }
-
-        // =========================================================================
-        // STRICT ADMIN ROLE CHECK:
-        // Even if valid User credentials were provided, REJECT with 403 Forbidden!
-        // =========================================================================
-        if (!user.IsAdminAccount)
-        {
-            _logger.LogWarning("SECURITY ALERT: User account {Email} ({Role}) attempted to log in through Admin Login portal from IP {IP}. REJECTED.",
-                user.Email, user.Role, ip);
-
-            await _auditLogService.LogAsync("AdminLoginRejected", user.Email, user.Id, user.Email,
-                $"Access denied: Non-admin account ({user.Role}) entered credentials on Admin Login page", ip);
-
-            const string deniedMsg = "Access denied. Valid Admin credentials are required.";
-            if (isAjax)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = deniedMsg });
-            }
-
-            model.ErrorMessage = deniedMsg;
-            Response.StatusCode = StatusCodes.Status403Forbidden;
-            return View("~/Views/Auth/AdminLogin.cshtml", model);
-        }
-
-        // Success: Reset lockout counters
+        // Reset lockout for admin
+        user.LockoutUntil = null;
         user.FailedLoginCount = 0;
         user.LockoutUntil = null;
         user.LastLoginAt = now;
@@ -308,7 +240,8 @@ public class AdminController : Controller
 
         var destination = "/admin/dashboard";
         if (!string.IsNullOrWhiteSpace(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl) &&
-            !model.ReturnUrl.Contains("login", StringComparison.OrdinalIgnoreCase))
+            !model.ReturnUrl.Contains("login", StringComparison.OrdinalIgnoreCase) &&
+            model.ReturnUrl.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
         {
             destination = model.ReturnUrl;
         }

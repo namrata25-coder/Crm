@@ -243,23 +243,23 @@
         }
 
         /* =========================================================
-           PORTAL SELECTION COMPONENT (ADMIN vs USER)
+           PORTAL SELECTION COMPONENT (ADMIN vs USER) - COMPACT DESIGN
            ========================================================= */
         .portal-selector-label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.6px;
             color: var(--crm-text-muted);
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .portal-switcher {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 26px;
+            gap: 10px;
+            margin-bottom: 18px;
         }
 
         .portal-btn {
@@ -267,35 +267,36 @@
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            padding: 14px 16px;
+            padding: 8px 12px;
             background: #ffffff;
-            border: 2px solid var(--crm-border-color);
-            border-radius: 12px;
+            border: 1.5px solid var(--crm-border-color);
+            border-radius: 9px;
             cursor: pointer;
             text-align: left;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             outline: none;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+            min-height: 0;
         }
 
         .portal-btn:hover {
             border-color: #cbd5e1;
             transform: translateY(-1px);
-            box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 3px 6px -1px rgba(0, 0, 0, 0.06);
         }
 
         /* User Portal Active State */
         .portal-btn.active.user-portal {
             border-color: #2563eb;
             background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+            box-shadow: 0 0 0 2.5px rgba(37, 99, 235, 0.16), 0 3px 5px -1px rgba(37, 99, 235, 0.08);
         }
 
         /* Admin Portal Active State */
         .portal-btn.active.admin-portal {
             border-color: #0f172a;
             background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
-            box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.18), 0 4px 6px -1px rgba(15, 23, 42, 0.1);
+            box-shadow: 0 0 0 2.5px rgba(15, 23, 42, 0.18), 0 3px 5px -1px rgba(15, 23, 42, 0.08);
         }
 
         .portal-btn-top {
@@ -303,17 +304,17 @@
             align-items: center;
             justify-content: space-between;
             width: 100%;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .portal-icon-box {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 13px;
             transition: all 0.2s ease;
         }
 
@@ -338,12 +339,13 @@
         }
 
         .portal-badge {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            padding: 2px 8px;
-            border-radius: 10px;
+            letter-spacing: 0.4px;
+            padding: 1px 6px;
+            border-radius: 6px;
+            line-height: 1.2;
         }
 
         .user-portal .portal-badge {
@@ -367,19 +369,24 @@
         }
 
         .portal-name {
-            font-size: 14.5px;
+            font-size: 13px;
             font-weight: 700;
             color: var(--crm-navy-dark);
-            margin-bottom: 2px;
+            margin-bottom: 1px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
+            line-height: 1.25;
         }
 
         .portal-desc {
-            font-size: 11.5px;
+            font-size: 10.5px;
             color: var(--crm-text-muted);
-            line-height: 1.35;
+            line-height: 1.25;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
         }
 
         /* Form Header */
@@ -737,8 +744,20 @@
             }
 
             .portal-switcher {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
                 gap: 8px;
+            }
+
+            .portal-btn {
+                padding: 7px 10px;
+            }
+
+            .portal-name {
+                font-size: 12px;
+            }
+
+            .portal-desc {
+                display: none;
             }
 
             .demo-bar {
@@ -975,8 +994,13 @@
                     </button>
                 </form>
 
+                <!-- Registration Link for Standard Users -->
+                <div id="userRegisterPrompt" style="margin-top: 14px; text-align: center; font-size: 13px; color: var(--crm-text-muted); display: @(isInitialAdmin ? "none" : "block");">
+                    Don't have an account? <a href="/register" style="color: var(--crm-blue-accent); font-weight: 600; text-decoration: none;">Register here &rarr;</a>
+                </div>
+
                 <footer class="form-footer">
-                    <span>Direct portal URLs: <a href="/admin/login">Admin Portal</a> · <a href="/user/login">User Portal</a></span>
+                    <span>Direct portal URLs: <a href="/admin/login">Admin Portal</a> · <a href="/user/login">User Portal</a> · <a href="/register">Register</a></span>
                 </footer>
             </div>
         </main>
@@ -984,8 +1008,8 @@
 
     <!-- Interactive Portal Logic and Scripting -->
     <script>
-        const adminEmail = '@(ViewBag.AdminEmail ?? "admin@visioncrm.com")';
-        const adminPassword = '@(ViewBag.AdminPassword ?? "AdminPassword123!")';
+        const adminEmail = '@(ViewBag.AdminEmail ?? "admin")';
+        const adminPassword = '@(ViewBag.AdminPassword ?? "admin123")';
         const userEmail = '@(ViewBag.UserEmail ?? "ananya.sharma@visioncrm.com")';
         const userPassword = '@(ViewBag.UserPassword ?? "Ananya@123!")';
 
@@ -999,6 +1023,25 @@
                 switchPortal('admin', false);
             } else if (portalParam === 'user' || window.location.pathname.includes('/user')) {
                 switchPortal('user', false);
+            }
+
+            if (urlParams.get('registered') === 'true') {
+                showAlert('Registration successful! Please sign in with your User ID and password.', true);
+            }
+
+            // Auto-switch to Admin Portal if admin is typed or prefilled
+            const uInput = document.getElementById('userIdInput');
+            if (uInput) {
+                const initialVal = (uInput.value || '').trim().toLowerCase();
+                if ((initialVal === 'admin' || initialVal === 'admin@visioncrm.com') && currentPortal !== 'admin') {
+                    switchPortal('admin', false);
+                }
+                uInput.addEventListener('input', (e) => {
+                    const val = (e.target.value || '').trim().toLowerCase();
+                    if ((val === 'admin' || val === 'admin@visioncrm.com') && currentPortal !== 'admin') {
+                        switchPortal('admin');
+                    }
+                });
             }
         });
 
@@ -1024,6 +1067,7 @@
             const submitBtnIcon = document.getElementById('submitBtnIcon');
             const submitBtnText = document.getElementById('submitBtnText');
             const rememberMeText = document.getElementById('rememberMeText');
+            const userRegisterPrompt = document.getElementById('userRegisterPrompt');
 
             if (portal === 'admin') {
                 // Activate Admin Portal UI
@@ -1041,12 +1085,14 @@
                 title.textContent = 'Admin Portal Sign In';
                 subtitle.textContent = 'Enter your Administrator ID & password to access the Admin Dashboard.';
 
-                quickFillIcon.style.color = '#d97706';
-                primaryDemoPill.className = 'demo-pill pill-admin';
-                primaryDemoPill.textContent = 'Load Admin Credentials';
+                if (quickFillIcon) quickFillIcon.style.color = '#d97706';
+                if (primaryDemoPill) {
+                    primaryDemoPill.className = 'demo-pill pill-admin';
+                    primaryDemoPill.textContent = 'Load Admin Credentials';
+                }
 
-                userIdLabel.textContent = 'Administrator ID or Admin Email';
-                userIdInput.placeholder = 'e.g. admin@visioncrm.com or Admin ID';
+                userIdLabel.textContent = 'Admin ID';
+                userIdInput.placeholder = 'e.g. admin or Admin ID';
                 passwordLabel.textContent = 'Admin Password';
 
                 rememberMeText.textContent = 'Keep admin session';
@@ -1054,6 +1100,8 @@
                 submitBtn.className = 'btn-primary-action btn-admin';
                 submitBtnIcon.className = 'bi bi-shield-lock-fill';
                 submitBtnText.textContent = 'Sign In to Admin Portal';
+
+                if (userRegisterPrompt) userRegisterPrompt.style.display = 'none';
 
                 document.title = 'Admin Portal Sign In · VisionCRM';
 
@@ -1078,12 +1126,14 @@
                 title.textContent = 'User Portal Sign In';
                 subtitle.textContent = 'Enter your User ID & password to access your User Dashboard.';
 
-                quickFillIcon.style.color = '#2563eb';
-                primaryDemoPill.className = 'demo-pill';
-                primaryDemoPill.textContent = 'Load User Credentials';
+                if (quickFillIcon) quickFillIcon.style.color = '#2563eb';
+                if (primaryDemoPill) {
+                    primaryDemoPill.className = 'demo-pill';
+                    primaryDemoPill.textContent = 'Load User Credentials';
+                }
 
                 userIdLabel.textContent = 'User ID or Work Email';
-                userIdInput.placeholder = 'e.g. ananya.sharma@visioncrm.com or User ID';
+                userIdInput.placeholder = 'e.g. rahul.verma or registered email';
                 passwordLabel.textContent = 'Password';
 
                 rememberMeText.textContent = 'Keep me signed in';
@@ -1091,6 +1141,8 @@
                 submitBtn.className = 'btn-primary-action';
                 submitBtnIcon.className = 'bi bi-box-arrow-in-right';
                 submitBtnText.textContent = 'Sign In to User Portal';
+
+                if (userRegisterPrompt) userRegisterPrompt.style.display = 'block';
 
                 document.title = 'User Portal Sign In · VisionCRM';
 
@@ -1191,6 +1243,13 @@
                 return;
             }
 
+            // If user enters admin identifier, ensure it is treated as Admin Portal login
+            if (userId.toLowerCase() === 'admin' || userId.toLowerCase() === 'admin@visioncrm.com') {
+                const loginTypeInput = document.getElementById('loginTypeInput');
+                if (loginTypeInput) loginTypeInput.value = 'admin';
+                currentPortal = 'admin';
+            }
+
             // Loading state
             submitBtn.disabled = true;
             if (submitSpinner) submitSpinner.style.display = 'inline-block';
@@ -1199,6 +1258,9 @@
 
             try {
                 const formData = new FormData(form);
+                if (userId.toLowerCase() === 'admin' || userId.toLowerCase() === 'admin@visioncrm.com') {
+                    formData.set('LoginType', 'admin');
+                }
 
                 const response = await fetch('/login', {
                     method: 'POST',

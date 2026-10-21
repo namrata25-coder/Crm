@@ -15,7 +15,20 @@ public static class LeadStore
 
     /// <summary>Returns a tracked entity — callers can mutate it (e.g. lead.CallHistory.Add(...))
     /// and the change is saved automatically at the end of the request.</summary>
-    public static Lead? GetById(string id) => DbAccessor.Db.Leads.FirstOrDefault(l => l.LeadId == id);
+    public static Lead? GetById(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        var trimmed = id.Trim();
+        if (int.TryParse(trimmed, out var numId))
+        {
+            var byId = DbAccessor.Db.Leads.FirstOrDefault(l => l.Id == numId || l.LeadId == trimmed);
+            if (byId != null) return byId;
+
+            var byPrefix = DbAccessor.Db.Leads.FirstOrDefault(l => l.LeadId == $"LD-{numId}" || l.LeadId == $"LD-100{numId}" || l.LeadId == $"LD-00{numId}" || l.LeadId.EndsWith(numId.ToString()));
+            if (byPrefix != null) return byPrefix;
+        }
+        return DbAccessor.Db.Leads.FirstOrDefault(l => l.LeadId == trimmed);
+    }
 
     /// <summary>Generates the next sequential Lead ID, e.g. LD-1009, guaranteed unique.</summary>
     public static string NextId()

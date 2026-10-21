@@ -85,7 +85,17 @@ public class AdminAuthorizeAttribute : Attribute, IAsyncActionFilter
         // 4. Strict role check: account must have Admin or Super Admin role in database
         if (!dbUser.IsAdminAccount)
         {
-            context.Result = BuildForbiddenResult(isApi, "Access denied. Valid Admin credentials are required.");
+            if (isApi)
+            {
+                context.Result = new ObjectResult(new { message = "Access denied. Valid Admin credentials are required.", success = false })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
+                return;
+            }
+
+            // Deny access and redirect regular user to the user portal/dashboard
+            context.Result = new RedirectResult("/user/dashboard?error=access_denied");
             return;
         }
 
@@ -93,7 +103,16 @@ public class AdminAuthorizeAttribute : Attribute, IAsyncActionFilter
         var sessionType = userPrincipal.FindFirst("session_type")?.Value;
         if (!string.IsNullOrEmpty(sessionType) && !string.Equals(sessionType, "Admin", StringComparison.OrdinalIgnoreCase))
         {
-            context.Result = BuildForbiddenResult(isApi, "Access denied. Valid Admin credentials are required.");
+            if (isApi)
+            {
+                context.Result = new ObjectResult(new { message = "Access denied. Valid Admin credentials are required.", success = false })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
+                return;
+            }
+
+            context.Result = new RedirectResult("/user/dashboard?error=access_denied");
             return;
         }
 

@@ -100,6 +100,12 @@ Authorization: Bearer {{adminToken}}
 Accept: application/json
 
 
+### 2.2.1 Get Lead Stats
+GET {{baseUrl}}/api/v1/app/leads/stats
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
 ### 2.3 Get Lead by ID
 GET {{baseUrl}}/api/v1/app/leads/LD-1001
 Authorization: Bearer {{adminToken}}
@@ -154,6 +160,68 @@ Accept: application/json
 DELETE {{baseUrl}}/api/v1/app/leads/LD-1005
 Authorization: Bearer {{adminToken}}
 Accept: application/json
+
+
+### 2.7 Get Lead Calls
+GET {{baseUrl}}/api/v1/app/leads/1/calls
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 2.8 Log Call for Lead
+POST {{baseUrl}}/api/v1/app/leads/1/calls
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "callDate": "2026-10-19",
+  "callTime": "12:00",
+  "callType": "Outgoing",
+  "callStatus": "Connected",
+  "duration": "02:30",
+  "remark": "Discussed requirement scope."
+}
+
+
+### 2.9 Get Lead Follow-ups
+GET {{baseUrl}}/api/v1/app/leads/1/followups
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 2.10 Schedule Follow-up for Lead
+POST {{baseUrl}}/api/v1/app/leads/1/followups
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "followUpDate": "2026-10-25",
+  "followUpTime": "10:00",
+  "followUpType": "Call",
+  "status": "Scheduled",
+  "remarks": "Call back to discuss pricing."
+}
+
+
+### 2.11 Get Lead Visits
+GET {{baseUrl}}/api/v1/app/leads/1/visits
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+
+### 2.12 Log Visit for Lead
+POST {{baseUrl}}/api/v1/app/leads/1/visits
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "visitDate": "2026-10-19",
+  "visitTime": "15:00",
+  "visitLocation": "Indore Office",
+  "outcome": "Interested",
+  "conversation": "Met client in person.",
+  "remarks": "Follow up next week."
+}
 
 
 ###############################################################################

@@ -10,6 +10,7 @@ namespace CrmLeadManagement.Models;
 public class UserRoleEntry
 {
     public int Id { get; set; }
+    public string? UserId { get; set; } = "";
     public string? Name { get; set; } = "";
     public string? Email { get; set; } = "";
     public string? Role { get; set; } = "";
@@ -32,11 +33,12 @@ public class UserRoleEntry
     public bool IsAdminAccount =>
         string.Equals(Role?.Trim(), "Admin", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(Role?.Trim(), "Super Admin", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(Role?.Trim(), "Administrator", StringComparison.OrdinalIgnoreCase);
+        string.Equals(Role?.Trim(), "Administrator", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(UserId?.Trim(), "admin", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Identifies if the account is authorized for User login (non-admin or explicitly authorized user).</summary>
+    /// <summary>Identifies if the account is authorized for User login (strictly non-admin registered users).</summary>
     public bool IsUserAccount =>
-        !IsAdminAccount || IsAuthorizedUser;
+        !IsAdminAccount;
 
     public bool HasPermission(string moduleName)
     {
@@ -326,40 +328,48 @@ public static class SettingsStore
             });
         }
 
-        // Seed or update Admin from configuration ("Seed:AdminEmail", "Seed:AdminPassword"), never logging the password.
+        // Seed or update Admin credentials strictly: Admin ID: admin, Password: admin123
         var hasher = new PasswordHasher<UserRoleEntry>();
-        var adminEmail = config?["Seed:AdminEmail"]?.Trim() ?? "admin@visioncrm.com";
-        var adminPassword = config?["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
+        var adminId = "admin";
+        var adminPassword = config?["Seed:AdminPassword"]?.Trim() ?? "admin123";
+        if (string.IsNullOrWhiteSpace(adminPassword) || adminPassword == "AdminPassword123!")
+        {
+            adminPassword = "admin123";
+        }
 
-        var existingAdmin = db.Users.FirstOrDefault(u => u.Email != null && 
-            (u.Email.ToLower() == adminEmail.ToLower() || u.Email.ToLower() == "admin@nimbuscrm.com" || u.Email.ToLower() == "admin@visioncrm.com"));
+        var existingAdmin = db.Users.FirstOrDefault(u => 
+            (u.UserId != null && u.UserId.ToLower() == adminId) ||
+            (u.Email != null && (u.Email.ToLower() == adminId || u.Email.ToLower() == "admin@visioncrm.com" || u.Email.ToLower() == "admin@nimbuscrm.com")) ||
+            (u.Role == "Admin" && (u.Name == "Administrator" || u.Name == adminId)));
+
         if (existingAdmin == null)
         {
             var admin = new UserRoleEntry
             {
+                UserId = adminId,
                 Name = "Administrator",
-                Email = adminEmail,
+                Email = "admin@visioncrm.com",
                 Role = "Admin",
                 Status = "Active",
                 IsAuthorizedUser = false
             };
-            admin.PasswordHash = hasher.HashPassword(admin, adminPassword);
+            admin.PasswordHash = hasher.HashPassword(admin, "admin123");
             db.Users.Add(admin);
-            logger?.LogInformation("Seeded administrator account for {AdminEmail}.", adminEmail);
+            logger?.LogInformation("Seeded administrator account for Admin ID: admin.");
         }
         else
         {
-            existingAdmin.Email = adminEmail;
+            existingAdmin.UserId = "admin";
             existingAdmin.Role = "Admin";
             existingAdmin.Status = "Active";
             existingAdmin.IsAuthorizedUser = false;
             if (string.IsNullOrWhiteSpace(existingAdmin.PasswordHash) ||
-                hasher.VerifyHashedPassword(existingAdmin, existingAdmin.PasswordHash, adminPassword) != PasswordVerificationResult.Success)
+                hasher.VerifyHashedPassword(existingAdmin, existingAdmin.PasswordHash, "admin123") != PasswordVerificationResult.Success)
             {
-                existingAdmin.PasswordHash = hasher.HashPassword(existingAdmin, adminPassword);
+                existingAdmin.PasswordHash = hasher.HashPassword(existingAdmin, "admin123");
                 existingAdmin.FailedLoginCount = 0;
                 existingAdmin.LockoutUntil = null;
-                logger?.LogInformation("Synchronized password for administrator account {AdminEmail}.", adminEmail);
+                logger?.LogInformation("Synchronized password for administrator account (admin / admin123).");
             }
         }
 

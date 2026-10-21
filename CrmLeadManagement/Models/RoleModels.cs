@@ -59,16 +59,34 @@ public class RoleMaster
     public string DataAccess { get; set; } = "OnlyAssigned"; // "All" or "OnlyAssigned"
     public string PermissionsJson { get; set; } = "[]";
 
+    private List<ModulePermissionItem> GetDefaultPermissionsForRole()
+    {
+        if (string.Equals(RoleName, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(RoleName, "Super Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return RoleStore.GetAdminPermissions();
+        }
+        if (string.Equals(RoleName, "Sales Manager", StringComparison.OrdinalIgnoreCase))
+        {
+            return RoleStore.GetSalesManagerPermissions();
+        }
+        if (string.Equals(RoleName, "Telecaller", StringComparison.OrdinalIgnoreCase))
+        {
+            return RoleStore.GetTelecallerPermissions();
+        }
+        return RoleStore.GetSalesExecutivePermissions();
+    }
+
     public List<ModulePermissionItem> GetPermissions()
     {
-        if (string.IsNullOrWhiteSpace(PermissionsJson))
-            return RoleStore.GetDefaultMatrixTemplate();
+        if (string.IsNullOrWhiteSpace(PermissionsJson) || PermissionsJson.Trim() == "[]")
+            return GetDefaultPermissionsForRole();
 
         try
         {
             var list = JsonSerializer.Deserialize<List<ModulePermissionItem>>(PermissionsJson);
             if (list == null || list.Count == 0)
-                return RoleStore.GetDefaultMatrixTemplate();
+                return GetDefaultPermissionsForRole();
 
             // Re-merge with standard matrix template to ensure all standard modules & Extra names are up to date
             var template = RoleStore.GetDefaultMatrixTemplate();
@@ -89,7 +107,7 @@ public class RoleMaster
         }
         catch
         {
-            return RoleStore.GetDefaultMatrixTemplate();
+            return GetDefaultPermissionsForRole();
         }
     }
 
@@ -453,6 +471,32 @@ public static class RoleStore
                 db.RoleMasters.Add(userRole);
                 changesNeeded = true;
             }
+
+            foreach (var r in db.RoleMasters.ToList())
+            {
+                if (string.IsNullOrWhiteSpace(r.PermissionsJson) || r.PermissionsJson.Trim() == "[]")
+                {
+                    if (string.Equals(r.RoleName, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(r.RoleName, "Super Admin", StringComparison.OrdinalIgnoreCase))
+                    {
+                        r.SetPermissions(GetAdminPermissions());
+                    }
+                    else if (string.Equals(r.RoleName, "Sales Manager", StringComparison.OrdinalIgnoreCase))
+                    {
+                        r.SetPermissions(GetSalesManagerPermissions());
+                    }
+                    else if (string.Equals(r.RoleName, "Telecaller", StringComparison.OrdinalIgnoreCase))
+                    {
+                        r.SetPermissions(GetTelecallerPermissions());
+                    }
+                    else
+                    {
+                        r.SetPermissions(GetSalesExecutivePermissions());
+                    }
+                    changesNeeded = true;
+                }
+            }
+
             if (changesNeeded)
             {
                 db.SaveChanges();

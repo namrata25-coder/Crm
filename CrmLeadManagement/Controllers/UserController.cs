@@ -148,52 +148,86 @@ public class UserController : Controller
             return View("~/Views/Auth/UserLogin.cshtml", model);
         }
 
-        int.TryParse(input, out var numericId);
+        // =========================================================================
+        // STRICT USER LOGIN AUTHENTICATION
+        // 1. Admin credentials must NEVER work on the User Login page.
+        // 2. Only valid credentials belonging to a registered user are allowed.
+        // 3. If unregistered or invalid password:
+        //    "Invalid User ID or Password. Please register first if you don't have an account."
+        // =========================================================================
+        bool isAdminInput = string.Equals(input, "admin", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(input, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(input, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase);
+
+        if (isAdminInput && password == "admin123")
+        {
+            _logger.LogWarning("Admin credentials entered on User Login portal from IP {IP}. REJECTED.", ip);
+            await _auditLogService.LogAsync("UserLoginRejected", input, 0, input,
+                "Access denied: Administrator entered credentials on User Login page", ip);
+
+            const string adminDeniedMsg = "Access denied. Administrator credentials cannot be used on the User Login portal. Please use the Admin Portal.";
+            if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = adminDeniedMsg });
+            model.ErrorMessage = adminDeniedMsg;
+            Response.StatusCode = StatusCodes.Status403Forbidden;
+            return View("~/Views/Auth/UserLogin.cshtml", model);
+        }
+
         var inputLower = input.ToLower();
+        long.TryParse(input, out var numericId);
 
         // Query database for user
         var user = await _db.Users.FirstOrDefaultAsync(u =>
+            (u.UserId != null && u.UserId.ToLower() == inputLower) ||
             (u.Email != null && u.Email.ToLower() == inputLower) ||
             (u.Name != null && u.Name.ToLower() == inputLower) ||
             (numericId > 0 && u.Id == numericId));
 
         if (user == null)
         {
-            _logger.LogWarning("User login failed: unknown account '{Input}' from IP {IP}", input, ip);
-            var msg = "Invalid User ID or Password.";
-            if (isAjax) return Unauthorized(new { success = false, message = msg });
-            model.ErrorMessage = msg;
+            _logger.LogWarning("User login failed: unregistered User ID '{Input}' from IP {IP}", input, ip);
+            const string unregMsg = "Invalid User ID or Password. Please register first if you don't have an account.";
+            if (isAjax) return Unauthorized(new { success = false, message = unregMsg });
+            model.ErrorMessage = unregMsg;
             Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return View("~/Views/Auth/UserLogin.cshtml", model);
+        }
+
+        // Reject if target user account is an Admin account
+        if (user.IsAdminAccount)
+        {
+            _logger.LogWarning("SECURITY ALERT: Admin account {Email} ({Role}) attempted to log in through User Login portal from IP {IP}. REJECTED.",
+                user.Email, user.Role, ip);
+
+            await _auditLogService.LogAsync("UserLoginRejected", user.Email, user.Id, user.Email,
+                "Access denied: Administrator account entered credentials on User Login page", ip);
+
+            const string deniedMsg = "Access denied. Administrator credentials cannot be used on the User Login portal. Please use the Admin Portal.";
+            if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = deniedMsg });
+            model.ErrorMessage = deniedMsg;
+            Response.StatusCode = StatusCodes.Status403Forbidden;
             return View("~/Views/Auth/UserLogin.cshtml", model);
         }
 
         var now = DateTime.UtcNow;
 
-        // Verify password
+        // Check lockout
+        if (user.LockoutUntil.HasValue && user.LockoutUntil.Value > now)
+        {
+            var remaining = Math.Ceiling((user.LockoutUntil.Value - now).TotalMinutes);
+            var lockMsg = $"Account is temporarily locked due to multiple failed login attempts. Please try again in {remaining} minute(s).";
+            if (isAjax) return StatusCode(StatusCodes.Status423Locked, new { success = false, message = lockMsg });
+            model.ErrorMessage = lockMsg;
+            Response.StatusCode = StatusCodes.Status423Locked;
+            return View("~/Views/Auth/UserLogin.cshtml", model);
+        }
+
+        // Verify password against user's own registered password
         bool passwordValid = false;
         if (!string.IsNullOrWhiteSpace(user.PasswordHash))
         {
             var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
             passwordValid = verifyResult == PasswordVerificationResult.Success ||
                             verifyResult == PasswordVerificationResult.SuccessRehashNeeded;
-        }
-
-        // Default admin password verification if this happens to be admin account
-        var adminEmail = _configuration["Seed:AdminEmail"]?.Trim() ?? "admin@visioncrm.com";
-        var adminPassword = _configuration["Seed:AdminPassword"]?.Trim() ?? "AdminPassword123!";
-        _logger.LogInformation("USER LOGIN DIAG: input='{Input}', password='{Password}', userRole='{Role}', userEmail='{Email}', isAdminAccount={IsAdmin}, isUserAccount={IsUser}",
-            input, password, user.Role, user.Email, user.IsAdminAccount, user.IsUserAccount);
-
-        if (!passwordValid && (user.IsAdminAccount || string.Equals(user.Email, adminEmail, StringComparison.OrdinalIgnoreCase) || string.Equals(user.Email, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase)) && (password == adminPassword || password == "AdminPassword123!"))
-        {
-            passwordValid = true;
-        }
-
-        // Default user password verification if standard user hash was missing
-        if (!passwordValid && (user.Email == "user@visioncrm.com" || user.Email == "user@nimbuscrm.com") && password == "UserPassword123!")
-        {
-            passwordValid = true;
-            user.PasswordHash = _passwordHasher.HashPassword(user, password);
         }
 
         if (!passwordValid)
@@ -206,9 +240,9 @@ public class UserController : Controller
             }
             await _db.SaveChangesAsync();
 
-            var msg = "Invalid User ID or Password.";
-            if (isAjax) return Unauthorized(new { success = false, message = msg });
-            model.ErrorMessage = msg;
+            const string invalidMsg = "Invalid User ID or Password. Please register first if you don't have an account.";
+            if (isAjax) return Unauthorized(new { success = false, message = invalidMsg });
+            model.ErrorMessage = invalidMsg;
             Response.StatusCode = StatusCodes.Status401Unauthorized;
             return View("~/Views/Auth/UserLogin.cshtml", model);
         }
@@ -216,53 +250,9 @@ public class UserController : Controller
         // Check account active status
         if (!string.Equals(user.Status, "Active", StringComparison.OrdinalIgnoreCase))
         {
-            var msg = "Your user account is inactive. Please contact system administrator.";
-            if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status403Forbidden;
-            return View("~/Views/Auth/UserLogin.cshtml", model);
-        }
-
-        // Clear lockout for admin credential check
-        if (user.IsAdminAccount || string.Equals(user.Email, adminEmail, StringComparison.OrdinalIgnoreCase))
-        {
-            user.LockoutUntil = null;
-            user.FailedLoginCount = 0;
-        }
-
-        // Check lockout
-        if (user.LockoutUntil.HasValue && user.LockoutUntil.Value > now)
-        {
-            var remaining = Math.Ceiling((user.LockoutUntil.Value - now).TotalMinutes);
-            var msg = $"Account is temporarily locked. Please try again in {remaining} minute(s).";
-            if (isAjax) return StatusCode(StatusCodes.Status423Locked, new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status423Locked;
-            return View("~/Views/Auth/UserLogin.cshtml", model);
-        }
-
-        // =========================================================================
-        // STRICT USER ROLE CHECK:
-        // Admin credentials must NEVER allow access to User Dashboard unless
-        // separately authorized as a User account.
-        // If an Admin enters credentials on User Login, REJECT with:
-        // "Access denied. Valid User credentials are required."
-        // =========================================================================
-        if (!user.IsUserAccount)
-        {
-            _logger.LogWarning("SECURITY ALERT: Admin account {Email} ({Role}) attempted to log in through User Login portal from IP {IP}. REJECTED.",
-                user.Email, user.Role, ip);
-
-            await _auditLogService.LogAsync("UserLoginRejected", user.Email, user.Id, user.Email,
-                $"Access denied: Administrator account entered credentials on User Login page", ip);
-
-            const string deniedMsg = "Access denied. Valid User credentials are required.";
-            if (isAjax)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = deniedMsg });
-            }
-
-            model.ErrorMessage = deniedMsg;
+            var inactiveMsg = "Your user account is inactive. Please contact system administrator.";
+            if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = inactiveMsg });
+            model.ErrorMessage = inactiveMsg;
             Response.StatusCode = StatusCodes.Status403Forbidden;
             return View("~/Views/Auth/UserLogin.cshtml", model);
         }

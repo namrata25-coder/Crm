@@ -86,8 +86,12 @@ public class LeadsApiController : ControllerBase
 
     // GET /api/leads/count
     // GET /api/leads/counts
-    [HttpGet("count")]
-    [HttpGet("counts")]
+    // GET /api/leads/stats
+    // GET /api/leads/statistics
+    [HttpGet("count", Order = -1)]
+    [HttpGet("counts", Order = -1)]
+    [HttpGet("stats", Order = -1)]
+    [HttpGet("statistics", Order = -1)]
     public ActionResult<LeadCountSummaryDto> GetCount([FromQuery] string? assignedTo)
     {
         var leads = LeadStore.Leads.AsEnumerable();
@@ -123,8 +127,16 @@ public class LeadsApiController : ControllerBase
 
     // GET /api/leads/{id}
     [HttpGet("{id}")]
-    public ActionResult<Lead> GetById(string id)
+    public ActionResult<object> GetById(string id)
     {
+        if (string.Equals(id, "stats", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(id, "statistics", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(id, "count", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(id, "counts", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(GetCount(null).Value);
+        }
+
         var lead = LeadStore.GetById(id);
         if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
         return Ok(lead);

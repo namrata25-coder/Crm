@@ -279,6 +279,201 @@ public class AppLeadInputDto
 }
 
 /// <summary>
+/// Call logging input DTO for /api/v1/app/leads/{id}/calls.
+/// </summary>
+public class AppCallInputDto
+{
+    [JsonPropertyName("callDate")]
+    public string? CallDate { get; set; }
+
+    [JsonPropertyName("callTime")]
+    public string? CallTime { get; set; }
+
+    [JsonPropertyName("callType")]
+    public string? CallType { get; set; } = "Outgoing";
+
+    [JsonPropertyName("callStatus")]
+    public string? CallStatus { get; set; } = "Connected";
+
+    [JsonPropertyName("duration")]
+    public string? Duration { get; set; } = "00:00";
+
+    [JsonPropertyName("employee")]
+    public string? Employee { get; set; }
+
+    [JsonPropertyName("remark")]
+    public string? Remark { get; set; }
+
+    [JsonPropertyName("remarks")]
+    public string? Remarks { get; set; }
+
+    [JsonPropertyName("notes")]
+    public string? Notes { get; set; }
+}
+
+/// <summary>
+/// Follow-up scheduling input DTO for /api/v1/app/leads/{id}/followups.
+/// </summary>
+public class AppFollowUpInputDto
+{
+    [JsonPropertyName("followUpDate")]
+    public string? FollowUpDate { get; set; }
+
+    [JsonPropertyName("followUpTime")]
+    public string? FollowUpTime { get; set; }
+
+    [JsonPropertyName("followUpType")]
+    public string? FollowUpType { get; set; } = "Call";
+
+    [JsonPropertyName("assignedEmployee")]
+    public string? AssignedEmployee { get; set; }
+
+    [JsonPropertyName("employee")]
+    public string? Employee { get; set; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; set; } = "Scheduled";
+
+    [JsonPropertyName("remarks")]
+    public string? Remarks { get; set; }
+
+    [JsonPropertyName("remark")]
+    public string? Remark { get; set; }
+}
+
+/// <summary>
+/// Visit entry input DTO for /api/v1/app/leads/{id}/visits.
+/// </summary>
+public class AppVisitInputDto
+{
+    [JsonPropertyName("visitDate")]
+    public string? VisitDate { get; set; }
+
+    [JsonPropertyName("visitTime")]
+    public string? VisitTime { get; set; }
+
+    [JsonPropertyName("visitLocation")]
+    public string? VisitLocation { get; set; }
+
+    [JsonPropertyName("employee")]
+    public string? Employee { get; set; }
+
+    [JsonPropertyName("outcome")]
+    public string? Outcome { get; set; } = "Interested";
+
+    [JsonPropertyName("conversation")]
+    public string? Conversation { get; set; }
+
+    [JsonPropertyName("remarks")]
+    public string? Remarks { get; set; }
+
+    [JsonPropertyName("remark")]
+    public string? Remark { get; set; }
+}
+
+/// <summary>
+/// Requirement entry input DTO for /api/v1/app/leads/{id}/requirements.
+/// </summary>
+public class AppRequirementInputDto
+{
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("priority")]
+    public string? Priority { get; set; } = "Medium";
+
+    [JsonPropertyName("expectedDate")]
+    public string? ExpectedDate { get; set; }
+
+    [JsonPropertyName("budget")]
+    public string? Budget { get; set; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; set; } = "New";
+
+    [JsonPropertyName("requirementType")]
+    public string? RequirementType { get; set; }
+
+    [JsonPropertyName("itemName")]
+    public string? ItemName { get; set; }
+
+    [JsonPropertyName("quantity")]
+    public string? Quantity { get; set; }
+
+    [JsonPropertyName("details")]
+    public string? Details { get; set; }
+
+    [JsonPropertyName("remarks")]
+    public string? Remarks { get; set; }
+}
+
+/// <summary>
+/// Lead statistics response DTO for /api/v1/app/leads/stats.
+/// </summary>
+public class AppLeadStatsDto
+{
+    [JsonPropertyName("total")]
+    public int Total { get; set; }
+
+    [JsonPropertyName("assigned")]
+    public int Assigned { get; set; }
+
+    [JsonPropertyName("unassigned")]
+    public int Unassigned { get; set; }
+
+    [JsonPropertyName("new")]
+    public int New { get; set; }
+
+    [JsonPropertyName("inProgress")]
+    public int InProgress { get; set; }
+
+    [JsonPropertyName("contacted")]
+    public int Contacted { get; set; }
+
+    [JsonPropertyName("qualified")]
+    public int Qualified { get; set; }
+
+    [JsonPropertyName("proposal")]
+    public int Proposal { get; set; }
+
+    [JsonPropertyName("won")]
+    public int Won { get; set; }
+
+    [JsonPropertyName("lost")]
+    public int Lost { get; set; }
+
+    [JsonPropertyName("closed")]
+    public int Closed { get; set; }
+
+    [JsonPropertyName("byStatus")]
+    public Dictionary<string, int> ByStatus { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    [JsonPropertyName("byPriority")]
+    public Dictionary<string, int> ByPriority { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    [JsonPropertyName("bySource")]
+    public Dictionary<string, int> BySource { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+/// <summary>
+/// Hybrid envelope supporting both flat keys and standard 'data' envelope.
+/// </summary>
+public class AppLeadStatsEnvelope : AppLeadStatsDto
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; } = true;
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = "Lead statistics retrieved successfully.";
+
+    [JsonPropertyName("data")]
+    public AppLeadStatsDto? Data { get; set; }
+}
+
+/// <summary>
 /// Project creation/update DTO for /api/v1/app/projects.
 /// </summary>
 public class AppProjectInputDto

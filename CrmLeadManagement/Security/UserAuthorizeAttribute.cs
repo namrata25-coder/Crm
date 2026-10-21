@@ -82,10 +82,20 @@ public class UserAuthorizeAttribute : Attribute, IAsyncActionFilter
             return;
         }
 
-        // 4. Strict role check: Admin cannot access User routes unless account is independently authorized
+        // 4. Strict role check: Admin cannot access User routes
         if (!dbUser.IsUserAccount)
         {
-            context.Result = BuildForbiddenResult(isApi, "Access denied. Valid User credentials are required.");
+            if (isApi)
+            {
+                context.Result = new ObjectResult(new { message = "Access denied. Valid User credentials are required.", success = false })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
+                return;
+            }
+
+            // Deny access and redirect Admin user to the admin portal/dashboard
+            context.Result = new RedirectResult("/admin/dashboard?error=access_denied");
             return;
         }
 
@@ -93,7 +103,16 @@ public class UserAuthorizeAttribute : Attribute, IAsyncActionFilter
         var sessionType = userPrincipal.FindFirst("session_type")?.Value;
         if (!string.IsNullOrEmpty(sessionType) && !string.Equals(sessionType, "User", StringComparison.OrdinalIgnoreCase))
         {
-            context.Result = BuildForbiddenResult(isApi, "Access denied. Valid User credentials are required.");
+            if (isApi)
+            {
+                context.Result = new ObjectResult(new { message = "Access denied. Valid User credentials are required.", success = false })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
+                return;
+            }
+
+            context.Result = new RedirectResult("/admin/dashboard?error=access_denied");
             return;
         }
 

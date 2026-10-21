@@ -50,12 +50,31 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@visioncrm.com\",\n  \"password\": \"AdminPassword123!\",\n  \"deviceId\": \"Admin-Chrome\"\n}"
+              "raw": "{\n  \"email\": \"admin\",\n  \"password\": \"admin123\",\n  \"deviceId\": \"Admin-Chrome\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/app/auth/admin-login",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "app", "auth", "admin-login"]
+            }
+          }
+        },
+        {
+          "name": "User Registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"rahul.verma\",\n  \"name\": \"Rahul Verma\",\n  \"email\": \"rahul.verma@example.com\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
             }
           }
         },

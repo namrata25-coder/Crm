@@ -313,11 +313,11 @@ Accept: application/json
 
 ---
 
-### 3.2 Lead Counts Summary
+### 3.2 Lead Statistics & Counts Summary
 Retrieves lead counts and distributions by status and priority.
 
 - **Method**: `GET`
-- **Route**: `/api/v1/app/leads/count` *(or `/counts`)*
+- **Route**: `/api/v1/app/leads/stats` *(or `/statistics`, `/count`, `/counts`)*
 - **Query Parameters**:
   - `assignedTo` *(optional, string)*: Filter metrics by assigned employee.
 
@@ -518,6 +518,69 @@ Accept: application/json
   "data": null
 }
 ```
+
+---
+
+### 3.7 Lead Calls (`/api/v1/app/leads/{id}/calls`)
+- `GET /api/v1/app/leads/{id}/calls`: Retrieves all call history entries for a lead.
+- `POST /api/v1/app/leads/{id}/calls`: Logs a new call against a lead.
+- `DELETE /api/v1/app/leads/{id}/calls/{callId}`: Removes a call entry.
+
+#### Request Body (POST)
+```json
+{
+  "callDate": "2026-10-19",
+  "callTime": "12:00",
+  "callType": "Outgoing",
+  "callStatus": "Connected",
+  "duration": "00:00",
+  "remark": "Discussed scope."
+}
+```
+
+---
+
+### 3.8 Lead Follow-ups (`/api/v1/app/leads/{id}/followups`)
+- `GET /api/v1/app/leads/{id}/followups`: Retrieves all follow-ups for a lead.
+- `POST /api/v1/app/leads/{id}/followups`: Schedules a new follow-up for a lead.
+- `DELETE /api/v1/app/leads/{id}/followups/{followUpId}`: Removes a follow-up.
+
+#### Request Body (POST)
+```json
+{
+  "followUpDate": "2026-10-25",
+  "followUpTime": "10:00",
+  "followUpType": "Call",
+  "status": "Scheduled",
+  "remarks": "Call back on Monday."
+}
+```
+
+---
+
+### 3.9 Lead Visits (`/api/v1/app/leads/{id}/visits`)
+- `GET /api/v1/app/leads/{id}/visits`: Retrieves all visit entries for a lead.
+- `POST /api/v1/app/leads/{id}/visits`: Records a new visit for a lead.
+- `DELETE /api/v1/app/leads/{id}/visits/{visitId}`: Removes a visit.
+
+#### Request Body (POST)
+```json
+{
+  "visitDate": "2026-10-19",
+  "visitTime": "10:00",
+  "visitLocation": "Indore",
+  "outcome": "Interested",
+  "conversation": "Met client.",
+  "remarks": "Follow up next week."
+}
+```
+
+---
+
+### 3.10 Lead Requirements (`/api/v1/app/leads/{id}/requirements`)
+- `GET /api/v1/app/leads/{id}/requirements`: Retrieves all requirements for a lead.
+- `POST /api/v1/app/leads/{id}/requirements`: Adds a requirement against a lead.
+- `DELETE /api/v1/app/leads/{id}/requirements/{reqId}`: Removes a requirement.
 
 ---
 

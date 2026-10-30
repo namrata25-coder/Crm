@@ -330,18 +330,15 @@ public class InvoicesApiController : ControllerBase
             bool isMilestoneBased = string.Equals(project.ProjectType, "Milestone Based Project", StringComparison.OrdinalIgnoreCase) ||
                                    (project.ProjectType != null && project.ProjectType.Contains("Milestone", StringComparison.OrdinalIgnoreCase));
 
-            if (isMilestoneBased)
+            if (isMilestoneBased && input.MilestoneId.HasValue && input.MilestoneId.Value > 0)
             {
-                if (!input.MilestoneId.HasValue || input.MilestoneId.Value <= 0)
-                    return BadRequest(new { message = "Milestone is required for Milestone Based projects." });
-
                 milestone = await _db.WorkMilestones
                     .Include(m => m.Tasks)
                     .FirstOrDefaultAsync(m => m.Id == input.MilestoneId.Value && m.ProjectId == input.ProjectId);
                 if (milestone is null)
                     return BadRequest(new { message = $"Milestone ID {input.MilestoneId} does not belong to Project {input.ProjectId}." });
 
-                // Rule: 1 Milestone = 1 Invoice. Duplicate milestone invoice not allowed!
+                // Check duplicate milestone invoice
                 var existingMilestoneInvoice = await _db.WorkInvoices
                     .AnyAsync(i => i.MilestoneId == input.MilestoneId.Value);
                 if (existingMilestoneInvoice)
@@ -353,30 +350,7 @@ public class InvoicesApiController : ControllerBase
                     ? input.Amount
                     : (milestone.Amount > 0 ? milestone.Amount : milestone.EffectiveAmount);
             }
-            else if (!isTaskBased) // Direct Project
-            {
-                input.MilestoneId = null;
-                milestone = null;
-
-                if (input.Amount <= 0)
-                    return BadRequest(new { message = "Amount must be greater than 0 for Direct Projects." });
-
-                subtotal = input.Amount;
-
-                if (project.Budget > 0)
-                {
-                    var existingInvoiced = await _db.WorkInvoices
-                        .Where(i => i.ProjectId == project.Id)
-                        .SumAsync(i => i.Amount);
-
-                    if (existingInvoiced + subtotal > project.Budget)
-                    {
-                        var remainingBudget = Math.Max(0, project.Budget - existingInvoiced);
-                        return BadRequest(new { message = $"Invoice amount ({subtotal:F2}) exceeds remaining project budget ({remainingBudget:F2}). Total project budget is {project.Budget:F2}." });
-                    }
-                }
-            }
-            else // Task Based Project
+            else if (isTaskBased && input.TaskIds != null && input.TaskIds.Any())
             {
                 input.MilestoneId = null;
                 milestone = null;
@@ -411,6 +385,16 @@ public class InvoicesApiController : ControllerBase
 
                 var taskMarker = $"[Tasks:{string.Join(",", distinctTaskIds)}]";
                 finalNotes = string.IsNullOrWhiteSpace(finalNotes) ? taskMarker : $"{finalNotes} {taskMarker}";
+            }
+            else
+            {
+                input.MilestoneId = null;
+                milestone = null;
+
+                if (input.Amount <= 0)
+                    return BadRequest(new { message = "Amount must be greater than 0." });
+
+                subtotal = input.Amount;
             }
 
             if (string.IsNullOrWhiteSpace(input.InvoiceDate))

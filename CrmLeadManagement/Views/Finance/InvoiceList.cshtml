@@ -191,7 +191,9 @@
         <div style="padding:1.5rem;overflow-y:auto;flex:1;">
             <form id="invoiceForm" onsubmit="submitInvoiceForm(event)">
                 <input type="hidden" id="modalInvId" value="0" />
-                <input type="hidden" id="modalAmount" value="0" />
+                <input type="hidden" id="modalProjectType" value="Direct Project" />
+                <input type="hidden" id="modalMilestoneId" value="" />
+                <input type="hidden" id="modalMilestoneName" value="" />
 
                 <!-- Invoice Number -->
                 <div style="margin-bottom:1rem;">
@@ -283,81 +285,6 @@
                     </div>
                 </div>
 
-                <!-- Project Type -->
-                <div style="margin-bottom:1rem;">
-                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
-                        Project Type
-                    </label>
-                    <select id="modalProjectType" onchange="onProjectTypeDropdownChange(this.value)"
-                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:var(--ink-800);">
-                        <option value="Direct Project">Direct Project</option>
-                        <option value="Milestone Based Project">Milestone</option>
-                        <option value="Task Based Project">Task</option>
-                    </select>
-                </div>
-
-
-
-                <!-- 3B. MILESTONE BASED PROJECT: MILESTONE NAME & MILESTONE AMOUNT -->
-                <div id="milestoneSection" style="display:none;margin-bottom:1rem;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-                        <label style="font-size:12.5px;font-weight:600;color:var(--ink-700);margin:0;">
-                            Milestone Name <span style="color:#ef4444;">*</span>
-                        </label>
-                        <span id="modalMilestoneCountBadge" style="font-size:11px;color:var(--brand-600);font-weight:600;"></span>
-                    </div>
-                    <select id="modalMilestoneSelect" onchange="onMilestoneDropdownChange()"
-                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:none;">
-                        <option value="">-- Select Project First --</option>
-                    </select>
-                    <input type="hidden" id="modalMilestoneId" name="milestoneId" />
-                    <input type="hidden" id="modalMilestoneName" name="milestoneName" />
-
-                    <div id="milestoneAmountContainer" style="margin-top:10px;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-                            <label style="font-size:12.5px;font-weight:600;color:var(--ink-700);margin:0;">
-                                Milestone Amount (₹) <span style="color:#ef4444;">*</span>
-                            </label>
-                            <span id="milestoneAutoHint" style="font-size:10.5px;color:var(--brand-600);font-weight:600;display:none;">Auto-calculated</span>
-                        </div>
-                        <input type="number" id="modalMilestoneAmount" step="0.01" min="0" readonly placeholder="0.00"
-                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;background:#f8fafc;color:var(--ink-800);cursor:not-allowed;" />
-                    </div>
-
-                    <div id="modalMilestoneMessage" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;"></div>
-                    <div id="milestoneWarning" style="display:none;font-size:11.5px;color:#dc2626;font-weight:600;margin-top:4px;">
-                        <i class="bi bi-exclamation-triangle"></i> An invoice already exists for this milestone.
-                    </div>
-                </div>
-
-                <!-- 3C. TASK BASED PROJECT: TASK SELECTION & TASK AMOUNT -->
-                <div id="taskSection" style="display:none;margin-bottom:1rem;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-                        <label style="font-size:12.5px;font-weight:600;color:var(--ink-700);margin:0;">
-                            Select Completed Tasks <span style="color:#ef4444;">*</span> <small style="color:var(--brand-600);font-weight:600;">(Completed & Unbilled)</small>
-                        </label>
-                        <div style="display:flex;align-items:center;gap:6px;">
-                            <button type="button" class="btn btn-outline" onclick="toggleSelectAllTasks(true)" style="padding:2px 7px;font-size:11px;font-weight:600;background:#fff;">Select All</button>
-                            <button type="button" class="btn btn-outline" onclick="toggleSelectAllTasks(false)" style="padding:2px 7px;font-size:11px;font-weight:600;background:#fff;">Deselect All</button>
-                            <span id="taskCountBadge" style="font-size:11px;color:var(--brand-600);font-weight:600;"></span>
-                        </div>
-                    </div>
-                    <div id="taskListContainer" style="border:1px solid var(--line);border-radius:8px;max-height:220px;overflow-y:auto;background:#fff;">
-                        <div style="padding:15px;text-align:center;color:var(--ink-400);font-size:12.5px;">
-                            Select a project to load tasks.
-                        </div>
-                    </div>
-                    <div id="taskMessage" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;"></div>
-
-                    <div id="taskAmountContainer" style="margin-top:10px;">
-                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
-                            Task Amount (₹) <span style="color:#ef4444;">*</span>
-                        </label>
-                        <input type="number" id="modalTaskAmount" step="0.01" min="0" readonly placeholder="0.00"
-                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;background:#f8fafc;color:var(--ink-800);cursor:not-allowed;" />
-                    </div>
-                </div>
-
                 <!-- Dates: Invoice Date & Due Date -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
                     <div>
@@ -382,7 +309,14 @@
                     <div style="font-size:12px;font-weight:700;color:var(--ink-600);text-transform:uppercase;margin-bottom:10px;letter-spacing:0.5px;">
                         Amount & Tax Calculation
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
+                        <div>
+                            <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
+                                Amount (₹) <span style="color:#ef4444;">*</span>
+                            </label>
+                            <input type="number" id="modalAmount" step="0.01" min="0.01" required placeholder="0.00" oninput="calculateTotals()"
+                                   style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700;color:var(--brand-600);background:#fff;" />
+                        </div>
                         <div>
                             <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
                                 Discount (₹)
@@ -1103,7 +1037,7 @@
                 <td colspan="10" style="padding:3.5rem;text-align:center;color:var(--ink-400);">
                     <i class="bi bi-receipt" style="font-size:32px;color:var(--ink-300);"></i>
                     <div style="font-weight:700;font-size:15px;color:var(--ink-700);margin-top:8px;">No invoices found.</div>
-                    <div style="font-size:12.5px;color:var(--ink-500);margin-top:2px;">Click <strong>+ Add Invoice</strong> to create a new milestone invoice.</div>
+                    <div style="font-size:12.5px;color:var(--ink-500);margin-top:2px;">Click <strong>+ Add Invoice</strong> to create a new invoice.</div>
                 </td>
             `;
             tbody.appendChild(emptyRow);
@@ -1622,78 +1556,15 @@
     }
 
     function applyProjectTypeFormLayout(projectType, isEdit = false) {
-        const normType = getNormalizedProjectType(projectType);
-        const directSec = document.getElementById('directBudgetSection');
-        const milestoneSec = document.getElementById('milestoneSection');
-        const taskSec = document.getElementById('taskSection');
-        const modalAmount = document.getElementById('modalAmount');
-        const modalBudget = document.getElementById('modalBudget');
-        const modalMsSelect = document.getElementById('modalMilestoneSelect');
-        const modalMsId = document.getElementById('modalMilestoneId');
-        const autoHint = document.getElementById('milestoneAutoHint');
         const titleEl = document.getElementById('invModalTitle');
-        const amountLabelText = document.getElementById('modalAmountLabelText');
-
         if (titleEl && !isEdit) {
             titleEl.textContent = 'Add Invoice';
         }
-
-        const projTypeSelect = document.getElementById('modalProjectType');
-        if (projTypeSelect && projTypeSelect.value !== normType) {
-            projTypeSelect.value = normType;
-        }
-
-        if (normType === 'Milestone Based Project') {
-            if (directSec) directSec.style.display = 'none';
-            if (milestoneSec) milestoneSec.style.display = 'block';
-            if (taskSec) taskSec.style.display = 'none';
-            if (modalMsSelect) modalMsSelect.required = true;
-            if (modalMsId) modalMsId.required = true;
-            if (modalBudget) modalBudget.required = false;
-
-            if (modalAmount) {
-                modalAmount.readOnly = true;
-                modalAmount.style.background = '#f8fafc';
-                modalAmount.style.cursor = 'not-allowed';
-            }
-            if (amountLabelText) {
-                amountLabelText.textContent = 'Subtotal (₹)';
-            }
-        } else if (normType === 'Task Based Project') {
-            if (directSec) directSec.style.display = 'none';
-            if (milestoneSec) milestoneSec.style.display = 'none';
-            if (taskSec) taskSec.style.display = 'block';
-            if (modalMsSelect) { modalMsSelect.required = false; modalMsSelect.value = ''; }
-            if (modalMsId) { modalMsId.required = false; modalMsId.value = ''; }
-            if (modalBudget) modalBudget.required = false;
-            if (autoHint) autoHint.style.display = 'none';
-
-            if (modalAmount) {
-                modalAmount.readOnly = true;
-                modalAmount.style.background = '#f8fafc';
-                modalAmount.style.cursor = 'not-allowed';
-            }
-            if (amountLabelText) {
-                amountLabelText.textContent = 'Subtotal (₹)';
-            }
-        } else {
-            // Direct Project
-            if (directSec) directSec.style.display = 'block';
-            if (milestoneSec) milestoneSec.style.display = 'none';
-            if (taskSec) taskSec.style.display = 'none';
-            if (modalMsSelect) { modalMsSelect.required = false; modalMsSelect.value = ''; }
-            if (modalMsId) { modalMsId.required = false; modalMsId.value = ''; }
-            if (autoHint) autoHint.style.display = 'none';
-            if (modalBudget) modalBudget.required = true;
-
-            if (modalAmount) {
-                modalAmount.readOnly = true;
-                modalAmount.style.background = '#f8fafc';
-                modalAmount.style.cursor = 'not-allowed';
-            }
-            if (amountLabelText) {
-                amountLabelText.textContent = 'Subtotal (₹)';
-            }
+        const modalAmount = document.getElementById('modalAmount');
+        if (modalAmount) {
+            modalAmount.readOnly = false;
+            modalAmount.style.background = '#fff';
+            modalAmount.style.cursor = 'text';
         }
     }
 
@@ -1927,35 +1798,14 @@
 
         applyProjectTypeFormLayout(normType, false);
 
-        if (normType === 'Milestone Based Project') {
-            resetTaskSection();
-            const budgetInput = document.getElementById('modalBudget');
-            if (budgetInput) budgetInput.value = '';
-            const bHint = document.getElementById('budgetAutoHint');
-            if (bHint) bHint.style.display = 'none';
-            loadMilestonesForProject(project.id);
-        } else if (normType === 'Task Based Project') {
-            resetMilestoneDropdown();
-            const budgetInput = document.getElementById('modalBudget');
-            if (budgetInput) budgetInput.value = '';
-            const bHint = document.getElementById('budgetAutoHint');
-            if (bHint) bHint.style.display = 'none';
-            loadBillableTasksForProject(project.id);
-        } else {
-            // Direct Project
-            resetMilestoneDropdown();
-            resetTaskSection();
-            const bVal = project.budget ? Number(project.budget) : '';
-            const bInput = document.getElementById('modalBudget');
-            if (bInput) bInput.value = bVal;
-            const bHint = document.getElementById('budgetAutoHint');
-            if (bHint) bHint.style.display = bVal ? 'inline' : 'none';
-            const amtInput = document.getElementById('modalAmount');
-            if (amtInput) {
-                amtInput.value = bVal;
+        // Pre-fill amount if empty and project has budget
+        const amtInput = document.getElementById('modalAmount');
+        if (amtInput && (!amtInput.value || parseFloat(amtInput.value) === 0)) {
+            if (project.budget && Number(project.budget) > 0) {
+                amtInput.value = Number(project.budget);
             }
-            calculateTotals();
         }
+        calculateTotals();
     }
 
     function clearSelectedProject(e) {
@@ -1976,26 +1826,8 @@
         const summaryBox = document.getElementById('projectInvoiceSummaryBox');
         if (summaryBox) summaryBox.style.display = 'none';
 
-        resetMilestoneDropdown();
-        resetTaskSection();
-
-        const budgetInput = document.getElementById('modalBudget');
-        if (budgetInput) budgetInput.value = '';
-        const bHint = document.getElementById('budgetAutoHint');
-        if (bHint) bHint.style.display = 'none';
-
-        const msAmountInput = document.getElementById('modalMilestoneAmount');
-        if (msAmountInput) msAmountInput.value = '';
-
-        const taskAmtInput = document.getElementById('modalTaskAmount');
-        if (taskAmtInput) taskAmtInput.value = '';
-
         const amtInput = document.getElementById('modalAmount');
-        if (amtInput) {
-            amtInput.value = '';
-        }
-        const autoHint = document.getElementById('milestoneAutoHint');
-        if (autoHint) autoHint.style.display = 'none';
+        if (amtInput) amtInput.value = '';
 
         applyProjectTypeFormLayout('Direct Project', false);
         calculateTotals();
@@ -2218,30 +2050,17 @@
         const summaryBox = document.getElementById('projectInvoiceSummaryBox');
         if (summaryBox) summaryBox.style.display = 'none';
 
-        const bInput = document.getElementById('modalBudget');
-        if (bInput) bInput.value = '';
-        const msAmtInput = document.getElementById('modalMilestoneAmount');
-        if (msAmtInput) msAmtInput.value = '';
-        const taskAmtInput = document.getElementById('modalTaskAmount');
-        if (taskAmtInput) taskAmtInput.value = '';
-        const bHint = document.getElementById('budgetAutoHint');
-        if (bHint) bHint.style.display = 'none';
-
         const amtInput = document.getElementById('modalAmount');
         if (amtInput) {
             amtInput.value = '';
-            amtInput.readOnly = true;
-            amtInput.style.background = '#f8fafc';
-            amtInput.style.cursor = 'not-allowed';
+            amtInput.readOnly = false;
+            amtInput.style.background = '#fff';
+            amtInput.style.cursor = 'text';
         }
 
         document.getElementById('modalDiscount').value = '0';
         document.getElementById('modalTaxRate').value = '18';
         document.getElementById('modalNotes').value = '';
-        const warn1 = document.getElementById('milestoneWarning');
-        if (warn1) warn1.style.display = 'none';
-        const autoHint1 = document.getElementById('milestoneAutoHint');
-        if (autoHint1) autoHint1.style.display = 'none';
 
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('modalInvDate').value = today;
@@ -2259,8 +2078,6 @@
 
         clearSelectedClient();
         clearSelectedProject();
-        resetMilestoneDropdown();
-        resetTaskSection();
         applyProjectTypeFormLayout('Direct Project', false);
 
         calculateTotals();
@@ -2335,59 +2152,17 @@
         const normType = getNormalizedProjectType(projectType);
 
         const ptInput = document.getElementById('modalProjectType');
-        if (ptInput) ptInput.value = project ? project.projectType : normType;
+        if (ptInput) ptInput.value = 'Direct Project';
 
-        applyProjectTypeFormLayout(normType, true);
+        applyProjectTypeFormLayout('Direct Project', true);
 
-        // Keep the saved amount and handle type specifics
-        document.getElementById('modalAmount').value = inv.amount || 0;
-
-        if (normType === 'Milestone Based Project') {
-            resetTaskSection();
-            const msAmtInput = document.getElementById('modalMilestoneAmount');
-            if (msAmtInput) msAmtInput.value = inv.amount || 0;
-            const bInput = document.getElementById('modalBudget');
-            if (bInput) bInput.value = '';
-            if (inv.projectId) {
-                await loadMilestonesForProject(inv.projectId, inv.milestoneId, /* isEdit */ true);
-            }
-        } else if (normType === 'Task Based Project') {
-            resetMilestoneDropdown();
-            const taskAmtInput = document.getElementById('modalTaskAmount');
-            if (taskAmtInput) taskAmtInput.value = inv.amount || 0;
-            const bInput = document.getElementById('modalBudget');
-            if (bInput) bInput.value = '';
-            // In edit mode for Task Based, allow adjusting amount if needed
-            const amtInput = document.getElementById('modalAmount');
-            if (amtInput) {
-                amtInput.readOnly = false;
-                amtInput.style.background = '#fff';
-                amtInput.style.cursor = 'text';
-            }
-            if (inv.projectId) {
-                let preselected = [];
-                if (inv.notes) {
-                    const match = inv.notes.match(/\[Tasks:([0-9,]+)\]/);
-                    if (match) {
-                        preselected = match[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
-                    }
-                }
-                await loadBillableTasksForProject(inv.projectId, preselected);
-                // Ensure amount is preserved
-                if (amtInput) amtInput.value = inv.amount || 0;
-                if (taskAmtInput) taskAmtInput.value = inv.amount || 0;
-            }
-        } else {
-            resetMilestoneDropdown();
-            resetTaskSection();
-            const bInput = document.getElementById('modalBudget');
-            if (bInput) bInput.value = inv.amount || 0;
-            const amtInput = document.getElementById('modalAmount');
-            if (amtInput) {
-                amtInput.readOnly = false;
-                amtInput.style.background = '#fff';
-                amtInput.style.cursor = 'text';
-            }
+        // Keep the saved amount and make sure it is editable
+        const amtInput = document.getElementById('modalAmount');
+        if (amtInput) {
+            amtInput.value = inv.amount || 0;
+            amtInput.readOnly = false;
+            amtInput.style.background = '#fff';
+            amtInput.style.cursor = 'text';
         }
 
         calculateTotals();
@@ -2466,29 +2241,10 @@
             return;
         }
 
-        const project = allProjects.find(p => p.id === projectId);
-        const projectType = project ? (project.projectType || 'Direct Project') : (document.getElementById('modalProjectType')?.value || 'Direct Project');
-        const normType = getNormalizedProjectType(projectType);
-
-        const subtotal = parseFloat(document.getElementById('modalAmount').value) || 0;
-        let milestoneId = null;
-        let taskIds = null;
-
-        // Validation per type
-        if (normType === 'Milestone Based Project') {
-            const milestoneVal = document.getElementById('modalMilestoneId').value;
-            milestoneId = milestoneVal ? parseInt(milestoneVal, 10) : null;
-            if (!milestoneId) {
-                showToast('Please select an eligible milestone for this invoice', true);
-                return;
-            }
-        } else if (normType === 'Task Based Project') {
-            const checkedBoxes = document.querySelectorAll('.billable-task-checkbox:checked');
-            taskIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10)).filter(n => !isNaN(n));
-            if (!isEdit && (!taskIds || taskIds.length === 0)) {
-                showToast('Please select at least one completed task to bill', true);
-                return;
-            }
+        const subtotal = parseFloat(document.getElementById('modalAmount')?.value) || 0;
+        if (subtotal <= 0) {
+            showToast('Please enter an invoice amount greater than 0', true);
+            return;
         }
 
         // Validate dates & discount
@@ -2499,7 +2255,7 @@
             return;
         }
 
-        const discount = parseFloat(document.getElementById('modalDiscount').value) || 0;
+        const discount = parseFloat(document.getElementById('modalDiscount')?.value) || 0;
         if (subtotal > 0 && discount > subtotal) {
             showToast('Discount cannot be greater than Subtotal amount', true);
             return;
@@ -2518,19 +2274,20 @@
         const payload = {
             id: id,
             projectId: projectId,
-            milestoneId: normType === 'Milestone Based Project' ? milestoneId : null,
-            taskIds: normType === 'Task Based Project' ? taskIds : null,
+            milestoneId: null,
+            taskIds: null,
             invoiceNumber: document.getElementById('modalInvNumber').value.trim(),
             clientId: clientId,
             clientName: resolvedContact,
             clientCompany: resolvedCompany,
             invoiceDate: invDate,
             dueDate: dueDate,
+            amount: subtotal,
             discount: discount,
             taxRate: taxRate,
             taxName: taxName,
             taxType: taxType,
-            notes: document.getElementById('modalNotes').value.trim()
+            notes: document.getElementById('modalNotes')?.value?.trim() || ''
         };
 
         const btn = document.getElementById('btnSaveInvoice');

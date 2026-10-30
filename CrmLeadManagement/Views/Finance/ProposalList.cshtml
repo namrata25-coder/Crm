@@ -4,14 +4,30 @@
     <a asp-controller="Home" asp-action="Index">Home</a><span class="sep">/</span>
     <span>Finance</span><span class="sep">/</span><span class="current">Proposal List</span>
 </div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert-success-banner" style="margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;padding:12px 16px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:10px;font-size:13.5px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <i class="bi bi-check-circle-fill" style="color:#059669;font-size:17px;"></i>
+        <span>@TempData["SuccessMessage"]</span>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert-danger-banner" style="margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;font-size:13.5px;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <i class="bi bi-exclamation-triangle-fill" style="color:#dc2626;font-size:17px;"></i>
+        <span>@TempData["ErrorMessage"]</span>
+    </div>
+}
+
 <div class="page-head">
     <div>
         <h1>Proposal List</h1>
         <p>All proposals raised across every lead, in one place.</p>
     </div>
     <div class="action-toolbar">
-        <button type="button" class="btn btn-primary" onclick="openModal('selectLeadProposalModal')">
-            <i class="bi bi-plus-lg"></i> New Proposal
+        <button type="button" class="btn btn-primary" onclick="openAddFinanceModal('proposal')" id="btnAddProposal" style="display:inline-flex;align-items:center;gap:6px;font-weight:600;box-shadow:0 2px 8px rgba(79,70,229,0.25);">
+            <i class="bi bi-plus-lg"></i> Add Proposal
         </button>
     </div>
 </div>
@@ -72,7 +88,7 @@
                     <th>Email</th>
                     <th>Proposal Date</th>
                     <th>P-ID</th>
-                    <th>Budget</th>
+                    <th>Attachment</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -80,7 +96,7 @@
             <tbody>
                 @if (Model.Count == 0)
                 {
-                    <tr id="emptyProposalRow"><td colspan="8"><div class="empty-state"><i class="bi bi-file-earmark-richtext"></i><p>No proposals created yet. Click "+ New Proposal" to create one.</p></div></td></tr>
+                    <tr id="emptyProposalRow"><td colspan="8"><div class="empty-state"><i class="bi bi-file-earmark-richtext"></i><p>No proposals created yet. Click "+ Add Proposal" to create one.</p></div></td></tr>
                 }
                 @foreach (var r in Model)
                 {
@@ -89,14 +105,28 @@
                         <td>@r.MobileNumber</td>
                         <td>@r.Email</td>
                         <td>@r.Date</td>
-                        <td class="cell-primary">@r.Number</td>
-                        <td>@FinanceHelpers.Money(r.Total)</td>
+                        <td class="cell-primary"><strong>@r.Number</strong></td>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(r.AttachmentPath))
+                            {
+                                <a href="@r.AttachmentPath" target="_blank" rel="noopener" class="btn btn-soft btn-sm" style="display:inline-flex;align-items:center;gap:5px;color:#dc2626;background:#fee2e2;border-color:#fecaca;" title="@r.AttachmentFileName">
+                                    <i class="bi bi-file-earmark-pdf-fill"></i> View PDF
+                                </a>
+                            }
+                            else
+                            {
+                                <span style="font-size:12px;color:var(--ink-400);">No PDF</span>
+                            }
+                        </td>
                         <td>@Html.Raw(FinanceHelpers.StatusBadge(r.Status))</td>
                         <td>
                             <div style="display:flex;gap:6px;">
                                 <a asp-controller="Finance" asp-action="ProposalDetails" asp-route-leadId="@r.LeadId" asp-route-number="@r.Number" class="btn btn-soft btn-sm" title="View">
                                     <i class="bi bi-eye"></i> View
                                 </a>
+                                <button type="button" class="btn btn-soft btn-sm" title="Edit" onclick="openEditFinanceModal('proposal', '@r.Number')">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
                                 <form method="post" asp-controller="Finance" asp-action="DeleteProposal" style="display:inline;" onsubmit="return confirm('Delete proposal @r.Number? This cannot be undone.')">
                                     <input type="hidden" name="leadId" value="@r.LeadId" />
                                     <input type="hidden" name="number" value="@r.Number" />
@@ -105,6 +135,7 @@
                                     </button>
                                 </form>
                             </div>
+                            <script type="application/json" id="proposal-json-@r.Number">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(r))</script>
                         </td>
                     </tr>
                 }
@@ -113,35 +144,85 @@
     </div>
 </div>
 
-<!-- Modal: Select Lead for New Proposal -->
-<div class="modal-backdrop-custom" id="selectLeadProposalModal">
-    <div class="modal-card" style="max-width:480px;">
-        <div class="modal-header">
-            <div>
-                <h3>Create New Proposal</h3>
-                <div class="sub">Select a lead to open their finance proposal sheet</div>
+<!-- Modal: Add / Edit Proposal -->
+<div class="modal-backdrop-custom" id="addProposalModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(3px);z-index:1050;align-items:center;justify-content:center;padding:1rem;">
+    <div class="modal-card" style="max-width:520px;width:100%;border-radius:14px;background:#fff;box-shadow:0 20px 25px -5px rgba(0,0,0,0.15);overflow:hidden;">
+        <div class="modal-header" style="padding:16px 20px;border-bottom:1px solid var(--line,#e2e8f0);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:8px;background:#eef2ff;color:var(--brand-600,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:18px;">
+                    <i class="bi bi-file-earmark-richtext"></i>
+                </div>
+                <div>
+                    <h3 id="proposalModalTitle" style="font-size:1.1rem;font-weight:700;color:var(--ink-900,#0f172a);margin:0;">Add Proposal</h3>
+                    <div class="sub" style="font-size:12px;color:var(--ink-500,#64748b);margin-top:2px;">Upload PDF document and add notes</div>
+                </div>
             </div>
-            <button type="button" class="modal-close-btn" onclick="closeModal('selectLeadProposalModal')">
+            <button type="button" class="modal-close-btn" onclick="closeModal('addProposalModal')" style="border:none;background:transparent;color:var(--ink-400,#94a3b8);font-size:22px;cursor:pointer;padding:2px 6px;line-height:1;">
                 <i class="bi bi-x"></i>
             </button>
         </div>
-        <div class="modal-body" style="padding:20px;">
-            <div class="form-field" style="margin-bottom:16px;">
-                <label style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Select Lead <span style="color:#b42318;">*</span></label>
-                <select id="proposalLeadSelector" style="width:100%;padding:10px 12px;border:1px solid var(--ink-300);border-radius:8px;font-size:13.5px;">
-                    @foreach (var l in LeadStore.Leads)
-                    {
-                        <option value="@l.LeadId">@l.LeadName — @l.CompanyName (@l.LeadId)</option>
-                    }
-                </select>
+        <form method="post" asp-controller="Finance" asp-action="SaveProposal" enctype="multipart/form-data" id="proposalForm" onsubmit="return validateFinanceForm(this, 'proposal')">
+            <input type="hidden" name="number" id="proposalNumber" value="" />
+            <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+            <div class="modal-body" style="padding:20px;">
+                <!-- Lead Selector -->
+                <div class="form-field" style="margin-bottom:16px;">
+                    <label style="font-weight:600;font-size:12.5px;display:block;margin-bottom:6px;color:var(--ink-700,#334155);">
+                        Select Lead <span style="color:#b42318;">*</span>
+                    </label>
+                    <select name="leadId" id="proposalLeadId" required style="width:100%;padding:10px 12px;border:1px solid var(--ink-300,#cbd5e1);border-radius:8px;font-size:13.5px;background:#fff;">
+                        @foreach (var l in LeadStore.Leads)
+                        {
+                            <option value="@l.LeadId">@l.LeadName — @l.CompanyName (@l.LeadId)</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Field 1: Attach PDF -->
+                <div class="form-field" style="margin-bottom:16px;">
+                    <label style="font-weight:600;font-size:12.5px;display:block;margin-bottom:6px;color:var(--ink-700,#334155);">
+                        Attach PDF <span style="color:#b42318;">*</span>
+                    </label>
+                    <div style="border:1.5px dashed #cbd5e1;border-radius:10px;padding:16px;background:#f8fafc;text-align:center;transition:border-color 0.2s;">
+                        <div style="width:40px;height:40px;border-radius:50%;background:#fee2e2;color:#dc2626;display:inline-flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:8px;">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                        </div>
+                        <div style="font-size:13px;font-weight:600;color:var(--ink-800,#1e293b);margin-bottom:4px;">
+                            Upload PDF File
+                        </div>
+                        <div style="font-size:12px;color:var(--ink-500,#64748b);margin-bottom:10px;">
+                            Click the button below to select a PDF document (up to 10 MB)
+                        </div>
+                        <label class="btn btn-outline btn-sm" for="proposalAttachment" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;background:#fff;border-color:#cbd5e1;font-weight:600;">
+                            <i class="bi bi-paperclip"></i> Choose PDF
+                        </label>
+                        <input type="file" name="attachment" id="proposalAttachment"
+                               accept=".pdf,application/pdf"
+                               style="display:none;" onchange="handleFinancePdfChange(this, 'proposal')" />
+                        <div id="proposalAttachmentFileName" style="font-size:12.5px;color:var(--ink-500,#64748b);font-weight:500;margin-top:8px;">No file chosen</div>
+                    </div>
+                    <div id="proposalCurrentAttachment" style="display:none;margin-top:8px;padding:8px 12px;background:#eef2ff;border-radius:6px;font-size:12.5px;align-items:center;gap:6px;color:#3538cd;">
+                        <i class="bi bi-paperclip"></i>
+                        <span>Current: <a href="#" id="proposalCurrentAttachmentLink" target="_blank" rel="noopener" style="font-weight:700;color:#3538cd;text-decoration:underline;"></a></span>
+                        <span style="font-size:11.5px;color:#64748b;">(Upload new file to replace)</span>
+                    </div>
+                </div>
+
+                <!-- Field 2: Description / Notes -->
+                <div class="form-field" style="margin-bottom:8px;">
+                    <label style="font-weight:600;font-size:12.5px;display:block;margin-bottom:6px;color:var(--ink-700,#334155);">
+                        Description / Notes
+                    </label>
+                    <textarea name="notes" id="proposalNotes" rows="4" placeholder="Enter additional information or notes..." style="width:100%;padding:10px 12px;border:1px solid var(--ink-300,#cbd5e1);border-radius:8px;font-size:13.5px;resize:vertical;font-family:inherit;"></textarea>
+                </div>
             </div>
-            <div style="display:flex;justify-content:flex-end;gap:10px;">
-                <button type="button" class="btn btn-outline" onclick="closeModal('selectLeadProposalModal')">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="proceedToLeadFinance('proposalLeadSelector','proposal')">
-                    Proceed <i class="bi bi-arrow-right"></i>
+            <div class="modal-footer" style="padding:14px 20px;border-top:1px solid var(--line,#e2e8f0);background:#f8fafc;display:flex;justify-content:flex-end;gap:10px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('addProposalModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="btnSubmitProposal" style="display:inline-flex;align-items:center;gap:6px;font-weight:600;">
+                    <i class="bi bi-check-lg"></i> <span id="proposalSubmitBtnText">Save Proposal</span>
                 </button>
             </div>
-        </div>
+        </form>
     </div>
 </div>
 
@@ -178,12 +259,6 @@
             if (st) st.value = '';
             filterFinanceTable(tableId, inputId, statusId);
         }
-
-        function proceedToLeadFinance(selectorId, subtab) {
-            var sel = document.getElementById(selectorId);
-            if (sel && sel.value) {
-                window.location.href = '/Lead/Details?id=' + encodeURIComponent(sel.value) + '&tab=finance&subtab=' + encodeURIComponent(subtab);
-            }
-        }
     </script>
 }
+

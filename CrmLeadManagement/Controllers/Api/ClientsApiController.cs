@@ -40,24 +40,28 @@ public class ClientsApiController : ControllerBase
             // Populate from Leads
             foreach (var lead in leads)
             {
-                var name = !string.IsNullOrWhiteSpace(lead.CompanyName) ? lead.CompanyName : lead.LeadName;
-                if (string.IsNullOrWhiteSpace(name)) continue;
+                var clientName = lead.LeadName?.Trim() ?? "";
+                var companyName = lead.CompanyName?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(clientName) && string.IsNullOrWhiteSpace(companyName)) continue;
 
-                var key = name.Trim();
+                var key = !string.IsNullOrWhiteSpace(lead.LeadId)
+                    ? lead.LeadId.Trim()
+                    : (!string.IsNullOrWhiteSpace(clientName) ? clientName : companyName);
+
                 if (!clientMap.ContainsKey(key))
                 {
                     clientMap[key] = new ClientLookupDto
                     {
                         ClientId = !string.IsNullOrWhiteSpace(lead.LeadId) ? lead.LeadId : lead.Id.ToString(),
                         LeadId = lead.LeadId ?? "",
-                        ClientName = lead.LeadName ?? "",
-                        CompanyName = lead.CompanyName ?? lead.LeadName ?? "",
+                        ClientName = clientName,
+                        CompanyName = companyName,
                         Email = lead.Email ?? "",
                         MobileNumber = lead.MobileNumber ?? "",
                         ProjectsCount = projects.Count(p => 
-                            string.Equals(p.ClientName, lead.LeadName, StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(p.ClientCompany, lead.CompanyName, StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(p.ClientName, lead.CompanyName, StringComparison.OrdinalIgnoreCase))
+                            (!string.IsNullOrEmpty(clientName) && string.Equals(p.ClientName, clientName, StringComparison.OrdinalIgnoreCase)) ||
+                            (!string.IsNullOrEmpty(companyName) && string.Equals(p.ClientCompany, companyName, StringComparison.OrdinalIgnoreCase)) ||
+                            (!string.IsNullOrEmpty(companyName) && string.Equals(p.ClientName, companyName, StringComparison.OrdinalIgnoreCase)))
                     };
                 }
             }
@@ -65,23 +69,24 @@ public class ClientsApiController : ControllerBase
             // Populate from Projects (if any client was created directly in Work module)
             foreach (var p in projects)
             {
-                var name = !string.IsNullOrWhiteSpace(p.ClientCompany) ? p.ClientCompany : p.ClientName;
-                if (string.IsNullOrWhiteSpace(name)) continue;
+                var clientName = p.ClientName?.Trim() ?? "";
+                var companyName = p.ClientCompany?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(clientName) && string.IsNullOrWhiteSpace(companyName)) continue;
 
-                var key = name.Trim();
+                var key = !string.IsNullOrWhiteSpace(clientName) ? clientName : companyName;
                 if (!clientMap.ContainsKey(key))
                 {
                     clientMap[key] = new ClientLookupDto
                     {
                         ClientId = !string.IsNullOrWhiteSpace(p.ProjectCode) ? p.ProjectCode : $"CLIENT-{p.Id}",
                         LeadId = "",
-                        ClientName = p.ClientName ?? "",
-                        CompanyName = p.ClientCompany ?? p.ClientName ?? "",
+                        ClientName = clientName,
+                        CompanyName = companyName,
                         Email = "",
                         MobileNumber = "",
                         ProjectsCount = projects.Count(x => 
-                            string.Equals(x.ClientCompany, p.ClientCompany, StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(x.ClientName, p.ClientName, StringComparison.OrdinalIgnoreCase))
+                            (!string.IsNullOrEmpty(clientName) && string.Equals(x.ClientName, clientName, StringComparison.OrdinalIgnoreCase)) ||
+                            (!string.IsNullOrEmpty(companyName) && string.Equals(x.ClientCompany, companyName, StringComparison.OrdinalIgnoreCase)))
                     };
                 }
             }
@@ -98,7 +103,11 @@ public class ClientsApiController : ControllerBase
                     c.MobileNumber.ToLower().Contains(term));
             }
 
-            return Ok(list.OrderBy(c => c.CompanyName).ToList());
+            return Ok(list
+                .OrderBy(c => string.IsNullOrWhiteSpace(c.ClientName) ? 1 : 0)
+                .ThenBy(c => c.ClientName)
+                .ThenBy(c => c.CompanyName)
+                .ToList());
         }
         catch (Exception ex)
         {

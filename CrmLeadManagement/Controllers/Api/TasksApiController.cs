@@ -61,6 +61,9 @@ public class TasksApiController : ControllerBase
                 .Include(t => t.Milestone)
                 .AsQueryable();
 
+            var accessibleProjectIds = await ProjectAccessPolicy.GetAccessibleProjectIdsAsync(_db, User);
+            query = query.Where(t => accessibleProjectIds.Contains(t.ProjectId));
+
             if (projectId.HasValue && projectId.Value > 0)
                 query = query.Where(t => t.ProjectId == projectId.Value);
 
@@ -173,7 +176,7 @@ public class TasksApiController : ControllerBase
                     .ThenInclude(i => i.Payments)
                 .FirstOrDefaultAsync(p => p.Id == projectId);
 
-            if (project == null)
+            if (project == null || !ProjectAccessPolicy.CanAccess(_db, User, project))
                 return NotFound(new { message = $"Project with ID {projectId} not found." });
 
             var milestones = project.Milestones.OrderBy(m => m.Id).ToList();
@@ -294,6 +297,8 @@ public class TasksApiController : ControllerBase
 
             if (t is null)
                 return NotFound(new { message = $"Task with ID {id} not found." });
+            if (t.Project is null || !ProjectAccessPolicy.CanAccess(_db, User, t.Project))
+                return NotFound(new { message = $"Task with ID {id} not found." });
 
             var projectMilestones = await _db.WorkMilestones.Where(m => m.ProjectId == t.ProjectId).ToListAsync();
             var projectInvoices = await _db.WorkInvoices.Include(i => i.Payments).Where(i => i.ProjectId == t.ProjectId).ToListAsync();
@@ -385,6 +390,8 @@ public class TasksApiController : ControllerBase
 
             if (project == null)
                 return BadRequest(new { message = $"Project with ID {input.ProjectId} does not exist." });
+            if (!ProjectAccessPolicy.CanAccess(_db, User, project))
+                return NotFound(new { message = $"Project with ID {input.ProjectId} does not exist." });
 
             WorkMilestone? parentMilestone = null;
             if (input.MilestoneId.HasValue && input.MilestoneId.Value > 0)
@@ -457,11 +464,16 @@ public class TasksApiController : ControllerBase
             var task = await _db.WorkTasks.FindAsync(id);
             if (task is null)
                 return NotFound(new { message = $"Task with ID {id} not found." });
+            var accessibleProjectIds = await ProjectAccessPolicy.GetAccessibleProjectIdsAsync(_db, User);
+            if (!accessibleProjectIds.Contains(task.ProjectId))
+                return NotFound(new { message = $"Task with ID {id} not found." });
 
             if (string.IsNullOrWhiteSpace(input.TaskName))
                 return BadRequest(new { message = "TaskName is required." });
 
             var targetProjectId = input.ProjectId > 0 ? input.ProjectId : task.ProjectId;
+            if (targetProjectId != task.ProjectId)
+                return BadRequest(new { message = "A task cannot be moved to another project." });
 
             var project = await _db.WorkProjects
                 .Include(p => p.Milestones)
@@ -472,6 +484,8 @@ public class TasksApiController : ControllerBase
 
             if (project == null)
                 return BadRequest(new { message = $"Project with ID {targetProjectId} does not exist." });
+            if (!ProjectAccessPolicy.CanAccess(_db, User, project))
+                return NotFound(new { message = $"Project with ID {targetProjectId} does not exist." });
 
             task.ProjectId = targetProjectId;
 
@@ -537,6 +551,9 @@ public class TasksApiController : ControllerBase
         {
             var task = await _db.WorkTasks.FindAsync(id);
             if (task is null)
+                return NotFound(new { message = $"Task with ID {id} not found." });
+            var project = await _db.WorkProjects.FindAsync(task.ProjectId);
+            if (project is null || !ProjectAccessPolicy.CanAccess(_db, User, project))
                 return NotFound(new { message = $"Task with ID {id} not found." });
 
             _db.WorkTasks.Remove(task);

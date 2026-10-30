@@ -72,7 +72,7 @@
             </button>
             <div id="projectActionDropdownMenu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);z-index:1000;min-width:210px;overflow:hidden;">
                 <a href="javascript:void(0)" onclick="openInvoiceModal(0, @Model.Id)" style="display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--ink-800);text-decoration:none;transition:background 0.2s;">
-                    <i class="bi bi-receipt" style="color:var(--brand-600);font-size:16px;"></i> Create Invoice
+                    <i class="bi bi-receipt" style="color:var(--brand-600);font-size:16px;"></i> Add Invoice
                 </a>
                 <a href="javascript:void(0)" onclick="openProjectRecurringModal(@Model.Id, '@Html.Raw(Model.ProjectName?.Replace("'", "\\'"))', '@Html.Raw(Model.ClientName?.Replace("'", "\\'"))', '@Html.Raw(Model.ClientCompany?.Replace("'", "\\'"))')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--ink-800);text-decoration:none;border-top:1px solid var(--line);transition:background 0.2s;">
                     <i class="bi bi-arrow-repeat" style="color:#7c3aed;font-size:16px;"></i> Add Recurring Invoice
@@ -805,7 +805,7 @@
                                 var rem = inv.RemainingAmount > 0 ? inv.RemainingAmount : (inv.PaymentStatus == "Paid" ? 0 : inv.GrandTotal);
                                 var msName = inv.Milestone?.MilestoneName ?? (inv.MilestoneId.HasValue ? Model.Milestones.FirstOrDefault(m => m.Id == inv.MilestoneId.Value)?.MilestoneName ?? $"Milestone #{inv.MilestoneId}" : "Project Direct");
                                 var msCode = inv.Milestone?.MilestoneCode ?? (inv.MilestoneId.HasValue ? Model.Milestones.FirstOrDefault(m => m.Id == inv.MilestoneId.Value)?.MilestoneCode ?? "MLS" : "PRJ");
-                                var clientStr = !string.IsNullOrWhiteSpace(inv.ClientCompany) ? inv.ClientCompany : (!string.IsNullOrWhiteSpace(inv.ClientName) ? inv.ClientName : Model.ClientCompany);
+                                var clientStr = !string.IsNullOrWhiteSpace(inv.ClientName) ? inv.ClientName : (!string.IsNullOrWhiteSpace(inv.ClientCompany) ? inv.ClientCompany : Model.ClientName);
                                 var dynStatus = inv.CalculatedStatus;
 
                                 <tr class="project-inv-row" data-number="@inv.InvoiceNumber" data-client="@clientStr" data-milestone="@msName" data-status="@dynStatus" style="border-bottom:1px solid var(--line);">
@@ -2249,13 +2249,12 @@
     </div>
 </div>
 
-<!-- ── MILESTONE BASED INVOICE MODAL ── -->
+<!-- ── ADD INVOICE MODAL ── -->
 <div class="modal-backdrop-custom" id="invoiceModal">
     <div class="modal-box modal-lg" style="max-width:780px;">
         <div class="modal-box-head">
             <div>
-                <h3><i class="bi bi-receipt" style="color:var(--brand-600);"></i> <span id="invModalTitle">Create Milestone Invoice</span></h3>
-                <p id="invModalSub">1 Milestone = 1 Invoice · Dynamic Project Billing</p>
+                <h3><i class="bi bi-receipt" style="color:var(--brand-600);"></i> <span id="invModalTitle">Add Invoice</span></h3>
             </div>
             <button class="modal-close" type="button" onclick="closeModal('invoiceModal')">&times;</button>
         </div>
@@ -2310,49 +2309,110 @@
                         </div>
                     </div>
 
-                    <!-- Milestone Selection (Displayed directly in the Create Invoice form) -->
+                    <!-- Client Dropdown (Order: Client Name – Company Name) -->
+                    <div class="form-field">
+                        <label>Client <span class="req">*</span></label>
+                        <select name="clientSelect" id="invClientSelect" required onchange="onProjectDetailsClientChange(this)">
+                            <option value="">-- Select Client --</option>
+                        </select>
+                        <input type="hidden" name="clientName" id="invClientName" value="@Model.ClientName"/>
+                        <input type="hidden" name="clientCompany" id="invClientCompany" value="@Model.ClientCompany"/>
+                        <input type="hidden" name="clientId" id="invClientId"/>
+                    </div>
+
+                    <!-- Project Type Dropdown -->
                     <div class="form-field full">
+                        <label>Project Type <span class="req">*</span></label>
+                        <select name="projectType" id="invProjectType" onchange="onProjectDetailsProjectTypeChange(this.value)" style="font-weight:600;">
+                            <option value="Direct Project">Direct Project</option>
+                            <option value="Milestone Based Project">Milestone</option>
+                            <option value="Task Based Project">Task</option>
+                        </select>
+                    </div>
+
+                    <!-- 3A. Direct Project: Budget Field -->
+                    <div class="form-field full" id="projDirectBudgetSection">
+                        <label>Budget (₹) <span class="req">*</span></label>
+                        <input type="number" name="budget" id="invBudget" min="0" step="0.01" placeholder="0.00" oninput="onProjectBudgetChange(this.value)" style="font-weight:600;"/>
+                        <span id="projBudgetAutoHint" style="font-size:11px;color:var(--brand-600);font-weight:600;display:none;margin-top:3px;">
+                            <i class="bi bi-info-circle"></i> Auto-filled from project budget
+                        </span>
+                    </div>
+
+                    <!-- 3B. Milestone: Milestone Selection & Milestone Amount Field -->
+                    <div class="form-field full" id="projMilestoneSection" style="display:none;">
                         <label style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                            <span>Milestone <span class="req">*</span> <small style="color:var(--brand-600);font-weight:600;">(1 Milestone = 1 Invoice)</small></span>
+                            <span>Milestone <span class="req">*</span></span>
                             <span id="msAvailableCountBadge" style="font-size:11.5px;color:var(--ink-500);font-weight:500;"></span>
                         </label>
-                        <input type="hidden" name="milestoneId" id="invMilestoneId" required />
+                        <input type="hidden" name="milestoneId" id="invMilestoneId" />
                         
                         <div id="invMilestonesContainer" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:10px;margin-bottom:4px;max-height:220px;overflow-y:auto;padding:2px;">
                             <!-- Populated dynamically with project milestones -->
                         </div>
-                    </div>
 
-                    <!-- Milestone Details Auto-Filled Live Preview Box -->
-                    <div class="form-field full" id="milestonePreviewCard" style="display:none;">
-                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid var(--brand-600);border-radius:8px;padding:12px 14px;">
-                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
-                                <div style="display:flex;align-items:center;gap:8px;">
-                                    <span class="badge badge-code" id="msCardCode" style="font-weight:700;">—</span>
-                                    <strong style="color:var(--ink-900);font-size:13.5px;" id="msCardName">Select a milestone</strong>
-                                </div>
-                                <div style="display:flex;align-items:center;gap:8px;">
-                                    <span id="msCardStatusBadge" class="badge badge-secondary">Pending</span>
-                                    <span style="font-weight:800;color:var(--brand-600);font-size:14px;" id="msCardAmount">₹0.00</span>
-                                </div>
-                            </div>
-                            <div style="font-size:12.5px;color:var(--ink-600);margin-bottom:8px;" id="msCardDesc">
-                                Milestone details will appear here.
-                            </div>
-                            <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding-top:6px;border-top:1px dashed #e2e8f0;">
-                                <div style="display:flex;align-items:center;gap:8px;">
-                                    <span style="font-size:11.5px;font-weight:600;color:var(--ink-500);">Progress:</span>
-                                    <div class="progress-bar-track" style="flex:1;max-width:180px;height:7px;">
-                                        <div class="progress-bar-fill fill-blue" id="msCardProgressFill" style="width:0%;"></div>
+                        <!-- Milestone Details Auto-Filled Live Preview Box -->
+                        <div id="milestonePreviewCard" style="display:none;margin-top:8px;">
+                            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid var(--brand-600);border-radius:8px;padding:12px 14px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <span class="badge badge-code" id="msCardCode" style="font-weight:700;">—</span>
+                                        <strong style="color:var(--ink-900);font-size:13.5px;" id="msCardName">Select a milestone</strong>
                                     </div>
-                                    <span style="font-size:12px;font-weight:700;" id="msCardProgressText">0%</span>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <span id="msCardStatusBadge" class="badge badge-secondary">Pending</span>
+                                        <span style="font-weight:800;color:var(--brand-600);font-size:14px;" id="msCardAmount">₹0.00</span>
+                                    </div>
                                 </div>
-                                <div style="font-size:12px;color:var(--ink-500);">
-                                    <i class="bi bi-calendar-check"></i> Due: <strong id="msCardDueDate">—</strong>
+                                <div style="font-size:12.5px;color:var(--ink-600);margin-bottom:8px;" id="msCardDesc">
+                                    Milestone details will appear here.
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding-top:6px;border-top:1px dashed #e2e8f0;">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <span style="font-size:11.5px;font-weight:600;color:var(--ink-500);">Progress:</span>
+                                        <div class="progress-bar-track" style="flex:1;max-width:180px;height:7px;">
+                                            <div class="progress-bar-fill fill-blue" id="msCardProgressFill" style="width:0%;"></div>
+                                        </div>
+                                        <span style="font-size:12px;font-weight:700;" id="msCardProgressText">0%</span>
+                                    </div>
+                                    <div style="font-size:12px;color:var(--ink-500);">
+                                        <i class="bi bi-calendar-check"></i> Due: <strong id="msCardDueDate">—</strong>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Milestone Amount Field -->
+                        <div id="projMilestoneAmountContainer" style="margin-top:10px;">
+                            <label>Milestone Amount (₹) <span class="req">*</span></label>
+                            <input type="number" id="invMilestoneAmount" min="0" step="0.01" readonly placeholder="0.00" style="background:#f1f5f9;font-weight:700;color:var(--ink-900);cursor:not-allowed;" />
+                        </div>
                     </div>
+
+                    <!-- 3C. Task: Task Selection & Task Amount Field -->
+                    <div class="form-field full" id="projTaskSection" style="display:none;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                            <label style="margin:0;">Completed Tasks <span class="req">*</span> <small style="color:var(--brand-600);font-weight:600;">(Completed &amp; Unbilled)</small></label>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <button type="button" class="btn btn-outline" onclick="toggleSelectAllProjectTasks(true)" style="padding:2px 7px;font-size:11px;font-weight:600;background:#fff;">Select All</button>
+                                <button type="button" class="btn btn-outline" onclick="toggleSelectAllProjectTasks(false)" style="padding:2px 7px;font-size:11px;font-weight:600;background:#fff;">Deselect All</button>
+                                <span id="projTaskCountBadge" style="font-size:11px;color:var(--brand-600);font-weight:600;"></span>
+                            </div>
+                        </div>
+                        <div id="projTaskListContainer" style="border:1px solid var(--line);border-radius:8px;max-height:220px;overflow-y:auto;background:#fff;padding:4px;">
+                            <div style="padding:15px;text-align:center;color:var(--ink-400);font-size:12.5px;">Loading tasks...</div>
+                        </div>
+                        <div id="projTaskMessage" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;"></div>
+
+                        <!-- Task Amount Field -->
+                        <div id="projTaskAmountContainer" style="margin-top:10px;">
+                            <label>Task Amount (₹) <span class="req">*</span></label>
+                            <input type="number" id="invTaskAmount" min="0" step="0.01" readonly placeholder="0.00" style="background:#f1f5f9;font-weight:700;color:var(--ink-900);cursor:not-allowed;" />
+                        </div>
+                    </div>
+
+                    <!-- Hidden Amount (Subtotal) input for calculations & submission -->
+                    <input type="hidden" name="amount" id="invAmount" value="0"/>
 
                     <!-- Dates -->
                     <div class="form-field">
@@ -2363,12 +2423,6 @@
                     <div class="form-field">
                         <label>Due Date <span class="req">*</span></label>
                         <input type="date" name="dueDate" id="invDue" required onchange="validateInvoiceDates()"/>
-                    </div>
-
-                    <!-- Milestone Subtotal (Auto-filled from Milestone Amount) -->
-                    <div class="form-field">
-                        <label>Milestone Subtotal (₹) <span class="req">*</span> <small style="color:var(--ink-500);">(Auto-filled)</small></label>
-                        <input type="number" name="amount" id="invAmount" min="0" step="0.01" value="0" required readonly style="background:#f1f5f9;font-weight:700;color:var(--ink-900);"/>
                     </div>
 
                     <!-- Discount -->
@@ -3726,6 +3780,334 @@ document.addEventListener('click', function(e) {
     }
 });
 
+let projectClientsCache = null;
+let projectBillableTasksCache = [];
+
+function getNormalizedProjectType(val) {
+    if (!val) return 'Direct Project';
+    const s = val.toString().toLowerCase();
+    if (s.includes('milestone')) return 'Milestone Based Project';
+    if (s.includes('task')) return 'Task Based Project';
+    return 'Direct Project';
+}
+
+async function loadProjectDetailsClients(preselectedName, preselectedCompany) {
+    const sel = document.getElementById('invClientSelect');
+    if (!sel) return;
+
+    if (!projectClientsCache) {
+        try {
+            const res = await fetch('/api/clients');
+            if (res.ok) {
+                projectClientsCache = await res.json();
+            } else {
+                projectClientsCache = [];
+            }
+        } catch (err) {
+            console.error('Error fetching clients:', err);
+            projectClientsCache = [];
+        }
+    }
+
+    sel.innerHTML = '<option value="">-- Select Client --</option>';
+
+    const targetName = (preselectedName || document.getElementById('invClientName')?.value || '').trim();
+    const targetComp = (preselectedCompany || document.getElementById('invClientCompany')?.value || '').trim();
+
+    let matchedOption = false;
+
+    if (Array.isArray(projectClientsCache)) {
+        projectClientsCache.forEach((c, idx) => {
+            const cName = (c.clientName || c.ClientName || '').trim();
+            const compName = (c.companyName || c.CompanyName || '').trim();
+            const cId = c.clientId || c.ClientId || c.leadId || c.LeadId || '';
+
+            if (!cName && !compName) return;
+
+            // Required order: Client Name – Company Name
+            let label = '';
+            if (cName && compName && cName.toLowerCase() !== compName.toLowerCase()) {
+                label = `${cName} – ${compName}`;
+            } else {
+                label = cName || compName;
+            }
+
+            const opt = document.createElement('option');
+            opt.value = idx.toString();
+            opt.textContent = label;
+            opt.setAttribute('data-client-name', cName);
+            opt.setAttribute('data-client-company', compName);
+            opt.setAttribute('data-client-id', cId);
+
+            const isMatch = (targetName && cName && targetName.toLowerCase() === cName.toLowerCase()) ||
+                            (targetComp && compName && targetComp.toLowerCase() === compName.toLowerCase());
+
+            if (isMatch && !matchedOption) {
+                opt.selected = true;
+                matchedOption = true;
+                document.getElementById('invClientName').value = cName;
+                document.getElementById('invClientCompany').value = compName;
+                document.getElementById('invClientId').value = cId;
+                updateClientBannerDisplay(cName, compName);
+            }
+
+            sel.appendChild(opt);
+        });
+    }
+
+    if (!matchedOption && (targetName || targetComp)) {
+        let label = '';
+        if (targetName && targetComp && targetName.toLowerCase() !== targetComp.toLowerCase()) {
+            label = `${targetName} – ${targetComp}`;
+        } else {
+            label = targetName || targetComp;
+        }
+        const opt = document.createElement('option');
+        opt.value = '__current__';
+        opt.textContent = label;
+        opt.setAttribute('data-client-name', targetName);
+        opt.setAttribute('data-client-company', targetComp);
+        opt.selected = true;
+        sel.appendChild(opt);
+        document.getElementById('invClientName').value = targetName;
+        document.getElementById('invClientCompany').value = targetComp;
+        updateClientBannerDisplay(targetName, targetComp);
+    }
+}
+
+function onProjectDetailsClientChange(sel) {
+    const selectedOpt = sel.options[sel.selectedIndex];
+    if (!selectedOpt || !selectedOpt.value) {
+        document.getElementById('invClientName').value = '';
+        document.getElementById('invClientCompany').value = '';
+        document.getElementById('invClientId').value = '';
+        updateClientBannerDisplay('', '');
+        return;
+    }
+    const cName = selectedOpt.getAttribute('data-client-name') || '';
+    const compName = selectedOpt.getAttribute('data-client-company') || '';
+    const cId = selectedOpt.getAttribute('data-client-id') || '';
+
+    document.getElementById('invClientName').value = cName;
+    document.getElementById('invClientCompany').value = compName;
+    document.getElementById('invClientId').value = cId;
+    updateClientBannerDisplay(cName, compName);
+}
+
+function updateClientBannerDisplay(clientName, clientCompany) {
+    const nameEl = document.getElementById('invClientNameDisplay');
+    const compEl = document.getElementById('invClientCompanyDisplay');
+    if (nameEl) nameEl.textContent = clientName || '—';
+    if (compEl) compEl.textContent = clientCompany ? `(${clientCompany})` : '';
+}
+
+function onProjectDetailsProjectTypeChange(val) {
+    const normType = getNormalizedProjectType(val);
+    applyProjectDetailsProjectTypeLayout(normType, false, 0);
+}
+
+function applyProjectDetailsProjectTypeLayout(normType, isEdit = false, editAmount = 0) {
+    const directSec = document.getElementById('projDirectBudgetSection');
+    const milestoneSec = document.getElementById('projMilestoneSection');
+    const taskSec = document.getElementById('projTaskSection');
+
+    const budgetInput = document.getElementById('invBudget');
+    const milestoneAmountInput = document.getElementById('invMilestoneAmount');
+    const taskAmountInput = document.getElementById('invTaskAmount');
+    const invAmount = document.getElementById('invAmount');
+    const projectId = parseInt(document.getElementById('invProjectId')?.value, 10) || @Model.Id;
+
+    const ptSelect = document.getElementById('invProjectType');
+    if (ptSelect && ptSelect.value !== normType) {
+        ptSelect.value = normType;
+    }
+
+    if (normType === 'Milestone Based Project') {
+        // B. Milestone: Show Milestone Amount, Hide Budget, Hide Task Amount
+        if (directSec) directSec.style.display = 'none';
+        if (milestoneSec) milestoneSec.style.display = 'block';
+        if (taskSec) taskSec.style.display = 'none';
+
+        if (budgetInput) { budgetInput.required = false; budgetInput.value = ''; }
+        if (taskAmountInput) taskAmountInput.value = '0';
+
+        if (isEdit && editAmount > 0) {
+            if (milestoneAmountInput) milestoneAmountInput.value = editAmount;
+            if (invAmount) invAmount.value = editAmount;
+        } else {
+            const msAmt = parseFloat(milestoneAmountInput?.value) || 0;
+            if (invAmount) invAmount.value = msAmt;
+        }
+
+        if (!projectMilestonesCache || projectMilestonesCache.length === 0) {
+            loadProjectMilestonesForInvoice(projectId, document.getElementById('invMilestoneId')?.value);
+        }
+    } else if (normType === 'Task Based Project') {
+        // C. Task: Show Task Amount, Hide Budget, Hide Milestone Amount
+        if (directSec) directSec.style.display = 'none';
+        if (milestoneSec) milestoneSec.style.display = 'none';
+        if (taskSec) taskSec.style.display = 'block';
+
+        if (budgetInput) { budgetInput.required = false; budgetInput.value = ''; }
+        const msIdInput = document.getElementById('invMilestoneId');
+        if (msIdInput) msIdInput.value = '';
+        if (milestoneAmountInput) milestoneAmountInput.value = '0';
+
+        if (isEdit && editAmount > 0) {
+            if (taskAmountInput) taskAmountInput.value = editAmount;
+            if (invAmount) invAmount.value = editAmount;
+        } else {
+            const taskAmt = parseFloat(taskAmountInput?.value) || 0;
+            if (invAmount) invAmount.value = taskAmt;
+        }
+
+        loadProjectDetailsBillableTasks(projectId);
+    } else {
+        // A. Direct Project: Show Budget, Hide Milestone Amount, Hide Task Amount
+        if (directSec) directSec.style.display = 'block';
+        if (milestoneSec) milestoneSec.style.display = 'none';
+        if (taskSec) taskSec.style.display = 'none';
+
+        if (budgetInput) budgetInput.required = true;
+        const msIdInput = document.getElementById('invMilestoneId');
+        if (msIdInput) msIdInput.value = '';
+        if (milestoneAmountInput) milestoneAmountInput.value = '0';
+        if (taskAmountInput) taskAmountInput.value = '0';
+
+        if (isEdit && editAmount > 0) {
+            if (budgetInput) budgetInput.value = editAmount;
+            if (invAmount) invAmount.value = editAmount;
+        } else {
+            if (budgetInput && (!budgetInput.value || parseFloat(budgetInput.value) === 0)) {
+                const projectBudget = @(Model.Budget > 0 ? Model.Budget.ToString(System.Globalization.CultureInfo.InvariantCulture) : "0");
+                if (projectBudget > 0) {
+                    budgetInput.value = projectBudget;
+                    const hint = document.getElementById('projBudgetAutoHint');
+                    if (hint) hint.style.display = 'inline';
+                }
+            }
+            const bAmt = parseFloat(budgetInput?.value) || 0;
+            if (invAmount) invAmount.value = bAmt;
+        }
+    }
+
+    recalcInvoiceTotal();
+}
+
+function onProjectBudgetChange(val) {
+    const amt = parseFloat(val) || 0;
+    const invAmount = document.getElementById('invAmount');
+    if (invAmount) invAmount.value = amt;
+    recalcInvoiceTotal();
+}
+
+async function loadProjectDetailsBillableTasks(projectId, preselectedIds = []) {
+    const container = document.getElementById('projTaskListContainer');
+    const badge = document.getElementById('projTaskCountBadge');
+    const msg = document.getElementById('projTaskMessage');
+    const taskAmtInput = document.getElementById('invTaskAmount');
+    const invAmount = document.getElementById('invAmount');
+
+    if (!container) return;
+    container.innerHTML = '<div style="padding:15px;text-align:center;color:var(--ink-400);font-size:12.5px;"><i class="bi bi-arrow-repeat spin"></i> Loading billable tasks...</div>';
+    if (badge) badge.textContent = '';
+    if (msg) msg.style.display = 'none';
+
+    try {
+        const res = await fetch(`/api/invoices/billable-tasks?projectId=${projectId}`);
+        const rawTasks = res.ok ? await res.json() : [];
+        projectBillableTasksCache = (Array.isArray(rawTasks) ? rawTasks : []).map(t => ({
+            id: t.Id !== undefined ? t.Id : t.id,
+            taskCode: t.TaskCode || t.taskCode || '',
+            taskName: t.TaskName || t.taskName || 'Untitled Task',
+            taskAmount: Number(t.TaskAmount !== undefined ? t.TaskAmount : (t.taskAmount || 0)),
+            dueDate: t.DueDate || t.dueDate || ''
+        }));
+
+        if (badge) {
+            badge.textContent = `${projectBillableTasksCache.length} Available`;
+        }
+
+        if (projectBillableTasksCache.length === 0) {
+            container.innerHTML = '<div style="padding:15px;text-align:center;color:var(--ink-400);font-size:12.5px;">No completed, unbilled tasks found for this project.</div>';
+            if (taskAmtInput) taskAmtInput.value = 0;
+            if (invAmount) invAmount.value = 0;
+            recalcInvoiceTotal();
+            if (msg) {
+                msg.style.display = 'block';
+                msg.style.background = '#fef2f2';
+                msg.style.border = '1px solid #fecaca';
+                msg.style.color = '#dc2626';
+                msg.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> No completed unbilled tasks found for this project.';
+            }
+            return;
+        }
+
+        container.innerHTML = '';
+        projectBillableTasksCache.forEach(task => {
+            const isChecked = Array.isArray(preselectedIds) && preselectedIds.includes(task.id);
+            const row = document.createElement('label');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.justifyContent = 'space-between';
+            row.style.padding = '8px 12px';
+            row.style.borderBottom = '1px solid #f1f5f9';
+            row.style.cursor = 'pointer';
+            row.style.margin = '0';
+            row.style.transition = 'background 0.15s ease';
+
+            row.onmouseover = () => row.style.background = '#f8fafc';
+            row.onmouseout = () => row.style.background = '#fff';
+
+            const codeStr = task.taskCode ? `[${escapeHtml(task.taskCode)}] ` : '';
+            const dueStr = task.dueDate ? ` &bull; Due: ${escapeHtml(task.dueDate)}` : '';
+
+            row.innerHTML = `
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <input type="checkbox" class="proj-billable-task-cb" value="${task.id}" data-amount="${task.taskAmount}" ${isChecked ? 'checked' : ''} onchange="onProjectTaskCheckboxChange()" style="cursor:pointer;width:15px;height:15px;" />
+                    <div>
+                        <div style="font-size:12.5px;font-weight:600;color:var(--ink-800);">${codeStr}${escapeHtml(task.taskName)}</div>
+                        <div style="font-size:11px;color:var(--ink-500);">Amount: ₹${task.taskAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}${dueStr}</div>
+                    </div>
+                </div>
+                <span style="font-size:12px;font-weight:700;color:var(--ink-900);">₹${task.taskAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+            `;
+            container.appendChild(row);
+        });
+
+        onProjectTaskCheckboxChange();
+
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = '<div style="padding:15px;text-align:center;color:#dc2626;font-size:12.5px;">Failed to load billable tasks.</div>';
+    }
+}
+
+function onProjectTaskCheckboxChange() {
+    const checkboxes = document.querySelectorAll('.proj-billable-task-cb:checked');
+    let total = 0;
+    checkboxes.forEach(cb => {
+        const amt = parseFloat(cb.getAttribute('data-amount')) || 0;
+        total += amt;
+    });
+
+    const taskAmtInput = document.getElementById('invTaskAmount');
+    if (taskAmtInput) taskAmtInput.value = total;
+
+    const invAmount = document.getElementById('invAmount');
+    if (invAmount) invAmount.value = total;
+
+    recalcInvoiceTotal();
+}
+
+function toggleSelectAllProjectTasks(selectAll) {
+    const checkboxes = document.querySelectorAll('.proj-billable-task-cb');
+    checkboxes.forEach(cb => {
+        cb.checked = selectAll;
+    });
+    onProjectTaskCheckboxChange();
+}
+
 async function openInvoiceModal(id, projectId, invNumber, date, due, amount, tax, discount, payStatus, payDate, notes, preselectedMilestoneId) {
     projectId = projectId || @Model.Id;
     document.getElementById('invId').value = id || 0;
@@ -3751,8 +4133,27 @@ async function openInvoiceModal(id, projectId, invNumber, date, due, amount, tax
     if (errBox) errBox.style.display = 'none';
     openModal('invoiceModal');
 
-    document.getElementById('invModalTitle').textContent = id ? ('Edit Invoice (' + (invNumber || '') + ')') : 'Create Milestone Invoice';
+    // 1. Heading: Change to 'Add Invoice' when creating new, 'Edit Invoice (...)' when editing
+    document.getElementById('invModalTitle').textContent = id ? ('Edit Invoice (' + (invNumber || '') + ')') : 'Add Invoice';
     document.getElementById('btnSubmitInvoiceText').textContent = id ? 'Update Invoice' : 'Create Invoice';
+
+    // 2. Load Client Dropdown (Order: Client Name – Company Name)
+    await loadProjectDetailsClients('@Html.Raw(Model.ClientName?.Replace("'", "\'"))', '@Html.Raw(Model.ClientCompany?.Replace("'", "\'"))');
+
+    // 3. Determine Project Type & apply layout
+    let targetType = 'Direct Project';
+    if (preselectedMilestoneId && Number(preselectedMilestoneId) > 0) {
+        targetType = 'Milestone Based Project';
+    } else if (notes && notes.includes('[Tasks:')) {
+        targetType = 'Task Based Project';
+    } else {
+        targetType = getNormalizedProjectType('@Model.ProjectType');
+    }
+
+    const ptSelect = document.getElementById('invProjectType');
+    if (ptSelect) ptSelect.value = targetType;
+
+    applyProjectDetailsProjectTypeLayout(targetType, id > 0, amount || 0);
 
     // Fetch dynamic invoice number if creating new invoice
     if (!id || !invNumber) {
@@ -3771,8 +4172,9 @@ async function openInvoiceModal(id, projectId, invNumber, date, due, amount, tax
         document.getElementById('invNumber').value = invNumber;
     }
 
-    // Load project milestones dynamically
-    await loadProjectMilestonesForInvoice(projectId, preselectedMilestoneId || (id ? preselectedMilestoneId : null));
+    if (targetType === 'Milestone Based Project') {
+        await loadProjectMilestonesForInvoice(projectId, preselectedMilestoneId || (id ? preselectedMilestoneId : null));
+    }
 
     recalcInvoiceTotal();
 }
@@ -3923,6 +4325,7 @@ function selectMilestoneForInvoice(selectedId) {
     const hiddenInput = document.getElementById('invMilestoneId');
     const preview = document.getElementById('milestonePreviewCard');
     const amountInput = document.getElementById('invAmount');
+    const milestoneAmountInput = document.getElementById('invMilestoneAmount');
     const dueInput = document.getElementById('invDue');
     const notesInput = document.getElementById('invNotes');
 
@@ -3941,6 +4344,7 @@ function selectMilestoneForInvoice(selectedId) {
     if (!selectedId) {
         if (hiddenInput) hiddenInput.value = '';
         if (preview) preview.style.display = 'none';
+        if (milestoneAmountInput) milestoneAmountInput.value = '0';
         if (amountInput) amountInput.value = '0';
         recalcInvoiceTotal();
         return;
@@ -3991,6 +4395,7 @@ function selectMilestoneForInvoice(selectedId) {
 
     // Auto-fill Amount / Price
     const milestoneAmt = Number(milestone.amount > 0 ? milestone.amount : (milestone.effectiveAmount || 0));
+    if (milestoneAmountInput) milestoneAmountInput.value = milestoneAmt;
     if (amountInput) amountInput.value = milestoneAmt;
 
     // Auto-fill Due Date if available
@@ -4171,14 +4576,44 @@ async function handleSaveProjectInvoice(e) {
 
     if (!validateInvoiceDates()) return;
 
-    const milestoneIdInput = document.getElementById('invMilestoneId');
-    const milestoneId = milestoneIdInput ? parseInt(milestoneIdInput.value, 10) : 0;
-    if (!milestoneId) {
-        if (errBox && errText) {
-            errText.textContent = 'Please select a milestone for this invoice.';
-            errBox.style.display = 'block';
+    const projectTypeVal = document.getElementById('invProjectType')?.value || 'Direct Project';
+    const normType = getNormalizedProjectType(projectTypeVal);
+
+    let milestoneId = null;
+    let taskIds = null;
+    let amount = 0;
+
+    if (normType === 'Milestone Based Project') {
+        const milestoneIdInput = document.getElementById('invMilestoneId');
+        milestoneId = milestoneIdInput ? parseInt(milestoneIdInput.value, 10) : 0;
+        if (!milestoneId) {
+            showInvoiceModalError('Please select a milestone for this invoice.');
+            return;
         }
-        return;
+        amount = parseFloat(document.getElementById('invMilestoneAmount')?.value) || parseFloat(document.getElementById('invAmount')?.value) || 0;
+        if (amount <= 0) {
+            showInvoiceModalError('Milestone amount must be greater than 0.');
+            return;
+        }
+    } else if (normType === 'Task Based Project') {
+        const checkedBoxes = document.querySelectorAll('.proj-billable-task-cb:checked');
+        taskIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10));
+        if (taskIds.length === 0) {
+            showInvoiceModalError('Please select at least one completed task for this invoice.');
+            return;
+        }
+        amount = parseFloat(document.getElementById('invTaskAmount')?.value) || parseFloat(document.getElementById('invAmount')?.value) || 0;
+        if (amount <= 0) {
+            showInvoiceModalError('Task amount must be greater than 0.');
+            return;
+        }
+    } else {
+        // Direct Project
+        amount = parseFloat(document.getElementById('invBudget')?.value) || parseFloat(document.getElementById('invAmount')?.value) || 0;
+        if (amount <= 0) {
+            showInvoiceModalError('Budget amount must be greater than 0 for Direct Projects.');
+            return;
+        }
     }
 
     const id = parseInt(document.getElementById('invId').value, 10) || 0;
@@ -4186,19 +4621,24 @@ async function handleSaveProjectInvoice(e) {
     const invNumber = document.getElementById('invNumber').value.trim();
     const invDate = document.getElementById('invDate').value;
     const dueDate = document.getElementById('invDue').value;
-    const amount = parseFloat(document.getElementById('invAmount').value) || 0;
     const discount = parseFloat(document.getElementById('invDiscount').value) || 0;
     const taxRate = parseFloat(document.getElementById('invTaxRate').value) || 0;
     const payStatus = document.getElementById('invPayStatus').value;
     const payDate = document.getElementById('invPayDate').value;
     const notes = document.getElementById('invNotes').value.trim();
 
+    const clientName = document.getElementById('invClientName')?.value?.trim() || '@Html.Raw(Model.ClientName?.Replace("'", "\'"))';
+    const clientCompany = document.getElementById('invClientCompany')?.value?.trim() || '@Html.Raw(Model.ClientCompany?.Replace("'", "\'"))';
+    const clientId = document.getElementById('invClientId')?.value?.trim() || '';
+
     const payload = {
         projectId: projectId,
-        milestoneId: milestoneId,
+        milestoneId: normType === 'Milestone Based Project' ? milestoneId : null,
+        taskIds: normType === 'Task Based Project' ? taskIds : null,
         invoiceNumber: invNumber,
-        clientName: '@Html.Raw(Model.ClientName?.Replace("'", "\\'"))',
-        clientCompany: '@Html.Raw(Model.ClientCompany?.Replace("'", "\\'"))',
+        clientId: clientId,
+        clientName: clientName,
+        clientCompany: clientCompany,
         invoiceDate: invDate,
         dueDate: dueDate,
         amount: amount,
@@ -4224,19 +4664,14 @@ async function handleSaveProjectInvoice(e) {
 
         if (!res.ok) {
             const errData = await res.json();
-            throw new Error(errData.message || 'Failed to save milestone invoice.');
+            throw new Error(errData.message || 'Failed to save invoice.');
         }
 
         closeModal('invoiceModal');
         // Reload project page on invoice tab to reflect new state
         window.location.href = `/Work/ProjectDetails?id=${projectId}&tab=invoice`;
     } catch (err) {
-        if (errBox && errText) {
-            errText.textContent = err.message || 'An error occurred while saving the invoice.';
-            errBox.style.display = 'block';
-        } else {
-            alert('Error: ' + err.message);
-        }
+        showInvoiceModalError(err.message || 'An error occurred while saving the invoice.');
     } finally {
         submitBtn.disabled = false;
         submitText.textContent = id > 0 ? 'Update Invoice' : 'Create Invoice';

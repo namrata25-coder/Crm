@@ -496,8 +496,8 @@
             const payDate = p.paymentDate || p.PaymentDate || '—';
             const invId = p.invoiceId || p.InvoiceId;
             const invNum = p.invoiceNumber || p.InvoiceNumber || `INV-${invId}`;
-            const client = p.clientCompany || p.ClientCompany || p.clientName || p.ClientName || '—';
-            const clientPerson = p.clientName || p.ClientName || '';
+            const client = p.clientName || p.ClientName || p.clientCompany || p.ClientCompany || '—';
+            const clientCompany = p.clientCompany || p.ClientCompany || '';
             const project = p.projectName || p.ProjectName || '—';
             const milestone = p.milestoneName || p.MilestoneName || '—';
             const invAmount = p.invoiceGrandTotal || p.InvoiceGrandTotal || 0;
@@ -548,7 +548,7 @@
                     </td>
                     <td style="padding:12px 14px;font-weight:600;color:var(--ink-800);">
                         ${escapeHtml(client)}
-                        ${clientPerson && clientPerson !== client ? `<div style="font-size:11px;color:var(--ink-500);font-weight:normal;">${escapeHtml(clientPerson)}</div>` : ''}
+                        ${clientCompany && clientCompany !== client ? `<div style="font-size:11px;color:var(--ink-500);font-weight:normal;">${escapeHtml(clientCompany)}</div>` : ''}
                     </td>
                     <td style="padding:12px 14px;color:var(--ink-700);font-weight:600;">
                         ${escapeHtml(project)}
@@ -607,7 +607,7 @@
                 const id = i.id || i.Id;
                 const invNum = i.invoiceNumber || i.InvoiceNumber;
                 const rem = Number(i.remainingAmount !== undefined ? i.remainingAmount : (i.RemainingAmount || 0));
-                const client = i.clientCompany || i.ClientCompany || i.clientName || i.ClientName || 'Client';
+                const client = i.clientName || i.ClientName || i.clientCompany || i.ClientCompany || 'Client';
                 const project = i.projectName || i.ProjectName || '';
                 const status = i.paymentStatus || i.PaymentStatus;
 
@@ -646,7 +646,7 @@
         const rem = Number(inv.remainingAmount !== undefined ? inv.remainingAmount : (inv.RemainingAmount || 0));
         const total = Number(inv.grandTotal !== undefined ? inv.grandTotal : (inv.GrandTotal || 0));
 
-        document.getElementById('invBoxClient').textContent = inv.clientCompany || inv.clientName || '—';
+        document.getElementById('invBoxClient').textContent = inv.clientName || inv.clientCompany || '—';
         document.getElementById('invBoxProject').textContent = (inv.projectName || '') + (inv.milestoneName ? ` (${inv.milestoneName})` : '');
         document.getElementById('invBoxTotal').textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
         document.getElementById('invBoxRemaining').textContent = '₹' + rem.toLocaleString('en-IN', { minimumFractionDigits: 2 });
@@ -753,8 +753,8 @@
         const payNum = p.paymentNumber || p.PaymentNumber || `PAY-${paymentId}`;
         const payDate = p.paymentDate || p.PaymentDate || '—';
         const invNum = p.invoiceNumber || p.InvoiceNumber || 'INV';
-        const client = p.clientCompany || p.ClientCompany || p.clientName || p.ClientName || 'Client';
-        const clientName = p.clientName || p.ClientName || '';
+        const client = p.clientName || p.ClientName || p.clientCompany || p.ClientCompany || 'Client';
+        const clientCompany = p.clientCompany || p.ClientCompany || '';
         const project = p.projectName || p.ProjectName || 'Project';
         const milestone = p.milestoneName || p.MilestoneName || 'Milestone';
         const invTotal = Number(p.invoiceGrandTotal || p.InvoiceGrandTotal || 0);
@@ -792,7 +792,7 @@
                     <div>
                         <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Received From (Client)</div>
                         <div style="font-size:14.5px;font-weight:800;color:#0f172a;">${escapeHtml(client)}</div>
-                        ${clientName && clientName !== client ? `<div style="font-size:12px;color:#475569;">Attn: ${escapeHtml(clientName)}</div>` : ''}
+                        ${clientCompany && clientCompany !== client ? `<div style="font-size:12px;color:#475569;">${escapeHtml(clientCompany)}</div>` : ''}
                     </div>
                     <div>
                         <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Project & Milestone</div>

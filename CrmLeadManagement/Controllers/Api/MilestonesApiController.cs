@@ -58,6 +58,9 @@ public class MilestonesApiController : ControllerBase
                 .Include(m => m.Tasks)
                 .AsQueryable();
 
+            var accessibleProjectIds = await ProjectAccessPolicy.GetAccessibleProjectIdsAsync(_db, User);
+            query = query.Where(m => accessibleProjectIds.Contains(m.ProjectId));
+
             if (projectId.HasValue && projectId.Value > 0)
                 query = query.Where(m => m.ProjectId == projectId.Value);
 
@@ -159,7 +162,7 @@ public class MilestonesApiController : ControllerBase
                     .ThenInclude(i => i.Payments)
                 .FirstOrDefaultAsync(p => p.Id == projectId);
 
-            if (project == null)
+            if (project == null || !ProjectAccessPolicy.CanAccess(_db, User, project))
                 return NotFound(new { message = $"Project with ID {projectId} not found." });
 
             var milestones = project.Milestones.OrderBy(m => m.Id).ToList();
@@ -244,6 +247,8 @@ public class MilestonesApiController : ControllerBase
                 .FirstOrDefaultAsync(x => x.Id == id);
 
             if (m is null)
+                return NotFound(new { message = $"Milestone with ID {id} not found." });
+            if (m.Project is null || !ProjectAccessPolicy.CanAccess(_db, User, m.Project))
                 return NotFound(new { message = $"Milestone with ID {id} not found." });
 
             var projectMilestones = await _db.WorkMilestones
@@ -334,6 +339,8 @@ public class MilestonesApiController : ControllerBase
 
             if (project == null)
                 return BadRequest(new { message = $"Project with ID {input.ProjectId} does not exist." });
+            if (!ProjectAccessPolicy.CanAccess(_db, User, project))
+                return NotFound(new { message = $"Project with ID {input.ProjectId} does not exist." });
 
             var dummyNext = new WorkMilestone { Id = 0, ProjectId = input.ProjectId };
             var depInfo = WorkDependencyHelper.EvaluateMilestone(dummyNext, project.Milestones, project.Invoices);
@@ -382,8 +389,13 @@ public class MilestonesApiController : ControllerBase
             var milestone = await _db.WorkMilestones.FindAsync(id);
             if (milestone is null)
                 return NotFound(new { message = $"Milestone with ID {id} not found." });
+            var accessibleProjectIds = await ProjectAccessPolicy.GetAccessibleProjectIdsAsync(_db, User);
+            if (!accessibleProjectIds.Contains(milestone.ProjectId))
+                return NotFound(new { message = $"Milestone with ID {id} not found." });
 
             var targetProjectId = input.ProjectId > 0 ? input.ProjectId : milestone.ProjectId;
+            if (targetProjectId != milestone.ProjectId)
+                return BadRequest(new { message = "A milestone cannot be moved to another project." });
 
             if (string.IsNullOrWhiteSpace(input.MilestoneName))
                 return BadRequest(new { message = "MilestoneName is required." });
@@ -396,6 +408,8 @@ public class MilestonesApiController : ControllerBase
 
             if (project == null)
                 return BadRequest(new { message = $"Project with ID {targetProjectId} does not exist." });
+            if (!ProjectAccessPolicy.CanAccess(_db, User, project))
+                return NotFound(new { message = $"Project with ID {targetProjectId} does not exist." });
 
             milestone.ProjectId = targetProjectId;
 
@@ -446,6 +460,9 @@ public class MilestonesApiController : ControllerBase
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (milestone is null)
+                return NotFound(new { message = $"Milestone with ID {id} not found." });
+            var project = await _db.WorkProjects.FindAsync(milestone.ProjectId);
+            if (project is null || !ProjectAccessPolicy.CanAccess(_db, User, project))
                 return NotFound(new { message = $"Milestone with ID {id} not found." });
 
             // Unlink tasks before removing milestone so tasks are not orphaned or deleted abruptly

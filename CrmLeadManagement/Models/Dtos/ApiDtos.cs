@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace CrmLeadManagement.Models.Dtos;
 
 /// <summary>Generic error payload returned by the API on failure (400/404/500).</summary>
@@ -123,10 +125,24 @@ public class ProposalRequest
 /// <summary>Summary of lead counts overall, by assignment, by status, and by priority.</summary>
 public class LeadCountSummaryDto
 {
+    [JsonPropertyName("count")]
     public int Count => Total;
+
+    [JsonPropertyName("total")]
     public int Total { get; set; }
+
+    [JsonPropertyName("assigned")]
     public int Assigned { get; set; }
+
+    [JsonPropertyName("unassigned")]
     public int Unassigned { get; set; }
+
+    [JsonPropertyName("totalProjects")]
+    public int TotalProjects { get; set; }
+
+    [JsonPropertyName("byStatus")]
     public Dictionary<string, int> ByStatus { get; set; } = new();
+
+    [JsonPropertyName("byPriority")]
     public Dictionary<string, int> ByPriority { get; set; } = new();
 }

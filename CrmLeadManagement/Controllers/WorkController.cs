@@ -21,12 +21,13 @@ public class WorkController : Controller
 
     private bool CheckPermission(string module, string action = "View")
     {
-        if (User.IsInRole("Admin")) return true;
+        if (User.IsInRole("Admin") || User.IsInRole("Manager")) return true;
 
         var authEmail = User.FindFirst(ClaimTypes.Email)?.Value;
         var currentUser = _db.Users.FirstOrDefault(u => u.Email == authEmail);
         if (currentUser != null && (string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
-                                    string.Equals(currentUser.Role, "Super Admin", StringComparison.OrdinalIgnoreCase)))
+                                    string.Equals(currentUser.Role, "Super Admin", StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(currentUser.Role, "Manager", StringComparison.OrdinalIgnoreCase)))
         {
             return true;
         }
@@ -120,6 +121,23 @@ public class WorkController : Controller
         return SettingsStore.Employees;
     }
 
+    private async Task<List<WorkProject>> GetAccessibleProjectsAsync()
+    {
+        var projectIds = await ProjectAccessPolicy.GetAccessibleProjectIdsAsync(_db, User);
+        return await _db.WorkProjects
+            .AsNoTracking()
+            .Where(project => projectIds.Contains(project.Id))
+            .ToListAsync();
+    }
+
+    private async Task<bool> CanAccessProjectIdAsync(int projectId)
+    {
+        var project = await _db.WorkProjects
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == projectId);
+        return project is not null && ProjectAccessPolicy.CanAccess(_db, User, project);
+    }
+
     private void SetWorkNav(string activePage)
     {
         ViewData["ActivePage"] = activePage;
@@ -140,7 +158,12 @@ public class WorkController : Controller
         SetWorkNav("WorkProject");
         ViewData["Title"] = "Projects";
 
-        var projects = await _db.WorkProjects
+        // Role-based UI permission flags
+        ViewData["CanCreateProject"] = CheckPermission("Project", "Create");
+        ViewData["CanEditProject"]   = CheckPermission("Project", "Edit");
+        ViewData["CanDeleteProject"] = CheckPermission("Project", "Delete");
+
+        var allProjects = await _db.WorkProjects
             .Include(p => p.Milestones)
                 .ThenInclude(m => m.Tasks)
             .Include(p => p.Tasks)
@@ -151,6 +174,7 @@ public class WorkController : Controller
             .Include(p => p.WorkNotes)
             .OrderByDescending(p => p.Id)
             .ToListAsync();
+        var projects = ProjectAccessPolicy.FilterAccessible(_db, User, allProjects);
 
         ViewData["Employees"] = GetEmployeesList();
         ViewData["Clients"]   = await _db.Leads
@@ -186,12 +210,64 @@ public class WorkController : Controller
             .Include(p => p.WorkNotes)
             .FirstOrDefaultAsync(p => p.Id == id);
 
-        if (project is null) return RedirectToAction(nameof(Projects));
+        if (project is null || !ProjectAccessPolicy.CanAccess(_db, User, project))
+            return RedirectToAction(nameof(Projects));
 
         SetWorkNav("WorkProject");
         ViewData["Title"] = $"{project.ProjectName} · Project Details";
         ViewData["ActiveTab"] = string.IsNullOrWhiteSpace(tab) ? "milestone" : tab.ToLowerInvariant();
         ViewData["Employees"] = GetEmployeesList();
+
+        // Role-based UI permission flags — Project
+        ViewData["CanEditProject"]   = CheckPermission("Project", "Edit");
+        ViewData["CanDeleteProject"] = CheckPermission("Project", "Delete");
+
+        // Milestone
+        ViewData["CanCreateMilestone"] = CheckPermission("Milestone", "Create");
+        ViewData["CanEditMilestone"]   = CheckPermission("Milestone", "Edit");
+        ViewData["CanDeleteMilestone"] = CheckPermission("Milestone", "Delete");
+        ViewData["CanApproveMilestone"] = CheckPermission("Milestone", "Extra");
+
+        // Task
+        ViewData["CanCreateTask"] = CheckPermission("Task", "Create");
+        ViewData["CanEditTask"]   = CheckPermission("Task", "Edit");
+        ViewData["CanDeleteTask"] = CheckPermission("Task", "Delete");
+        ViewData["CanAssignTask"] = CheckPermission("Task", "Extra");
+
+        // Invoice
+        ViewData["CanCreateInvoice"] = CheckPermission("Invoice", "Create");
+        ViewData["CanEditInvoice"]   = CheckPermission("Invoice", "Edit");
+        ViewData["CanDeleteInvoice"] = CheckPermission("Invoice", "Delete");
+
+        // Payment
+        ViewData["CanCreatePayment"] = CheckPermission("Payment", "Create");
+        ViewData["CanEditPayment"]   = CheckPermission("Payment", "Edit");
+        ViewData["CanDeletePayment"] = CheckPermission("Payment", "Delete");
+
+        // Timesheet
+        ViewData["CanCreateTimesheet"] = CheckPermission("Timesheet", "Create");
+        ViewData["CanEditTimesheet"]   = CheckPermission("Timesheet", "Edit");
+        ViewData["CanDeleteTimesheet"] = CheckPermission("Timesheet", "Delete");
+        ViewData["CanApproveTimesheet"] = CheckPermission("Timesheet", "Extra");
+
+        // Expense
+        ViewData["CanCreateExpense"] = CheckPermission("Expenses", "Create");
+        ViewData["CanEditExpense"]   = CheckPermission("Expenses", "Edit");
+        ViewData["CanDeleteExpense"] = CheckPermission("Expenses", "Delete");
+        ViewData["CanApproveExpense"] = CheckPermission("Expenses", "Extra");
+
+        // File
+        ViewData["CanUploadFile"]    = CheckPermission("File", "Create");
+        ViewData["CanDeleteFile"]    = CheckPermission("File", "Delete");
+        ViewData["CanDownloadFile"]  = CheckPermission("File", "Extra");
+
+        // Note
+        ViewData["CanCreateNote"] = CheckPermission("Note", "Create");
+        ViewData["CanEditNote"]   = CheckPermission("Note", "Edit");
+        ViewData["CanDeleteNote"] = CheckPermission("Note", "Delete");
+
+        // Member
+        ViewData["CanManageMember"] = CheckPermission("Member", "Create");
 
         return View(project);
     }
@@ -214,6 +290,14 @@ public class WorkController : Controller
             return RedirectToAction(nameof(Projects));
         }
 
+        var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+        var isAdmin = PermissionChecker.IsAdminOrManager(User, currentUser);
+        if (!isAdmin && currentUser is null)
+        {
+            TempData["ErrorMessage"] = "Access denied. A valid user account is required.";
+            return RedirectToAction(nameof(Projects));
+        }
+
         if (id == 0)
         {
             var p = new WorkProject
@@ -226,7 +310,7 @@ public class WorkController : Controller
                 Description     = description?.Trim() ?? "",
                 StartDate       = startDate?.Trim() ?? "",
                 Deadline        = deadline?.Trim() ?? "",
-                ProjectManager  = projectManager?.Trim() ?? "",
+                ProjectManager  = isAdmin ? projectManager?.Trim() ?? "" : currentUser!.Name?.Trim() ?? "",
                 AssignedMembers = assignedMembers?.Trim() ?? "",
                 Budget          = Math.Max(0, budget),
                 Priority        = string.IsNullOrWhiteSpace(priority) ? "Medium" : priority,
@@ -239,7 +323,7 @@ public class WorkController : Controller
         else
         {
             var p = await _db.WorkProjects.FindAsync(id);
-            if (p is not null)
+            if (p is not null && ProjectAccessPolicy.CanAccess(_db, User, p))
             {
                 p.ProjectName     = projectName?.Trim() ?? p.ProjectName;
                 p.ClientName      = clientName?.Trim() ?? "";
@@ -248,7 +332,7 @@ public class WorkController : Controller
                 p.Description     = description?.Trim() ?? "";
                 p.StartDate       = startDate?.Trim() ?? "";
                 p.Deadline        = deadline?.Trim() ?? "";
-                p.ProjectManager  = projectManager?.Trim() ?? "";
+                p.ProjectManager  = isAdmin ? projectManager?.Trim() ?? "" : currentUser!.Name?.Trim() ?? "";
                 p.AssignedMembers = assignedMembers?.Trim() ?? "";
                 p.Budget          = Math.Max(0, budget);
                 p.Priority        = string.IsNullOrWhiteSpace(priority) ? p.Priority : priority;
@@ -273,7 +357,7 @@ public class WorkController : Controller
             .Include(x => x.Expenses)
             .FirstOrDefaultAsync(x => x.Id == id);
 
-        if (p is not null)
+        if (p is not null && ProjectAccessPolicy.CanAccess(_db, User, p))
         {
             foreach (var f in p.Files)
             {
@@ -294,9 +378,12 @@ public class WorkController : Controller
     public async Task<IActionResult> SaveProjectMembers(int projectId, string? projectManager, string? assignedMembers)
     {
         var project = await _db.WorkProjects.FindAsync(projectId);
-        if (project is not null)
+        if (project is not null && ProjectAccessPolicy.CanAccess(_db, User, project))
         {
-            project.ProjectManager = projectManager?.Trim() ?? "";
+            var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+            project.ProjectManager = PermissionChecker.IsAdminOrManager(User, currentUser)
+                ? projectManager?.Trim() ?? ""
+                : currentUser?.Name?.Trim() ?? project.ProjectManager;
             project.AssignedMembers = assignedMembers?.Trim() ?? "";
             await _db.SaveChangesAsync();
         }
@@ -307,7 +394,7 @@ public class WorkController : Controller
     public async Task<IActionResult> AddProjectMember(int projectId, string memberName, string? role)
     {
         var project = await _db.WorkProjects.FindAsync(projectId);
-        if (project is not null && !string.IsNullOrWhiteSpace(memberName))
+        if (project is not null && ProjectAccessPolicy.CanAccess(_db, User, project) && !string.IsNullOrWhiteSpace(memberName))
         {
             var cleanMember = memberName.Trim();
             if (string.Equals(role, "Project Manager", StringComparison.OrdinalIgnoreCase))
@@ -334,7 +421,7 @@ public class WorkController : Controller
     public async Task<IActionResult> RemoveProjectMember(int projectId, string memberName)
     {
         var project = await _db.WorkProjects.FindAsync(projectId);
-        if (project is not null && !string.IsNullOrWhiteSpace(memberName))
+        if (project is not null && ProjectAccessPolicy.CanAccess(_db, User, project) && !string.IsNullOrWhiteSpace(memberName))
         {
             var cleanMember = memberName.Trim();
             if (string.Equals(project.ProjectManager, cleanMember, StringComparison.OrdinalIgnoreCase))
@@ -372,9 +459,11 @@ public class WorkController : Controller
             .OrderByDescending(m => m.Id)
             .ToListAsync();
 
-        var projects = await _db.WorkProjects
+        var projects = (await GetAccessibleProjectsAsync())
             .OrderBy(p => p.ProjectName)
-            .ToListAsync();
+            .ToList();
+        var accessibleProjectIds = projects.Select(p => p.Id).ToHashSet();
+        milestones = milestones.Where(m => accessibleProjectIds.Contains(m.ProjectId)).ToList();
 
         ViewData["Projects"]  = projects;
         ViewData["Employees"] = GetEmployeesList();
@@ -405,6 +494,15 @@ public class WorkController : Controller
             .FirstOrDefaultAsync(p => p.Id == projectId);
 
         var existingMilestone = milestoneId > 0 ? await _db.WorkMilestones.FindAsync(milestoneId) : null;
+        if (project is null || !ProjectAccessPolicy.CanAccess(_db, User, project) ||
+            (milestoneId > 0 && (existingMilestone is null ||
+                                existingMilestone.ProjectId != projectId ||
+                                !await CanAccessProjectIdAsync(existingMilestone.ProjectId))))
+        {
+            TempData["ErrorMessage"] = "Access denied. You can only manage milestones in your assigned projects.";
+            return RedirectToAction(nameof(Milestones));
+        }
+
         var evalTarget = existingMilestone ?? new WorkMilestone { Id = 0, ProjectId = projectId };
         var depInfo = project != null
             ? WorkDependencyHelper.EvaluateMilestone(evalTarget, project.Milestones, project.Invoices)
@@ -473,7 +571,7 @@ public class WorkController : Controller
         }
 
         var m = await _db.WorkMilestones.Include(x => x.Tasks).FirstOrDefaultAsync(x => x.Id == id);
-        if (m is not null)
+        if (m is not null && await CanAccessProjectIdAsync(m.ProjectId))
         {
             _db.WorkTasks.RemoveRange(m.Tasks);
             _db.WorkMilestones.Remove(m);
@@ -502,9 +600,14 @@ public class WorkController : Controller
         SetWorkNav("WorkTask");
         ViewData["Title"] = "Tasks";
 
+        var projects = (await GetAccessibleProjectsAsync())
+            .OrderBy(p => p.ProjectName)
+            .ToList();
+        var accessibleProjectIds = projects.Select(p => p.Id).ToHashSet();
         var query = _db.WorkTasks
             .Include(t => t.Project)
             .Include(t => t.Milestone)
+            .Where(t => accessibleProjectIds.Contains(t.ProjectId))
             .AsQueryable();
 
         if (projectId.HasValue && projectId.Value > 0)
@@ -515,8 +618,11 @@ public class WorkController : Controller
 
         var tasks = await query.OrderByDescending(t => t.Id).ToListAsync();
 
-        ViewData["Projects"]   = await _db.WorkProjects.OrderBy(p => p.ProjectName).ToListAsync();
-        ViewData["Milestones"] = await _db.WorkMilestones.OrderBy(m => m.MilestoneName).ToListAsync();
+        ViewData["Projects"]   = projects;
+        ViewData["Milestones"] = await _db.WorkMilestones
+            .Where(m => accessibleProjectIds.Contains(m.ProjectId))
+            .OrderBy(m => m.MilestoneName)
+            .ToListAsync();
         ViewData["Employees"]  = GetEmployeesList();
         ViewData["FilterProjectId"]   = projectId;
         ViewData["FilterMilestoneId"] = milestoneId;
@@ -547,11 +653,21 @@ public class WorkController : Controller
             .Include(p => p.Invoices)
                 .ThenInclude(i => i.Payments)
             .FirstOrDefaultAsync(p => p.Id == projectId);
+        if (project is null || !ProjectAccessPolicy.CanAccess(_db, User, project))
+        {
+            TempData["ErrorMessage"] = "Access denied. You can only manage tasks in your assigned projects.";
+            return RedirectToAction(nameof(Tasks));
+        }
 
         WorkMilestone? parentMilestone = null;
         if (milestoneId.HasValue && project != null)
         {
             parentMilestone = project.Milestones.FirstOrDefault(m => m.Id == milestoneId.Value);
+            if (parentMilestone is null)
+            {
+                TempData["ErrorMessage"] = "The selected milestone does not belong to this project.";
+                return RedirectToAction(nameof(Tasks));
+            }
         }
 
         var scopeTasks = (project != null)
@@ -600,7 +716,7 @@ public class WorkController : Controller
         else
         {
             var t = await _db.WorkTasks.FindAsync(taskId);
-            if (t is not null)
+            if (t is not null && t.ProjectId == projectId && await CanAccessProjectIdAsync(t.ProjectId))
             {
                 t.ProjectId       = projectId;
                 t.MilestoneId     = milestoneId;
@@ -635,7 +751,7 @@ public class WorkController : Controller
         }
 
         var t = await _db.WorkTasks.FindAsync(id);
-        if (t is not null)
+        if (t is not null && await CanAccessProjectIdAsync(t.ProjectId))
         {
             _db.WorkTasks.Remove(t);
             await _db.SaveChangesAsync();
@@ -661,6 +777,35 @@ public class WorkController : Controller
         var project = await _db.WorkProjects.FindAsync(projectId);
         if (project is null)
             return RedirectToAction(nameof(Projects));
+
+        bool isTaskBased = string.Equals(project.ProjectType, "Task Based Project", StringComparison.OrdinalIgnoreCase) ||
+                           (project.ProjectType != null && project.ProjectType.Contains("Task", StringComparison.OrdinalIgnoreCase));
+
+        bool isMilestoneBased = string.Equals(project.ProjectType, "Milestone Based Project", StringComparison.OrdinalIgnoreCase) ||
+                               (project.ProjectType != null && project.ProjectType.Contains("Milestone", StringComparison.OrdinalIgnoreCase));
+
+        if (invoiceId == 0)
+        {
+            if (isTaskBased)
+            {
+                TempData["Error"] = "Task Based projects invoices must be created from Finance > Invoice.";
+                return RedirectToAction(nameof(ProjectDetails), new { id = projectId, tab = "invoice" });
+            }
+
+            if (isMilestoneBased)
+            {
+                if (!milestoneId.HasValue || milestoneId.Value <= 0)
+                {
+                    TempData["Error"] = "Milestone is required for Milestone Based projects.";
+                    return RedirectToAction(nameof(ProjectDetails), new { id = projectId, tab = "invoice" });
+                }
+            }
+            else
+            {
+                // Direct Project
+                milestoneId = null;
+            }
+        }
 
         WorkMilestone? milestone = null;
         if (milestoneId.HasValue && milestoneId.Value > 0)
@@ -1036,7 +1181,7 @@ public class WorkController : Controller
         SetWorkNav("WorkReport");
         ViewData["Title"] = "Work Reports";
 
-        var projects = await _db.WorkProjects
+        var allProjects = await _db.WorkProjects
             .Include(p => p.Milestones)
                 .ThenInclude(m => m.Tasks)
             .Include(p => p.Tasks)
@@ -1047,6 +1192,7 @@ public class WorkController : Controller
             .Include(p => p.WorkNotes)
             .OrderBy(p => p.ProjectName)
             .ToListAsync();
+        var projects = ProjectAccessPolicy.FilterAccessible(_db, User, allProjects);
 
         ViewData["Projects"] = projects;
 

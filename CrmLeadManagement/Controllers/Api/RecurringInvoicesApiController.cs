@@ -116,6 +116,13 @@ public class RecurringInvoicesApiController : ControllerBase
                     (r.Project != null && r.Project.ProjectName != null && r.Project.ProjectName.ToLower().Contains(term)));
             }
 
+            var user = PermissionChecker.GetCurrentUser(_db, User);
+            var isAdmin = PermissionChecker.IsAdminOrManager(User, user);
+            if (!isAdmin)
+            {
+                var accessibleProjectIds = await ProjectAccessPolicy.GetAccessibleProjectIdsAsync(_db, User);
+                query = query.Where(r => accessibleProjectIds.Contains(r.ProjectId));
+            }
             var list = await query.OrderByDescending(r => r.Id).ToListAsync();
             return Ok(list.Select(MapToDto).ToList());
         }
@@ -139,6 +146,11 @@ public class RecurringInvoicesApiController : ControllerBase
 
             if (profile is null)
                 return NotFound(new { message = $"Recurring profile with ID {id} not found." });
+
+            var user = PermissionChecker.GetCurrentUser(_db, User);
+            var isAdmin = PermissionChecker.IsAdminOrManager(User, user);
+            if (!isAdmin && !ProjectAccessPolicy.CanAccess(_db, User, profile.Project))
+                return Forbid();
 
             return Ok(MapToDto(profile));
         }
@@ -237,6 +249,12 @@ public class RecurringInvoicesApiController : ControllerBase
 
             if (profile is null)
                 return NotFound(new { message = $"Recurring profile with ID {id} not found." });
+
+            // Permission check: non-admin users can only modify profiles within accessible projects
+            var user = PermissionChecker.GetCurrentUser(_db, User);
+            var isAdmin = PermissionChecker.IsAdminOrManager(User, user);
+            if (!isAdmin && !ProjectAccessPolicy.CanAccess(_db, User, profile.Project))
+                return Forbid();
 
             if (input.ProjectId > 0 && input.ProjectId != profile.ProjectId)
             {
@@ -366,9 +384,17 @@ public class RecurringInvoicesApiController : ControllerBase
     {
         try
         {
-            var profile = await _db.WorkRecurringInvoices.FindAsync(id);
+            var profile = await _db.WorkRecurringInvoices
+                .Include(r => r.Project)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
             if (profile is null)
                 return NotFound(new { message = $"Recurring profile with ID {id} not found." });
+
+            var user = PermissionChecker.GetCurrentUser(_db, User);
+            var isAdmin = PermissionChecker.IsAdminOrManager(User, user);
+            if (!isAdmin && !ProjectAccessPolicy.CanAccess(_db, User, profile.Project))
+                return Forbid();
 
             _db.WorkRecurringInvoices.Remove(profile);
             await _db.SaveChangesAsync();

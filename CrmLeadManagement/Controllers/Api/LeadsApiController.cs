@@ -51,18 +51,66 @@ public class LeadsApiController : ControllerBase
         }
     }
 
+    private (UserRoleEntry? user, bool isSalesExec, List<string> matches) IdentifyUser()
+    {
+        var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+        bool isAdmin = currentUser != null && currentUser.IsAdminAccount;
+        bool isRestricted = currentUser != null && !isAdmin;
+
+        var matches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(currentUser?.Name)) matches.Add(currentUser.Name.Trim());
+        if (!string.IsNullOrWhiteSpace(currentUser?.Email)) matches.Add(currentUser.Email.Trim());
+        if (!string.IsNullOrWhiteSpace(currentUser?.UserId)) matches.Add(currentUser.UserId.Trim());
+        if (currentUser?.Id > 0) matches.Add(currentUser.Id.ToString());
+        if (User?.Identity?.IsAuthenticated == true)
+        {
+            if (!string.IsNullOrWhiteSpace(User.Identity.Name)) matches.Add(User.Identity.Name.Trim());
+            var emailClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            if (!string.IsNullOrWhiteSpace(emailClaim)) matches.Add(emailClaim.Trim());
+        }
+
+        return (currentUser, isRestricted, matches.Where(s => !string.IsNullOrWhiteSpace(s)).ToList());
+    }
+
+    private bool IsAssigned(Lead? lead, List<string> matches)
+    {
+        if (lead == null || string.IsNullOrWhiteSpace(lead.AssignedTo)) return false;
+        var assigned = lead.AssignedTo.Trim();
+        return matches.Any(m => string.Equals(m, assigned, StringComparison.OrdinalIgnoreCase));
+    }
+
     // GET /api/leads
     // GET /api/leads?status=Qualified&assignedTo=Ananya+Sharma&search=orion
     [HttpGet]
     public ActionResult<IEnumerable<Lead>> GetAll([FromQuery] string? status, [FromQuery] string? assignedTo, [FromQuery] string? search)
     {
+        var (currentUser, isSalesExec, matches) = IdentifyUser();
+        if (currentUser == null)
+        {
+            return Unauthorized(new { success = false, message = "Unauthorized. Please log in." });
+        }
+
         var leads = LeadStore.Leads.AsEnumerable();
+
+        if (isSalesExec)
+        {
+            if (matches.Count > 0)
+            {
+                leads = leads.Where(l => !string.IsNullOrWhiteSpace(l.AssignedTo) &&
+                    matches.Any(m => string.Equals(m, l.AssignedTo.Trim(), StringComparison.OrdinalIgnoreCase)));
+            }
+            else
+            {
+                return Ok(new List<Lead>());
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(assignedTo))
+        {
+            leads = leads.Where(l => string.Equals(l.AssignedTo, assignedTo, StringComparison.OrdinalIgnoreCase));
+        }
 
         if (!string.IsNullOrWhiteSpace(status))
             leads = leads.Where(l => string.Equals(l.LeadStatus, status, StringComparison.OrdinalIgnoreCase));
-
-        if (!string.IsNullOrWhiteSpace(assignedTo))
-            leads = leads.Where(l => string.Equals(l.AssignedTo, assignedTo, StringComparison.OrdinalIgnoreCase));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -81,21 +129,66 @@ public class LeadsApiController : ControllerBase
     [HttpGet("assigned")]
     public ActionResult<IEnumerable<Lead>> GetAssigned()
     {
-        return Ok(LeadStore.Leads.Where(l => !string.IsNullOrWhiteSpace(l.AssignedTo)).ToList());
+        var (currentUser, isSalesExec, matches) = IdentifyUser();
+        var leads = LeadStore.Leads.Where(l => !string.IsNullOrWhiteSpace(l.AssignedTo));
+        if (isSalesExec)
+        {
+            leads = leads.Where(l => matches.Any(m => string.Equals(m, l.AssignedTo!.Trim(), StringComparison.OrdinalIgnoreCase)));
+        }
+        return Ok(leads.ToList());
     }
 
     // GET /api/leads/count
     // GET /api/leads/counts
     // GET /api/leads/stats
     // GET /api/leads/statistics
+    [AllowAnonymous]
     [HttpGet("count", Order = -1)]
+    [HttpGet("count/", Order = -1)]
     [HttpGet("counts", Order = -1)]
+    [HttpGet("counts/", Order = -1)]
     [HttpGet("stats", Order = -1)]
+    [HttpGet("stats/", Order = -1)]
     [HttpGet("statistics", Order = -1)]
-    public ActionResult<LeadCountSummaryDto> GetCount([FromQuery] string? assignedTo)
+    [HttpGet("statistics/", Order = -1)]
+    [HttpPost("count", Order = -1)]
+    [HttpPost("count/", Order = -1)]
+    [HttpPost("counts", Order = -1)]
+    [HttpPost("counts/", Order = -1)]
+    [HttpPost("stats", Order = -1)]
+    [HttpPost("stats/", Order = -1)]
+    [HttpPost("statistics", Order = -1)]
+    [HttpPost("statistics/", Order = -1)]
+    public async Task<ActionResult<LeadCountSummaryDto>> GetCount([FromQuery] string? assignedTo)
     {
+        var authHeader = Request.Headers.Authorization.ToString();
+        var hasAuthHeader = !string.IsNullOrWhiteSpace(authHeader);
+
+        var (currentUser, isSalesExec, matches) = IdentifyUser();
+        if (currentUser == null && hasAuthHeader)
+        {
+            return Unauthorized(new { success = false, message = "Unauthorized. Please log in." });
+        }
+
         var leads = LeadStore.Leads.AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(assignedTo))
+
+        var totalProjects = (currentUser == null || !isSalesExec)
+            ? await _db.WorkProjects.CountAsync()
+            : await ProjectAccessPolicy.CountAccessibleProjectsAsync(_db, User, currentUser);
+
+        if (isSalesExec)
+        {
+            if (matches.Count > 0)
+            {
+                leads = leads.Where(l => !string.IsNullOrWhiteSpace(l.AssignedTo) &&
+                    matches.Any(m => string.Equals(m, l.AssignedTo.Trim(), StringComparison.OrdinalIgnoreCase)));
+            }
+            else
+            {
+                return Ok(new LeadCountSummaryDto { TotalProjects = totalProjects });
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(assignedTo))
         {
             leads = leads.Where(l => string.Equals(l.AssignedTo, assignedTo, StringComparison.OrdinalIgnoreCase));
         }
@@ -120,6 +213,7 @@ public class LeadsApiController : ControllerBase
             Total = total,
             Assigned = assigned,
             Unassigned = unassigned,
+            TotalProjects = totalProjects,
             ByStatus = byStatus,
             ByPriority = byPriority
         });
@@ -127,18 +221,25 @@ public class LeadsApiController : ControllerBase
 
     // GET /api/leads/{id}
     [HttpGet("{id}")]
-    public ActionResult<object> GetById(string id)
+    public async Task<ActionResult<object>> GetById(string id)
     {
         if (string.Equals(id, "stats", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(id, "statistics", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(id, "count", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(id, "counts", StringComparison.OrdinalIgnoreCase))
         {
-            return Ok(GetCount(null).Value);
+            var countResult = await GetCount(null);
+            if (countResult.Result is OkObjectResult ok) return Ok(ok.Value);
+            return Ok(countResult.Value);
         }
 
+        var (currentUser, isSalesExec, matches) = IdentifyUser();
         var lead = LeadStore.GetById(id);
         if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
+        if (isSalesExec && !IsAssigned(lead, matches))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ApiError { Message = "You do not have permission to view this lead." });
+        }
         return Ok(lead);
     }
 
@@ -180,6 +281,17 @@ public class LeadsApiController : ControllerBase
         return NoContent();
     }
 
+    // GET /api/leads/{id}/calls
+    // GET /api/leads/{id}/call-details
+    [HttpGet("{id}/calls")]
+    [HttpGet("{id}/call-details")]
+    public ActionResult<IEnumerable<CallHistoryEntry>> GetCalls(string id)
+    {
+        var lead = LeadStore.GetById(id);
+        if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
+        return Ok(lead.CallHistory.OrderByDescending(c => c.Id).ToList());
+    }
+
     // POST /api/leads/{id}/calls
     // POST /api/leads/{id}/call-details
     [HttpPost("{id}/calls")]
@@ -189,20 +301,24 @@ public class LeadsApiController : ControllerBase
         var lead = LeadStore.GetById(id);
         if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
 
-        if (string.IsNullOrWhiteSpace(request.CallDate) || string.IsNullOrWhiteSpace(request.CallTime) || string.IsNullOrWhiteSpace(request.CallStatus))
-            return BadRequest(new ApiError { Message = "CallDate, CallTime and CallStatus are required." });
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var nowTime = DateTime.UtcNow.ToString("HH:mm");
 
-        var remarkText = !string.IsNullOrWhiteSpace(request.Remark) 
+        var callDate = !string.IsNullOrWhiteSpace(request?.CallDate) ? request.CallDate.Trim() : today;
+        var callTime = !string.IsNullOrWhiteSpace(request?.CallTime) ? request.CallTime.Trim() : nowTime;
+        var callStatus = !string.IsNullOrWhiteSpace(request?.CallStatus) ? request.CallStatus.Trim() : "Connected";
+
+        var remarkText = !string.IsNullOrWhiteSpace(request?.Remark) 
             ? request.Remark 
-            : (!string.IsNullOrWhiteSpace(request.Remarks) ? request.Remarks : (request.Notes ?? ""));
+            : (!string.IsNullOrWhiteSpace(request?.Remarks) ? request.Remarks : (request?.Notes ?? ""));
 
         var newCall = new CallHistoryEntry
         {
-            CallDate = request.CallDate,
-            CallTime = request.CallTime,
-            CallType = string.IsNullOrWhiteSpace(request.CallType) ? "Outgoing" : request.CallType,
-            CallStatus = request.CallStatus,
-            Duration = request.Duration ?? "",
+            CallDate = callDate,
+            CallTime = callTime,
+            CallType = string.IsNullOrWhiteSpace(request?.CallType) ? "Outgoing" : request.CallType,
+            CallStatus = callStatus,
+            Duration = !string.IsNullOrWhiteSpace(request?.Duration) ? request.Duration.Trim() : "00:00",
             Employee = lead.AssignedTo,
             Notes = remarkText
         };
@@ -224,6 +340,17 @@ public class LeadsApiController : ControllerBase
         });
     }
 
+    // GET /api/leads/{id}/followups
+    // GET /api/leads/{id}/follow-ups
+    [HttpGet("{id}/followups")]
+    [HttpGet("{id}/follow-ups")]
+    public ActionResult<IEnumerable<FollowUpEntry>> GetFollowUps(string id)
+    {
+        var lead = LeadStore.GetById(id);
+        if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
+        return Ok(lead.FollowUps.OrderByDescending(f => f.Id).ToList());
+    }
+
     // POST /api/leads/{id}/followups
     [HttpPost("{id}/followups")]
     public async Task<IActionResult> AddFollowUp(string id, [FromBody] AddFollowUpRequest request)
@@ -231,23 +358,27 @@ public class LeadsApiController : ControllerBase
         var lead = LeadStore.GetById(id);
         if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
 
-        if (string.IsNullOrWhiteSpace(request.FollowUpDate) || string.IsNullOrWhiteSpace(request.FollowUpTime) || string.IsNullOrWhiteSpace(request.Status))
-            return BadRequest(new ApiError { Message = "FollowUpDate, FollowUpTime and Status are required." });
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var nowTime = DateTime.UtcNow.ToString("HH:mm");
+
+        var followUpDate = !string.IsNullOrWhiteSpace(request?.FollowUpDate) ? request.FollowUpDate.Trim() : today;
+        var followUpTime = !string.IsNullOrWhiteSpace(request?.FollowUpTime) ? request.FollowUpTime.Trim() : nowTime;
+        var status = !string.IsNullOrWhiteSpace(request?.Status) ? request.Status.Trim() : "Scheduled";
 
         var newFollowUp = new FollowUpEntry
         {
-            FollowUpDate = request.FollowUpDate,
-            FollowUpTime = request.FollowUpTime,
-            FollowUpType = string.IsNullOrWhiteSpace(request.FollowUpType) ? "Call" : request.FollowUpType,
+            FollowUpDate = followUpDate,
+            FollowUpTime = followUpTime,
+            FollowUpType = string.IsNullOrWhiteSpace(request?.FollowUpType) ? "Call" : request.FollowUpType,
             AssignedEmployee = lead.AssignedTo,
-            Status = request.Status,
-            Remarks = request.Remarks ?? ""
+            Status = status,
+            Remarks = request?.Remarks ?? ""
         };
 
         lead.FollowUps.Add(newFollowUp);
 
         // Keep the lead's "next follow-up" quick-glance field in sync with the latest entry.
-        lead.FollowUpDate = request.FollowUpDate;
+        lead.FollowUpDate = followUpDate;
 
         if (!await TrySaveAsync($"add follow-up for lead '{id}'"))
         {
@@ -264,6 +395,17 @@ public class LeadsApiController : ControllerBase
         });
     }
 
+    // GET /api/leads/{id}/visits
+    // GET /api/leads/{id}/client-visits
+    [HttpGet("{id}/visits")]
+    [HttpGet("{id}/client-visits")]
+    public ActionResult<IEnumerable<VisitEntry>> GetVisits(string id)
+    {
+        var lead = LeadStore.GetById(id);
+        if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
+        return Ok(lead.Visits.OrderByDescending(v => v.Id).ToList());
+    }
+
     // POST /api/leads/{id}/visits
     [HttpPost("{id}/visits")]
     public async Task<IActionResult> AddVisit(string id, [FromBody] AddVisitRequest request)
@@ -271,18 +413,22 @@ public class LeadsApiController : ControllerBase
         var lead = LeadStore.GetById(id);
         if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
 
-        if (string.IsNullOrWhiteSpace(request.VisitDate) || string.IsNullOrWhiteSpace(request.VisitTime) || string.IsNullOrWhiteSpace(request.VisitLocation))
-            return BadRequest(new ApiError { Message = "VisitDate, VisitTime and VisitLocation are required." });
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var nowTime = DateTime.UtcNow.ToString("HH:mm");
+
+        var visitDate = !string.IsNullOrWhiteSpace(request?.VisitDate) ? request.VisitDate.Trim() : today;
+        var visitTime = !string.IsNullOrWhiteSpace(request?.VisitTime) ? request.VisitTime.Trim() : nowTime;
+        var visitLocation = !string.IsNullOrWhiteSpace(request?.VisitLocation) ? request.VisitLocation.Trim() : "Office";
 
         var newVisit = new VisitEntry
         {
-            VisitDate = request.VisitDate,
-            VisitTime = request.VisitTime,
-            VisitLocation = request.VisitLocation,
-            Employee = !string.IsNullOrWhiteSpace(request.Employee) ? request.Employee : (lead.AssignedTo ?? ""),
-            Outcome = !string.IsNullOrWhiteSpace(request.Outcome) ? request.Outcome : "Interested",
-            Conversation = request.Conversation ?? "",
-            Remarks = request.Remarks ?? ""
+            VisitDate = visitDate,
+            VisitTime = visitTime,
+            VisitLocation = visitLocation,
+            Employee = !string.IsNullOrWhiteSpace(request?.Employee) ? request.Employee : (lead.AssignedTo ?? ""),
+            Outcome = !string.IsNullOrWhiteSpace(request?.Outcome) ? request.Outcome : "Interested",
+            Conversation = request?.Conversation ?? "",
+            Remarks = request?.Remarks ?? ""
         };
 
         lead.Visits.Add(newVisit);
@@ -300,6 +446,15 @@ public class LeadsApiController : ControllerBase
             visit = newVisit,
             lead = lead
         });
+    }
+
+    // GET /api/leads/{id}/requirements
+    [HttpGet("{id}/requirements")]
+    public ActionResult<IEnumerable<RequirementEntry>> GetRequirements(string id)
+    {
+        var lead = LeadStore.GetById(id);
+        if (lead is null) return NotFound(new ApiError { Message = $"Lead '{id}' not found." });
+        return Ok(lead.Requirements.OrderByDescending(r => r.Id).ToList());
     }
 
     // POST /api/leads/{id}/requirements   (JSON body, no image)

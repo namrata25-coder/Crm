@@ -5,7 +5,7 @@ set -e
 TARGET_DIR="${Storage__UploadsPath:-/app/wwwroot/uploads}"
 
 # Ensure the uploads directory exists and is owned by non-root $APP_UID
-mkdir -p "$TARGET_DIR"
+mkdir -p "$TARGET_DIR" 2>/dev/null || true
 chown -R "${APP_UID:-1654}:${APP_UID:-1654}" "$TARGET_DIR" 2>/dev/null || true
 
 # If running as root and APP_UID is set, drop privileges and execute command as $APP_UID
@@ -22,3 +22,4 @@ if [ "$(id -u)" = "0" ] && [ -n "$APP_UID" ]; then
 fi
 
 exec "$@"
+

@@ -450,11 +450,11 @@
                 <thead>
                     <tr>
                         <th style="width:40px;text-align:center;">#</th>
-                        <th>Milestone Scope &amp; Deliverables Description</th>
-                        <th style="width:120px;text-align:center;">Project Code</th>
-                        <th style="width:120px;text-align:center;">Milestone Code</th>
+                        <th>Product / Service Details</th>
+                        <th style="width:140px;text-align:center;">Project / Milestone</th>
                         <th style="width:70px;text-align:center;">Qty</th>
-                        <th style="width:130px;text-align:right;">Amount (₹)</th>
+                        <th style="width:120px;text-align:right;">Price (₹)</th>
+                        <th style="width:130px;text-align:right;">Subtotal (₹)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -469,9 +469,12 @@
                                 <i class="bi bi-check-circle-fill"></i> Progress Completion: 100%
                             </div>
                         </td>
-                        <td style="text-align:center;font-family:monospace;font-weight:700;" id="tableProjectCode">PRJ-0001</td>
-                        <td style="text-align:center;font-family:monospace;font-weight:700;color:var(--brand-600,#4f46e5);" id="tableMilestoneCode">MLS-1001</td>
-                        <td style="text-align:center;font-weight:600;">1</td>
+                        <td style="text-align:center;">
+                            <span style="font-family:monospace;font-weight:700;color:#475569;" id="tableProjectCode">PRJ</span><br/>
+                            <span style="font-family:monospace;font-weight:700;color:var(--brand-600,#4f46e5);font-size:12px;" id="tableMilestoneCode">MLS</span>
+                        </td>
+                        <td style="text-align:center;font-weight:600;" id="tableItemQty">1</td>
+                        <td style="text-align:right;font-weight:700;color:#334155;" id="tableItemPrice">₹0.00</td>
                         <td style="text-align:right;font-weight:800;font-size:14px;color:#0f172a;" id="tableItemAmount">₹0.00</td>
                     </tr>
                 </tbody>
@@ -808,7 +811,59 @@
         }
     }
 
-    function renderProfessionalInvoice(inv) {
+    function renderProfessionalInvoice(rawInv) {
+        if (!rawInv) return;
+
+        const inv = {
+            id: rawInv.Id !== undefined ? rawInv.Id : rawInv.id,
+            invoiceNumber: rawInv.InvoiceNumber || rawInv.invoiceNumber || 'INV-0000',
+            paymentStatus: rawInv.PaymentStatus || rawInv.paymentStatus || 'Pending',
+            companyName: rawInv.CompanyName || rawInv.companyName || 'Vision CRM Technologies Pvt. Ltd.',
+            companyAddress: rawInv.CompanyAddress || rawInv.companyAddress || '',
+            companyEmail: rawInv.CompanyEmail || rawInv.companyEmail || '',
+            companyPhone: rawInv.CompanyPhone || rawInv.companyPhone || '',
+            companyGstin: rawInv.CompanyGstin || rawInv.companyGstin || '',
+            companyPan: rawInv.CompanyPan || rawInv.companyPan || '',
+            companyWebsite: rawInv.CompanyWebsite || rawInv.companyWebsite || '',
+            clientCompany: rawInv.ClientCompany || rawInv.clientCompany || rawInv.ClientName || rawInv.clientName || 'Client Organization',
+            clientName: rawInv.ClientName || rawInv.clientName || '',
+            clientEmail: rawInv.ClientEmail || rawInv.clientEmail || '',
+            clientMobile: rawInv.ClientMobile || rawInv.clientMobile || '',
+            invoiceDate: rawInv.InvoiceDate || rawInv.invoiceDate || '—',
+            dueDate: rawInv.DueDate || rawInv.dueDate || '—',
+            projectName: rawInv.ProjectName || rawInv.projectName || '',
+            projectCode: rawInv.ProjectCode || rawInv.projectCode || '',
+            milestoneName: rawInv.MilestoneName || rawInv.milestoneName || 'Milestone Deliverable Scope',
+            milestoneCode: rawInv.MilestoneCode || rawInv.milestoneCode || 'MLS',
+            milestoneDescription: rawInv.MilestoneDescription || rawInv.milestoneDescription || rawInv.Notes || rawInv.notes || '',
+            milestoneProgressPercent: rawInv.MilestoneProgressPercent !== undefined ? rawInv.MilestoneProgressPercent : (rawInv.milestoneProgressPercent !== undefined ? rawInv.milestoneProgressPercent : 100),
+            quantity: rawInv.Quantity !== undefined ? rawInv.Quantity : (rawInv.quantity !== undefined ? rawInv.quantity : 1),
+            unitPrice: rawInv.UnitPrice !== undefined ? rawInv.UnitPrice : (rawInv.unitPrice !== undefined ? rawInv.unitPrice : (rawInv.Subtotal !== undefined ? rawInv.Subtotal : (rawInv.subtotal !== undefined ? rawInv.subtotal : (rawInv.Amount !== undefined ? rawInv.Amount : (rawInv.amount || 0))))),
+            subtotal: rawInv.Subtotal !== undefined ? rawInv.Subtotal : (rawInv.subtotal !== undefined ? rawInv.subtotal : (rawInv.Amount !== undefined ? rawInv.Amount : (rawInv.amount || 0))),
+            discount: rawInv.Discount !== undefined ? rawInv.Discount : (rawInv.discount || 0),
+            taxableAmount: rawInv.TaxableAmount !== undefined ? rawInv.TaxableAmount : (rawInv.taxableAmount || 0),
+            taxRate: rawInv.TaxRate !== undefined ? rawInv.TaxRate : (rawInv.taxRate || 0),
+            taxAmount: rawInv.TaxAmount !== undefined ? rawInv.TaxAmount : (rawInv.taxAmount !== undefined ? rawInv.taxAmount : (rawInv.Tax !== undefined ? rawInv.Tax : (rawInv.tax || 0))),
+            taxName: rawInv.TaxName || rawInv.taxName || '',
+            taxType: (rawInv.TaxType || rawInv.taxType || 'GST').trim().toUpperCase(),
+            cgstRate: rawInv.CgstRate !== undefined ? rawInv.CgstRate : rawInv.cgstRate,
+            cgstAmount: rawInv.CgstAmount !== undefined ? rawInv.CgstAmount : rawInv.cgstAmount,
+            sgstRate: rawInv.SgstRate !== undefined ? rawInv.SgstRate : rawInv.sgstRate,
+            sgstAmount: rawInv.SgstAmount !== undefined ? rawInv.SgstAmount : rawInv.sgstAmount,
+            igstRate: rawInv.IgstRate !== undefined ? rawInv.IgstRate : rawInv.igstRate,
+            igstAmount: rawInv.IgstAmount !== undefined ? rawInv.IgstAmount : rawInv.igstAmount,
+            grandTotal: rawInv.GrandTotal !== undefined ? rawInv.GrandTotal : (rawInv.grandTotal || 0),
+            paidAmount: rawInv.PaidAmount !== undefined ? rawInv.PaidAmount : (rawInv.paidAmount || 0),
+            remainingAmount: rawInv.RemainingAmount !== undefined ? rawInv.RemainingAmount : (rawInv.remainingAmount !== undefined ? rawInv.remainingAmount : 0),
+            bankName: rawInv.BankName || rawInv.bankName || 'HDFC Bank Ltd.',
+            bankAccountName: rawInv.BankAccountName || rawInv.bankAccountName || 'Vision CRM Technologies Pvt. Ltd.',
+            bankAccountNumber: rawInv.BankAccountNumber || rawInv.bankAccountNumber || '50200012345678',
+            bankIfsc: rawInv.BankIfsc || rawInv.bankIfsc || 'HDFC0000123',
+            upiId: rawInv.UpiId || rawInv.upiId || 'visioncrm@hdfcbank',
+            notes: rawInv.Notes || rawInv.notes || '',
+            paymentHistory: rawInv.PaymentHistory || rawInv.paymentHistory || rawInv.Payments || rawInv.payments || []
+        };
+
         // Headers & Breadcrumbs
         const invNum = inv.invoiceNumber || 'INV-0000';
         document.getElementById('topBreadcrumbInvNum').textContent = invNum;
@@ -852,9 +907,9 @@
 
         // Billed To
         document.getElementById('invClientCompany').textContent = inv.clientCompany || inv.clientName || 'Client Organization';
-        document.getElementById('invClientName').textContent = inv.clientCompany && inv.clientName ? `Attn: ${inv.clientName}` : (inv.clientName || 'Valued Client');
-        document.getElementById('invClientEmail').textContent = inv.clientEmail || 'finance@client.com';
-        document.getElementById('invClientMobile').textContent = inv.clientMobile || '+91 98765 43210';
+        document.getElementById('invClientName').textContent = inv.clientCompany && inv.clientName && inv.clientCompany !== inv.clientName ? `Attn: ${inv.clientName}` : (inv.clientName || 'Valued Client');
+        document.getElementById('invClientEmail').textContent = inv.clientEmail || '—';
+        document.getElementById('invClientMobile').textContent = inv.clientMobile || '—';
 
         // Meta Info
         document.getElementById('invDateVal').textContent = inv.invoiceDate || '—';
@@ -863,12 +918,18 @@
         document.getElementById('invMilestoneVal').textContent = `${inv.milestoneName || 'Milestone Phase'} (${inv.milestoneCode || 'MLS'})`;
 
         // Deliverables Table
+        const qty = inv.quantity || 1;
+        const unitPrice = inv.unitPrice || inv.subtotal || inv.amount || 0;
+        const subtotalAmount = inv.subtotal || inv.amount || 0;
+
         document.getElementById('tableMilestoneName').textContent = inv.milestoneName || 'Milestone Deliverable Scope';
         document.getElementById('tableMilestoneDesc').textContent = inv.milestoneDescription || inv.notes || 'Full deliverable scope, technical specifications, and project phase acceptance sign-off.';
         document.getElementById('tableMilestoneProgress').innerHTML = `<i class="bi bi-check-circle-fill"></i> Progress Completion: ${inv.milestoneProgressPercent || 100}%`;
         document.getElementById('tableProjectCode').textContent = inv.projectCode || 'PRJ';
         document.getElementById('tableMilestoneCode').textContent = inv.milestoneCode || 'MLS';
-        document.getElementById('tableItemAmount').textContent = formatCurrency(inv.subtotal || inv.amount);
+        document.getElementById('tableItemQty').textContent = qty;
+        document.getElementById('tableItemPrice').textContent = formatCurrency(unitPrice);
+        document.getElementById('tableItemAmount').textContent = formatCurrency(subtotalAmount);
 
         // Bank Details
         if (inv.bankName) document.getElementById('bankNameVal').textContent = inv.bankName;
@@ -995,13 +1056,21 @@
         }
 
         let html = '';
-        payments.forEach(p => {
+        payments.forEach(rawP => {
+            const p = {
+                id: rawP.Id !== undefined ? rawP.Id : rawP.id,
+                paymentNumber: rawP.PaymentNumber || rawP.paymentNumber || 'REC',
+                paymentDate: rawP.PaymentDate || rawP.paymentDate || '—',
+                paymentMethod: rawP.PaymentMethod || rawP.paymentMethod || 'Bank Transfer',
+                transactionReference: rawP.TransactionReference || rawP.transactionReference || '—',
+                amount: rawP.Amount !== undefined ? rawP.Amount : (rawP.amount || 0)
+            };
             html += `
                 <tr style="border-bottom:1px solid #f1f5f9;">
                     <td style="padding:8px;font-family:monospace;font-weight:700;color:var(--brand-600,#4f46e5);">${escapeHtml(p.paymentNumber)}</td>
-                    <td style="padding:8px;color:#334155;">${escapeHtml(p.paymentDate || '—')}</td>
-                    <td style="padding:8px;font-weight:600;color:#0f172a;">${escapeHtml(p.paymentMethod || 'Bank Transfer')}</td>
-                    <td style="padding:8px;color:#64748b;font-family:monospace;">${escapeHtml(p.transactionReference || '—')}</td>
+                    <td style="padding:8px;color:#334155;">${escapeHtml(p.paymentDate)}</td>
+                    <td style="padding:8px;font-weight:600;color:#0f172a;">${escapeHtml(p.paymentMethod)}</td>
+                    <td style="padding:8px;color:#64748b;font-family:monospace;">${escapeHtml(p.transactionReference)}</td>
                     <td style="padding:8px;text-align:right;font-weight:800;color:#059669;">${formatCurrency(p.amount)}</td>
                     <td class="no-print" style="padding:8px;text-align:center;">
                         <button type="button" class="btn-action btn-delete" onclick="deletePayment(${p.id}, '${escapeHtml(p.paymentNumber)}')" title="Delete Payment" style="padding:2px 5px;font-size:11px;">

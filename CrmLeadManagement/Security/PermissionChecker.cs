@@ -45,6 +45,30 @@ public static class PermissionChecker
         return user != null && user.IsAdminAccount;
     }
 
+    /// <summary>
+    /// Returns true if the user is Admin, Super Admin, or Manager.
+    /// Manager role users get full data visibility in Work module (same as Admin).
+    /// </summary>
+    public static bool IsAdminOrManager(ClaimsPrincipal? userPrincipal, UserRoleEntry? user = null)
+    {
+        if (IsAdmin(userPrincipal, user)) return true;
+        if (user != null)
+        {
+            return string.Equals(user.Role?.Trim(), "Manager", StringComparison.OrdinalIgnoreCase);
+        }
+        return userPrincipal?.IsInRole("Manager") == true;
+    }
+
+    /// <summary>
+    /// Returns true if the user is Admin, Super Admin, or Manager.
+    /// Overload that fetches the user from the database.
+    /// </summary>
+    public static bool IsAdminOrManager(AppDbContext db, ClaimsPrincipal? userPrincipal)
+    {
+        var user = GetCurrentUser(db, userPrincipal);
+        return user != null && IsAdminOrManager(userPrincipal, user);
+    }
+
     public static bool IsUser(AppDbContext db, ClaimsPrincipal? userPrincipal)
     {
         var user = GetCurrentUser(db, userPrincipal);
@@ -74,9 +98,10 @@ public static class PermissionChecker
             return false;
         }
 
-        // Super Admin and Admin always possess unrestricted authority
+        // Super Admin, Admin, and Manager always possess unrestricted authority
         if (string.Equals(user.Role, "Super Admin", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(user.Role, "Manager", StringComparison.OrdinalIgnoreCase) ||
             user.IsAdminAccount)
         {
             return true;

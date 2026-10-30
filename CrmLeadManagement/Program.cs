@@ -12,7 +12,18 @@ using Microsoft.Extensions.FileProviders;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 
-var builder = WebApplication.CreateBuilder(args);
+var currentDir = Directory.GetCurrentDirectory();
+var contentRoot = currentDir;
+if (!Directory.Exists(Path.Combine(contentRoot, "Views")) && Directory.Exists(Path.Combine(contentRoot, "CrmLeadManagement", "Views")))
+{
+    contentRoot = Path.Combine(contentRoot, "CrmLeadManagement");
+}
+
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = contentRoot
+});
 
 // Render sets the PORT environment variable (default 10000).
 // When PORT is set (Render/Docker), bind to 0.0.0.0:{port} so reverse proxies can route traffic.
@@ -297,6 +308,7 @@ builder.Services.AddControllersWithViews(options =>
         // Saves tracked changes before the response starts (see Filters/SaveChangesFilter.cs).
         options.Filters.Add<SaveChangesFilter>();
     })
+    .AddApplicationPart(typeof(Program).Assembly)
     .AddJsonOptions(options =>
     {
         // Keep API responses readable (PascalCase already matches the model properties,

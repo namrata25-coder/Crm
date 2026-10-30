@@ -41,8 +41,15 @@ public class WorkApiController : ControllerBase
                 .Include(p => p.Tasks)
                 .ToListAsync();
 
-            var milestones = await _db.WorkMilestones.Include(m => m.Tasks).ToListAsync();
-            var tasks = await _db.WorkTasks.ToListAsync();
+            projects = ProjectAccessPolicy.FilterAccessible(_db, User, projects);
+            var accessibleProjectIds = projects.Select(project => project.Id).ToList();
+            var milestones = await _db.WorkMilestones
+                .Include(m => m.Tasks)
+                .Where(m => accessibleProjectIds.Contains(m.ProjectId))
+                .ToListAsync();
+            var tasks = await _db.WorkTasks
+                .Where(t => accessibleProjectIds.Contains(t.ProjectId))
+                .ToListAsync();
 
             var totalProjects = projects.Count;
             var activeProjects = projects.Count(p => string.Equals(p.Status, "Active", StringComparison.OrdinalIgnoreCase));
@@ -110,7 +117,10 @@ public class WorkApiController : ControllerBase
                 query = query.Where(p => p.Id == projectId.Value);
             }
 
-            var projects = await query.ToListAsync();
+            var projects = ProjectAccessPolicy.FilterAccessible(
+                _db,
+                User,
+                await query.ToListAsync());
             var reportData = projects.Select(p => new
             {
                 p.Id,

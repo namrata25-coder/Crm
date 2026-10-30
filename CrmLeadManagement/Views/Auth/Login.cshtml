@@ -994,13 +994,8 @@
                     </button>
                 </form>
 
-                <!-- Registration Link for Standard Users -->
-                <div id="userRegisterPrompt" style="margin-top: 14px; text-align: center; font-size: 13px; color: var(--crm-text-muted); display: @(isInitialAdmin ? "none" : "block");">
-                    Don't have an account? <a href="/register" style="color: var(--crm-blue-accent); font-weight: 600; text-decoration: none;">Register here &rarr;</a>
-                </div>
-
                 <footer class="form-footer">
-                    <span>Direct portal URLs: <a href="/admin/login">Admin Portal</a> · <a href="/user/login">User Portal</a> · <a href="/register">Register</a></span>
+                    <span>Direct portal URLs: <a href="/admin/login">Admin Portal</a> · <a href="/user/login">User Portal</a></span>
                 </footer>
             </div>
         </main>
@@ -1067,7 +1062,6 @@
             const submitBtnIcon = document.getElementById('submitBtnIcon');
             const submitBtnText = document.getElementById('submitBtnText');
             const rememberMeText = document.getElementById('rememberMeText');
-            const userRegisterPrompt = document.getElementById('userRegisterPrompt');
 
             if (portal === 'admin') {
                 // Activate Admin Portal UI
@@ -1101,8 +1095,6 @@
                 submitBtnIcon.className = 'bi bi-shield-lock-fill';
                 submitBtnText.textContent = 'Sign In to Admin Portal';
 
-                if (userRegisterPrompt) userRegisterPrompt.style.display = 'none';
-
                 document.title = 'Admin Portal Sign In · VisionCRM';
 
                 if (updateUrl && window.history && window.history.replaceState) {
@@ -1133,7 +1125,7 @@
                 }
 
                 userIdLabel.textContent = 'User ID or Work Email';
-                userIdInput.placeholder = 'e.g. rahul.verma or registered email';
+                userIdInput.placeholder = 'e.g. rahul.verma or work email';
                 passwordLabel.textContent = 'Password';
 
                 rememberMeText.textContent = 'Keep me signed in';
@@ -1141,8 +1133,6 @@
                 submitBtn.className = 'btn-primary-action';
                 submitBtnIcon.className = 'bi bi-box-arrow-in-right';
                 submitBtnText.textContent = 'Sign In to User Portal';
-
-                if (userRegisterPrompt) userRegisterPrompt.style.display = 'block';
 
                 document.title = 'User Portal Sign In · VisionCRM';
 

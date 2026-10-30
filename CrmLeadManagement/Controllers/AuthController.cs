@@ -50,7 +50,7 @@ public class AuthController : Controller
     [HttpGet("auth/login")]
     [HttpGet("account/login")]
     [AllowAnonymous]
-    public async Task<IActionResult> Login(string? returnUrl = null, [FromQuery] string? portal = null, [FromQuery] string? registered = null)
+    public async Task<IActionResult> Login(string? returnUrl = null, [FromQuery] string? portal = null)
     {
         // If the user is already authenticated via cookie, redirect directly to their dashboard
         if (User.Identity?.IsAuthenticated == true)
@@ -72,11 +72,6 @@ public class AuthController : Controller
             RememberMe = true,
             LoginType = isTargetAdmin ? "admin" : "user"
         };
-
-        if (string.Equals(registered, "true", StringComparison.OrdinalIgnoreCase))
-        {
-            ViewBag.SuccessMessage = "Account registered successfully! Please sign in with your User ID and password.";
-        }
 
         ViewBag.AdminEmail = "admin";
         ViewBag.AdminPassword = "admin123";
@@ -277,8 +272,8 @@ public class AuthController : Controller
 
         if (user == null)
         {
-            _logger.LogWarning("User login failed: unregistered User ID '{Input}' from IP {IP}", input, ip);
-            const string unregMsg = "Invalid User ID or Password. Please register first if you don't have an account.";
+            _logger.LogWarning("User login failed: unknown User ID '{Input}' from IP {IP}", input, ip);
+            const string unregMsg = "Invalid User ID or Password.";
             if (isAjax) return Unauthorized(new { success = false, message = unregMsg });
             model.ErrorMessage = unregMsg;
             Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -330,7 +325,7 @@ public class AuthController : Controller
             }
             await _db.SaveChangesAsync();
 
-            const string invalidMsg = "Invalid User ID or Password. Please register first if you don't have an account.";
+            const string invalidMsg = "Invalid User ID or Password.";
             if (isAjax) return Unauthorized(new { success = false, message = invalidMsg });
             model.ErrorMessage = invalidMsg;
             Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -412,6 +407,8 @@ public class AuthController : Controller
 
     /// <summary>
     /// Displays the User Registration page.
+    /// <summary>
+    /// Registration is disabled: Redirect any register GET requests to login.
     /// Route: /register, /auth/register, /user/register
     /// </summary>
     [HttpGet("register")]
@@ -420,194 +417,47 @@ public class AuthController : Controller
     [AllowAnonymous]
     public IActionResult Register()
     {
-        if (User.Identity?.IsAuthenticated == true)
-        {
-            var isAdmin = User.IsInRole("Admin") || User.IsInRole("Super Admin");
-            return Redirect(isAdmin ? "/admin/dashboard" : "/user/dashboard");
-        }
-
-        return View("~/Views/Auth/Register.cshtml", new RegisterViewModel());
+        return Redirect("/login");
     }
 
     /// <summary>
-    /// Handles User Registration submission.
-    /// Strictly assigns the 'User' role. Admin role can NEVER be granted via registration.
-    /// Validates unique User ID and Email.
-    /// Hashes passwords securely.
+    /// Registration is disabled: Redirect any register POST requests to login.
     /// </summary>
     [HttpPost("register")]
     [HttpPost("auth/register")]
     [HttpPost("user/register")]
     [Consumes("application/x-www-form-urlencoded", "multipart/form-data")]
     [AllowAnonymous]
-    [EnableRateLimiting("AuthRateLimit")]
-    public async Task<IActionResult> Register([FromForm] RegisterViewModel model)
+    public IActionResult Register([FromForm] RegisterViewModel model)
     {
         var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest" ||
                      Request.Headers["Accept"].ToString().Contains("application/json");
 
-        var userId = (model.UserId ?? "").Trim();
-        var name = (model.Name ?? "").Trim();
-        var email = (model.Email ?? "").Trim().ToLowerInvariant();
-        var password = model.Password ?? "";
-        var confirmPassword = model.ConfirmPassword ?? "";
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-
-        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(name) ||
-            string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-        {
-            var msg = "All fields (User ID, Name, Email, Password) are required.";
-            if (isAjax) return BadRequest(new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status400BadRequest;
-            return View("~/Views/Auth/Register.cshtml", model);
-        }
-
-        if (password != confirmPassword)
-        {
-            var msg = "Password and confirmation password do not match.";
-            if (isAjax) return BadRequest(new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status400BadRequest;
-            return View("~/Views/Auth/Register.cshtml", model);
-        }
-
-        if (password.Length < 6)
-        {
-            var msg = "Password must be at least 6 characters long.";
-            if (isAjax) return BadRequest(new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status400BadRequest;
-            return View("~/Views/Auth/Register.cshtml", model);
-        }
-
-        // The identifier 'admin' is strictly reserved for the Administrator account
-        if (string.Equals(userId, "admin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(email, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(email, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase))
-        {
-            var msg = "The User ID 'admin' is reserved for system administration. Please choose a different User ID.";
-            if (isAjax) return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status403Forbidden;
-            return View("~/Views/Auth/Register.cshtml", model);
-        }
-
-        // Prevent duplicate User IDs or duplicate Emails
-        var isDuplicate = await _db.Users.AnyAsync(u =>
-            (u.UserId != null && u.UserId.ToLower() == userId.ToLower()) ||
-            (u.Email != null && u.Email.ToLower() == email) ||
-            (u.UserId != null && u.UserId.ToLower() == email) ||
-            (u.Email != null && u.Email.ToLower() == userId.ToLower()));
-
-        if (isDuplicate)
-        {
-            _logger.LogWarning("Registration failed: duplicate User ID or Email '{UserId}' / '{Email}' from IP {IP}", userId, email, ip);
-            var msg = "A user with this User ID or Email already exists. Please choose a different User ID or log in.";
-            if (isAjax) return Conflict(new { success = false, message = msg });
-            model.ErrorMessage = msg;
-            Response.StatusCode = StatusCodes.Status409Conflict;
-            return View("~/Views/Auth/Register.cshtml", model);
-        }
-
-        // Create new user with STRICT 'User' role (never Admin)
-        var newUser = new UserRoleEntry
-        {
-            UserId = userId,
-            Name = name,
-            Email = email,
-            Role = "User",
-            Status = "Active",
-            IsAuthorizedUser = true,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        newUser.PasswordHash = _passwordHasher.HashPassword(newUser, password);
-        _db.Users.Add(newUser);
-        await _db.SaveChangesAsync();
-
-        _logger.LogInformation("New user registered successfully: User ID '{UserId}', Email '{Email}' from IP {IP}", userId, email, ip);
-        await _auditLogService.LogAsync("UserRegistered", email, newUser.Id, email, $"Self-registered User ID: {userId}", ip);
-
-        var successMessage = "Registration successful! Please sign in with your User ID and password.";
         if (isAjax)
         {
-            return Ok(new
+            return StatusCode(StatusCodes.Status403Forbidden, new
             {
-                success = true,
-                message = successMessage,
-                redirectUrl = "/login?portal=user&registered=true",
-                user = new { id = newUser.Id, userId = newUser.UserId, name = newUser.Name, email = newUser.Email, role = newUser.Role }
+                success = false,
+                message = "Registration is disabled. Please contact your system administrator for account access."
             });
         }
 
-        return Redirect("/login?portal=user&registered=true");
+        return Redirect("/login");
     }
 
     /// <summary>
-    /// REST JSON User Registration API endpoint.
+    /// REST JSON User Registration API endpoint is disabled.
     /// Route: /api/auth/register
     /// </summary>
     [HttpPost("api/auth/register")]
     [Consumes("application/json")]
     [AllowAnonymous]
-    [EnableRateLimiting("AuthRateLimit")]
-    public async Task<IActionResult> ApiRegister([FromBody] RegisterViewModel model)
+    public IActionResult ApiRegister([FromBody] RegisterViewModel? model)
     {
-        var userId = (model?.UserId ?? "").Trim();
-        var name = (model?.Name ?? "").Trim();
-        var email = (model?.Email ?? "").Trim().ToLowerInvariant();
-        var password = model?.Password ?? "";
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-
-        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(name) ||
-            string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        return StatusCode(StatusCodes.Status403Forbidden, new
         {
-            return BadRequest(new { success = false, message = "All fields (User ID, Name, Email, Password) are required." });
-        }
-
-        if (password.Length < 6)
-        {
-            return BadRequest(new { success = false, message = "Password must be at least 6 characters long." });
-        }
-
-        if (string.Equals(userId, "admin", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(email, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = "The User ID 'admin' is reserved for system administration." });
-        }
-
-        var isDuplicate = await _db.Users.AnyAsync(u =>
-            (u.UserId != null && u.UserId.ToLower() == userId.ToLower()) ||
-            (u.Email != null && u.Email.ToLower() == email));
-
-        if (isDuplicate)
-        {
-            return Conflict(new { success = false, message = "A user with this User ID or Email already exists." });
-        }
-
-        var newUser = new UserRoleEntry
-        {
-            UserId = userId,
-            Name = name,
-            Email = email,
-            Role = "User",
-            Status = "Active",
-            IsAuthorizedUser = true,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        newUser.PasswordHash = _passwordHasher.HashPassword(newUser, password);
-        _db.Users.Add(newUser);
-        await _db.SaveChangesAsync();
-
-        await _auditLogService.LogAsync("ApiUserRegistered", email, newUser.Id, email, $"API registered User ID: {userId}", ip);
-
-        return Ok(new
-        {
-            success = true,
-            message = "Registration successful! You can now log in.",
-            user = new { id = newUser.Id, userId = newUser.UserId, name = newUser.Name, email = newUser.Email, role = newUser.Role }
+            success = false,
+            message = "User registration is disabled. Accounts can only be created by an Administrator."
         });
     }
 

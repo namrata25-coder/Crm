@@ -156,9 +156,10 @@ public class BearerTokenAuthenticationHandler : AuthenticationHandler<Authentica
         Response.Headers["WWW-Authenticate"] = "Bearer";
         Response.ContentType = "application/json";
 
-        var payload = new AppApiError
+        var payload = new
         {
-            Message = "Unauthorized. Missing or invalid token."
+            success = false,
+            message = "Unauthorized. Missing or invalid token."
         };
 
         await Response.WriteAsync(JsonSerializer.Serialize(payload));
@@ -171,9 +172,10 @@ public class BearerTokenAuthenticationHandler : AuthenticationHandler<Authentica
         Response.StatusCode = StatusCodes.Status403Forbidden;
         Response.ContentType = "application/json";
 
-        var payload = new AppApiError
+        var payload = new
         {
-            Message = "You do not have permission."
+            success = false,
+            message = "You do not have permission."
         };
 
         await Response.WriteAsync(JsonSerializer.Serialize(payload));

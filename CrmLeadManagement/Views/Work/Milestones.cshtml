@@ -1189,15 +1189,17 @@ async function openViewInvoiceModal(invId) {
                     <table style="width:100%;border-collapse:collapse;font-size:13px;">
                         <thead>
                             <tr style="background:#f1f5f9;border-top:1px solid #cbd5e1;border-bottom:2px solid #cbd5e1;font-size:11.5px;text-align:left;color:#475569;">
-                                <th style="padding:8px 10px;">#</th>
-                                <th style="padding:8px 10px;">Milestone Scope &amp; Deliverables Description</th>
-                                <th style="padding:8px 10px;text-align:center;">Milestone Code</th>
-                                <th style="padding:8px 10px;text-align:right;">Amount (₹)</th>
+                                <th style="padding:8px 10px;text-align:center;width:40px;">#</th>
+                                <th style="padding:8px 10px;">Product / Service Details</th>
+                                <th style="padding:8px 10px;text-align:center;width:120px;">Milestone Code</th>
+                                <th style="padding:8px 10px;text-align:center;width:70px;">Quantity</th>
+                                <th style="padding:8px 10px;text-align:right;width:110px;">Price (₹)</th>
+                                <th style="padding:8px 10px;text-align:right;width:120px;">Subtotal (₹)</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="padding:12px 10px;color:#64748b;font-weight:700;">1</td>
+                                <td style="padding:12px 10px;color:#64748b;font-weight:700;text-align:center;">1</td>
                                 <td style="padding:12px 10px;">
                                     <strong style="color:#0f172a;font-size:13.5px;">${escapeHtml(pdf.milestoneName)}</strong>
                                     <div style="font-size:12px;color:#64748b;margin-top:3px;line-height:1.4;">
@@ -1208,6 +1210,8 @@ async function openViewInvoiceModal(invId) {
                                     </div>
                                 </td>
                                 <td style="padding:12px 10px;text-align:center;font-family:monospace;font-weight:700;color:#4f46e5;">${escapeHtml(pdf.milestoneCode || 'MLS')}</td>
+                                <td style="padding:12px 10px;text-align:center;font-weight:600;">${pdf.quantity || 1}</td>
+                                <td style="padding:12px 10px;text-align:right;font-weight:700;color:#334155;">${formatCurrency(pdf.unitPrice || pdf.subtotal)}</td>
                                 <td style="padding:12px 10px;text-align:right;font-weight:800;font-size:14px;color:#0f172a;">${formatCurrency(pdf.subtotal)}</td>
                             </tr>
                         </tbody>

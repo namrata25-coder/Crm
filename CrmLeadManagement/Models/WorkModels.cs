@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace CrmLeadManagement.Models;
@@ -28,6 +29,7 @@ public class WorkProject
     // Navigation
     public List<WorkMilestone> Milestones { get; set; } = new();
     public List<WorkTask>      Tasks      { get; set; } = new();
+    [JsonIgnore]
     public List<WorkInvoice>   Invoices   { get; set; } = new();
     public List<WorkFile>      Files      { get; set; } = new();
     public List<WorkTimesheet> Timesheets { get; set; } = new();
@@ -49,6 +51,20 @@ public class WorkProject
 
     public int ProgressPercent =>
         Budget <= 0 ? 0 : (int)Math.Min(100, Math.Max(0, Math.Round(CompletedAmount / Budget * 100)));
+
+    // Invoice Summary (Computed from Invoices and Payments tables, not stored in DB)
+    [NotMapped]
+    public decimal InvoiceTotal => Invoices != null && Invoices.Any()
+        ? Invoices.Sum(i => i.GrandTotal)
+        : 0m;
+
+    [NotMapped]
+    public decimal InvoiceReceived => Invoices != null && Invoices.Any()
+        ? Invoices.Sum(i => (i.Payments != null && i.Payments.Any()) ? i.Payments.Sum(p => p.Amount) : i.PaidAmount)
+        : 0m;
+
+    [NotMapped]
+    public decimal InvoiceDue => Math.Max(0m, InvoiceTotal - InvoiceReceived);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

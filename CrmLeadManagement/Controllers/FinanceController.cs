@@ -128,7 +128,16 @@ public class FinanceController : Controller
         ViewData["Title"] = "Estimation List";
         ViewData["ActivePage"] = "FinanceEstimation";
 
+        // Apply role‑based filtering: admins/managers see all, others only their assigned leads
+        var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+        var isAdminOrManager = currentUser != null && PermissionChecker.IsAdminOrManager(User, currentUser);
+
         var rows = LeadStore.Leads
+            .Where(lead => isAdminOrManager ||
+                (lead.AssignedTo != null && currentUser != null &&
+                 (string.Equals(lead.AssignedTo.Trim(), currentUser.Name?.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(lead.AssignedTo.Trim(), currentUser.Email?.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(lead.AssignedTo.Trim(), currentUser.UserId?.Trim(), StringComparison.OrdinalIgnoreCase))))
             .SelectMany(lead => lead.Estimations.Select(e => new FinanceListRow
             {
                 LeadId = lead.LeadId,
@@ -140,6 +149,9 @@ public class FinanceController : Controller
                 Number = e.Number ?? "",
                 Total = e.Total ?? "",
                 Status = e.Status ?? "",
+                AttachmentPath = e.AttachmentPath ?? "",
+                AttachmentFileName = e.AttachmentFileName ?? "",
+                Notes = e.Notes ?? "",
             }))
             .OrderByDescending(r => r.Number)
             .ToList();
@@ -169,9 +181,88 @@ public class FinanceController : Controller
         return View(entry);
     }
 
+    // POST /Finance/SaveEstimation
+    [HttpPost]
+    public async Task<IActionResult> SaveEstimation(string? leadId, string? number, string? notes, IFormFile? attachment, string? returnUrl = null)
+    {
+        if (!CheckPermission("Estimation", "Create") && !CheckPermission("Estimation", "Edit"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to create or edit estimations.";
+            return RedirectToAction(nameof(EstimationList));
+        }
+
+        Lead? lead = null;
+        EstimationEntry? existing = null;
+        if (!string.IsNullOrWhiteSpace(number))
+        {
+            foreach (var l in LeadStore.Leads)
+            {
+                var found = l.Estimations.FirstOrDefault(e => e.Number == number);
+                if (found is not null)
+                {
+                    lead = l;
+                    existing = found;
+                    break;
+                }
+            }
+        }
+
+        if (lead is null)
+        {
+            var selectedLeadId = !string.IsNullOrWhiteSpace(leadId) ? leadId : LeadStore.Leads.FirstOrDefault()?.LeadId;
+            if (string.IsNullOrWhiteSpace(selectedLeadId))
+            {
+                TempData["ErrorMessage"] = "Please create or select a lead before adding an estimation.";
+                return RedirectToAction(nameof(EstimationList));
+            }
+
+            lead = LeadStore.GetById(selectedLeadId);
+            if (lead is null)
+            {
+                TempData["ErrorMessage"] = "Selected lead could not be found.";
+                return RedirectToAction(nameof(EstimationList));
+            }
+        }
+
+        var entry = existing ?? new EstimationEntry { Number = LeadStore.NextEstimationNumber() };
+
+        var (attPath, attName, attError) = await FinanceAttachmentService.SaveAsync(attachment, "estimations");
+        if (attError is not null)
+        {
+            TempData["ErrorMessage"] = attError;
+            return RedirectToAction(nameof(EstimationList));
+        }
+
+        if (!string.IsNullOrWhiteSpace(attPath))
+        {
+            FinanceAttachmentService.Delete(entry.AttachmentPath);
+            entry.AttachmentPath = attPath;
+            entry.AttachmentFileName = attName;
+        }
+
+        entry.Date = !string.IsNullOrWhiteSpace(entry.Date) ? entry.Date : DateTime.UtcNow.ToString("yyyy-MM-dd");
+        entry.LeadCustomer = $"{lead.LeadName} ({lead.CompanyName})";
+        entry.Notes = notes ?? "";
+        entry.Status = !string.IsNullOrWhiteSpace(entry.Status) ? entry.Status : "Draft";
+
+        if (existing is null)
+        {
+            lead.Estimations.Add(entry);
+        }
+
+        await _db.SaveChangesAsync();
+        TempData["SuccessMessage"] = $"Estimation {entry.Number} saved successfully.";
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+        return RedirectToAction(nameof(EstimationList));
+    }
+
     // POST /Finance/DeleteEstimation
     [HttpPost]
-    public IActionResult DeleteEstimation(string leadId, string number)
+    public async Task<IActionResult> DeleteEstimation(string leadId, string number)
     {
         if (!CheckPermission("Estimation", "Delete"))
         {
@@ -185,6 +276,8 @@ public class FinanceController : Controller
         {
             FinanceAttachmentService.Delete(existing.AttachmentPath);
             lead!.Estimations.Remove(existing);
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Estimation {number} deleted successfully.";
         }
 
         return RedirectToAction("EstimationList");
@@ -204,7 +297,16 @@ public class FinanceController : Controller
         ViewData["Title"] = "Quotation List";
         ViewData["ActivePage"] = "FinanceQuotation";
 
+        // Apply role‑based filtering: admins/managers see all, others only their assigned leads
+        var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+        var isAdminOrManager = currentUser != null && PermissionChecker.IsAdminOrManager(User, currentUser);
+
         var rows = LeadStore.Leads
+            .Where(lead => isAdminOrManager ||
+                (lead.AssignedTo != null && currentUser != null &&
+                 (string.Equals(lead.AssignedTo.Trim(), currentUser.Name?.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(lead.AssignedTo.Trim(), currentUser.Email?.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(lead.AssignedTo.Trim(), currentUser.UserId?.Trim(), StringComparison.OrdinalIgnoreCase))))
             .SelectMany(lead => lead.Quotations.Select(q => new FinanceListRow
             {
                 LeadId = lead.LeadId,
@@ -216,6 +318,9 @@ public class FinanceController : Controller
                 Number = q.Number ?? "",
                 Total = q.GrandTotal ?? "",
                 Status = q.Status ?? "",
+                AttachmentPath = q.AttachmentPath ?? "",
+                AttachmentFileName = q.AttachmentFileName ?? "",
+                Notes = q.Notes ?? "",
             }))
             .OrderByDescending(r => r.Number)
             .ToList();
@@ -245,9 +350,88 @@ public class FinanceController : Controller
         return View(entry);
     }
 
+    // POST /Finance/SaveQuotation
+    [HttpPost]
+    public async Task<IActionResult> SaveQuotation(string? leadId, string? number, string? notes, IFormFile? attachment, string? returnUrl = null)
+    {
+        if (!CheckPermission("Quotation", "Create") && !CheckPermission("Quotation", "Edit"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to create or edit quotations.";
+            return RedirectToAction(nameof(QuotationList));
+        }
+
+        Lead? lead = null;
+        QuotationEntry? existing = null;
+        if (!string.IsNullOrWhiteSpace(number))
+        {
+            foreach (var l in LeadStore.Leads)
+            {
+                var found = l.Quotations.FirstOrDefault(q => q.Number == number);
+                if (found is not null)
+                {
+                    lead = l;
+                    existing = found;
+                    break;
+                }
+            }
+        }
+
+        if (lead is null)
+        {
+            var selectedLeadId = !string.IsNullOrWhiteSpace(leadId) ? leadId : LeadStore.Leads.FirstOrDefault()?.LeadId;
+            if (string.IsNullOrWhiteSpace(selectedLeadId))
+            {
+                TempData["ErrorMessage"] = "Please create or select a lead before adding a quotation.";
+                return RedirectToAction(nameof(QuotationList));
+            }
+
+            lead = LeadStore.GetById(selectedLeadId);
+            if (lead is null)
+            {
+                TempData["ErrorMessage"] = "Selected lead could not be found.";
+                return RedirectToAction(nameof(QuotationList));
+            }
+        }
+
+        var entry = existing ?? new QuotationEntry { Number = LeadStore.NextQuotationNumber() };
+
+        var (attPath, attName, attError) = await FinanceAttachmentService.SaveAsync(attachment, "quotations");
+        if (attError is not null)
+        {
+            TempData["ErrorMessage"] = attError;
+            return RedirectToAction(nameof(QuotationList));
+        }
+
+        if (!string.IsNullOrWhiteSpace(attPath))
+        {
+            FinanceAttachmentService.Delete(entry.AttachmentPath);
+            entry.AttachmentPath = attPath;
+            entry.AttachmentFileName = attName;
+        }
+
+        entry.Date = !string.IsNullOrWhiteSpace(entry.Date) ? entry.Date : DateTime.UtcNow.ToString("yyyy-MM-dd");
+        entry.LeadCustomer = $"{lead.LeadName} ({lead.CompanyName})";
+        entry.Notes = notes ?? "";
+        entry.Status = !string.IsNullOrWhiteSpace(entry.Status) ? entry.Status : "Draft";
+
+        if (existing is null)
+        {
+            lead.Quotations.Add(entry);
+        }
+
+        await _db.SaveChangesAsync();
+        TempData["SuccessMessage"] = $"Quotation {entry.Number} saved successfully.";
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+        return RedirectToAction(nameof(QuotationList));
+    }
+
     // POST /Finance/DeleteQuotation
     [HttpPost]
-    public IActionResult DeleteQuotation(string leadId, string number)
+    public async Task<IActionResult> DeleteQuotation(string leadId, string number)
     {
         if (!CheckPermission("Quotation", "Delete"))
         {
@@ -261,6 +445,8 @@ public class FinanceController : Controller
         {
             FinanceAttachmentService.Delete(existing.AttachmentPath);
             lead!.Quotations.Remove(existing);
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Quotation {number} deleted successfully.";
         }
 
         return RedirectToAction("QuotationList");
@@ -280,7 +466,16 @@ public class FinanceController : Controller
         ViewData["Title"] = "Proposal List";
         ViewData["ActivePage"] = "FinanceProposal";
 
+        // Apply role‑based filtering: admins/managers see all, others only their assigned leads
+        var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+        var isAdminOrManager = currentUser != null && PermissionChecker.IsAdminOrManager(User, currentUser);
+
         var rows = LeadStore.Leads
+            .Where(lead => isAdminOrManager ||
+                (lead.AssignedTo != null && currentUser != null &&
+                 (string.Equals(lead.AssignedTo.Trim(), currentUser.Name?.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(lead.AssignedTo.Trim(), currentUser.Email?.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                  string.Equals(lead.AssignedTo.Trim(), currentUser.UserId?.Trim(), StringComparison.OrdinalIgnoreCase))))
             .SelectMany(lead => lead.Proposals.Select(p => new FinanceListRow
             {
                 LeadId = lead.LeadId,
@@ -292,6 +487,9 @@ public class FinanceController : Controller
                 Number = p.Number ?? "",
                 Total = p.Budget ?? "",
                 Status = p.Status ?? "",
+                AttachmentPath = p.AttachmentPath ?? "",
+                AttachmentFileName = p.AttachmentFileName ?? "",
+                Notes = p.Notes ?? p.Description ?? "",
             }))
             .OrderByDescending(r => r.Number)
             .ToList();
@@ -321,9 +519,90 @@ public class FinanceController : Controller
         return View(entry);
     }
 
+    // POST /Finance/SaveProposal
+    [HttpPost]
+    public async Task<IActionResult> SaveProposal(string? leadId, string? number, string? notes, IFormFile? attachment, string? returnUrl = null)
+    {
+        if (!CheckPermission("Proposal", "Create") && !CheckPermission("Proposal", "Edit"))
+        {
+            TempData["ErrorMessage"] = "Access Denied: You do not have permission to create or edit proposals.";
+            return RedirectToAction(nameof(ProposalList));
+        }
+
+        Lead? lead = null;
+        ProposalEntry? existing = null;
+        if (!string.IsNullOrWhiteSpace(number))
+        {
+            foreach (var l in LeadStore.Leads)
+            {
+                var found = l.Proposals.FirstOrDefault(p => p.Number == number);
+                if (found is not null)
+                {
+                    lead = l;
+                    existing = found;
+                    break;
+                }
+            }
+        }
+
+        if (lead is null)
+        {
+            var selectedLeadId = !string.IsNullOrWhiteSpace(leadId) ? leadId : LeadStore.Leads.FirstOrDefault()?.LeadId;
+            if (string.IsNullOrWhiteSpace(selectedLeadId))
+            {
+                TempData["ErrorMessage"] = "Please create or select a lead before adding a proposal.";
+                return RedirectToAction(nameof(ProposalList));
+            }
+
+            lead = LeadStore.GetById(selectedLeadId);
+            if (lead is null)
+            {
+                TempData["ErrorMessage"] = "Selected lead could not be found.";
+                return RedirectToAction(nameof(ProposalList));
+            }
+        }
+
+        var entry = existing ?? new ProposalEntry { Number = LeadStore.NextProposalNumber() };
+
+        var (attPath, attName, attError) = await FinanceAttachmentService.SaveAsync(attachment, "proposals");
+        if (attError is not null)
+        {
+            TempData["ErrorMessage"] = attError;
+            return RedirectToAction(nameof(ProposalList));
+        }
+
+        if (!string.IsNullOrWhiteSpace(attPath))
+        {
+            FinanceAttachmentService.Delete(entry.AttachmentPath);
+            entry.AttachmentPath = attPath;
+            entry.AttachmentFileName = attName;
+        }
+
+        entry.Date = !string.IsNullOrWhiteSpace(entry.Date) ? entry.Date : DateTime.UtcNow.ToString("yyyy-MM-dd");
+        entry.LeadCustomer = $"{lead.LeadName} ({lead.CompanyName})";
+        entry.Title = !string.IsNullOrWhiteSpace(entry.Title) ? entry.Title : "Proposal";
+        entry.Notes = notes ?? "";
+        entry.Description = notes ?? "";
+        entry.Status = !string.IsNullOrWhiteSpace(entry.Status) ? entry.Status : "Draft";
+
+        if (existing is null)
+        {
+            lead.Proposals.Add(entry);
+        }
+
+        await _db.SaveChangesAsync();
+        TempData["SuccessMessage"] = $"Proposal {entry.Number} saved successfully.";
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+        return RedirectToAction(nameof(ProposalList));
+    }
+
     // POST /Finance/DeleteProposal
     [HttpPost]
-    public IActionResult DeleteProposal(string leadId, string number)
+    public async Task<IActionResult> DeleteProposal(string leadId, string number)
     {
         if (!CheckPermission("Proposal", "Delete"))
         {
@@ -337,6 +616,8 @@ public class FinanceController : Controller
         {
             FinanceAttachmentService.Delete(existing.AttachmentPath);
             lead!.Proposals.Remove(existing);
+            await _db.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Proposal {number} deleted successfully.";
         }
 
         return RedirectToAction("ProposalList");
@@ -355,4 +636,7 @@ public class FinanceListRow
     public string Number { get; set; } = "";
     public string Total { get; set; } = "0";
     public string Status { get; set; } = "";
+    public string AttachmentPath { get; set; } = "";
+    public string AttachmentFileName { get; set; } = "";
+    public string Notes { get; set; } = "";
 }

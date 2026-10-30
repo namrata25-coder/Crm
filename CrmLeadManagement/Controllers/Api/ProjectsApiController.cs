@@ -59,6 +59,8 @@ public class ProjectsApiController : ControllerBase
                 .Include(p => p.Milestones)
                     .ThenInclude(m => m.Tasks)
                 .Include(p => p.Tasks)
+                .Include(p => p.Invoices)
+                    .ThenInclude(i => i.Payments)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status))
@@ -103,7 +105,7 @@ public class ProjectsApiController : ControllerBase
             }
 
             var projects = await query.OrderByDescending(p => p.Id).ToListAsync();
-            return Ok(projects);
+            return Ok(ProjectAccessPolicy.FilterAccessible(_db, User, projects));
         }
         catch (Exception ex)
         {
@@ -125,7 +127,7 @@ public class ProjectsApiController : ControllerBase
                 .Include(p => p.Invoices)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
-            if (project is null)
+            if (project is null || !ProjectAccessPolicy.CanAccess(_db, User, project))
                 return NotFound(new { message = $"Project with ID {id} not found." });
 
             return Ok(project);
@@ -146,6 +148,11 @@ public class ProjectsApiController : ControllerBase
             if (string.IsNullOrWhiteSpace(input.ProjectName))
                 return BadRequest(new { message = "ProjectName is required." });
 
+            var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+            var isAdmin = PermissionChecker.IsAdminOrManager(User, currentUser);
+            if (!isAdmin && currentUser is null)
+                return Forbid();
+
             var project = new WorkProject
             {
                 ProjectCode     = NextProjectCode(),
@@ -156,7 +163,7 @@ public class ProjectsApiController : ControllerBase
                 Description     = input.Description?.Trim() ?? "",
                 StartDate       = input.StartDate?.Trim() ?? "",
                 Deadline        = input.Deadline?.Trim() ?? "",
-                ProjectManager  = input.ProjectManager?.Trim() ?? "",
+                ProjectManager  = isAdmin ? input.ProjectManager?.Trim() ?? "" : currentUser!.Name?.Trim() ?? "",
                 AssignedMembers = input.AssignedMembers?.Trim() ?? "",
                 Budget          = Math.Max(0, input.Budget),
                 Priority        = string.IsNullOrWhiteSpace(input.Priority) ? "Medium" : input.Priority,
@@ -184,12 +191,14 @@ public class ProjectsApiController : ControllerBase
         try
         {
             var project = await _db.WorkProjects.FindAsync(id);
-            if (project is null)
+            if (project is null || !ProjectAccessPolicy.CanAccess(_db, User, project))
                 return NotFound(new { message = $"Project with ID {id} not found." });
 
             if (string.IsNullOrWhiteSpace(input.ProjectName))
                 return BadRequest(new { message = "ProjectName is required." });
 
+            var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+            var isAdmin = PermissionChecker.IsAdminOrManager(User, currentUser);
             project.ProjectName     = input.ProjectName?.Trim() ?? project.ProjectName;
             project.ClientName      = input.ClientName?.Trim() ?? "";
             project.ClientCompany   = input.ClientCompany?.Trim() ?? "";
@@ -197,7 +206,7 @@ public class ProjectsApiController : ControllerBase
             project.Description     = input.Description?.Trim() ?? "";
             project.StartDate       = input.StartDate?.Trim() ?? "";
             project.Deadline        = input.Deadline?.Trim() ?? "";
-            project.ProjectManager  = input.ProjectManager?.Trim() ?? "";
+            project.ProjectManager  = isAdmin ? input.ProjectManager?.Trim() ?? "" : currentUser!.Name?.Trim() ?? "";
             project.AssignedMembers = input.AssignedMembers?.Trim() ?? "";
             project.Budget          = Math.Max(0, input.Budget);
             project.Priority        = string.IsNullOrWhiteSpace(input.Priority) ? project.Priority : input.Priority;
@@ -227,7 +236,7 @@ public class ProjectsApiController : ControllerBase
                 .Include(p => p.Invoices)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
-            if (project is null)
+            if (project is null || !ProjectAccessPolicy.CanAccess(_db, User, project))
                 return NotFound(new { message = $"Project with ID {id} not found." });
 
             _db.WorkProjects.Remove(project);

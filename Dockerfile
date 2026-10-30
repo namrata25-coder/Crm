@@ -3,12 +3,11 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy project file and restore dependencies
-COPY ["CrmLeadManagement/CrmLeadManagement.csproj", "CrmLeadManagement/"]
-RUN dotnet restore "CrmLeadManagement/CrmLeadManagement.csproj"
+COPY ["CrmLeadManagement.csproj", "./"]
+RUN dotnet restore "CrmLeadManagement.csproj"
 
 # Copy all source files and publish release
 COPY . .
-WORKDIR "/src/CrmLeadManagement"
 RUN dotnet publish "CrmLeadManagement.csproj" -c Release -o /app/publish --no-restore
 
 # Stage 2: Runtime
@@ -29,3 +28,4 @@ RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["dotnet", "CrmLeadManagement.dll"]
+

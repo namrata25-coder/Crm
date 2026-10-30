@@ -184,8 +184,8 @@ public class UserController : Controller
 
         if (user == null)
         {
-            _logger.LogWarning("User login failed: unregistered User ID '{Input}' from IP {IP}", input, ip);
-            const string unregMsg = "Invalid User ID or Password. Please register first if you don't have an account.";
+            _logger.LogWarning("User login failed: unknown User ID '{Input}' from IP {IP}", input, ip);
+            const string unregMsg = "Invalid User ID or Password.";
             if (isAjax) return Unauthorized(new { success = false, message = unregMsg });
             model.ErrorMessage = unregMsg;
             Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -240,7 +240,7 @@ public class UserController : Controller
             }
             await _db.SaveChangesAsync();
 
-            const string invalidMsg = "Invalid User ID or Password. Please register first if you don't have an account.";
+            const string invalidMsg = "Invalid User ID or Password.";
             if (isAjax) return Unauthorized(new { success = false, message = invalidMsg });
             model.ErrorMessage = invalidMsg;
             Response.StatusCode = StatusCodes.Status401Unauthorized;

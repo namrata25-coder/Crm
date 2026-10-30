@@ -179,8 +179,7 @@
                     <i class="bi bi-receipt"></i>
                 </div>
                 <div>
-                    <h3 id="invModalTitle" style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Create Milestone Invoice</h3>
-                    <p style="font-size:12px;color:var(--ink-500);margin:2px 0 0 0;">1 Milestone = 1 Invoice &bull; Connected directly to Database API</p>
+                    <h3 id="invModalTitle" style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Add Invoice</h3>
                 </div>
             </div>
             <button type="button" onclick="closeInvoiceModal()" style="border:none;background:transparent;color:var(--ink-400);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px;">
@@ -192,6 +191,7 @@
         <div style="padding:1.5rem;overflow-y:auto;flex:1;">
             <form id="invoiceForm" onsubmit="submitInvoiceForm(event)">
                 <input type="hidden" id="modalInvId" value="0" />
+                <input type="hidden" id="modalAmount" value="0" />
 
                 <!-- Invoice Number -->
                 <div style="margin-bottom:1rem;">
@@ -265,26 +265,96 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Project Invoice Summary (Read-Only) -->
+                    <div id="projectInvoiceSummaryBox" style="display:none;margin-top:8px;padding:9px 13px;background:#f8fafc;border:1px solid var(--line);border-radius:8px;font-size:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                        <div>
+                            <span style="color:var(--ink-500);font-weight:500;">Invoice Total:</span>
+                            <strong id="projSummaryTotal" style="color:var(--ink-900);margin-left:4px;">₹0</strong>
+                        </div>
+                        <div style="border-left:1px solid #e2e8f0;padding-left:10px;">
+                            <span style="color:#059669;font-weight:500;">Received:</span>
+                            <strong id="projSummaryReceived" style="color:#059669;margin-left:4px;">₹0</strong>
+                        </div>
+                        <div style="border-left:1px solid #e2e8f0;padding-left:10px;">
+                            <span style="color:#dc2626;font-weight:500;">Due:</span>
+                            <strong id="projSummaryDue" style="color:#dc2626;margin-left:4px;">₹0</strong>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- 3. AUTOMATIC MILESTONE NAME (Dropdown & Auto-select) -->
+                <!-- Project Type -->
                 <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                        Project Type
+                    </label>
+                    <select id="modalProjectType" onchange="onProjectTypeDropdownChange(this.value)"
+                            style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:var(--ink-800);">
+                        <option value="Direct Project">Direct Project</option>
+                        <option value="Milestone Based Project">Milestone</option>
+                        <option value="Task Based Project">Task</option>
+                    </select>
+                </div>
+
+
+
+                <!-- 3B. MILESTONE BASED PROJECT: MILESTONE NAME & MILESTONE AMOUNT -->
+                <div id="milestoneSection" style="display:none;margin-bottom:1rem;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
                         <label style="font-size:12.5px;font-weight:600;color:var(--ink-700);margin:0;">
-                            3. Milestone Name <span style="color:#ef4444;">*</span> <small style="color:var(--brand-600);font-weight:600;">(1 Milestone = 1 Invoice)</small>
+                            Milestone Name <span style="color:#ef4444;">*</span>
                         </label>
                         <span id="modalMilestoneCountBadge" style="font-size:11px;color:var(--brand-600);font-weight:600;"></span>
                     </div>
-                    <select id="modalMilestoneSelect" required onchange="onMilestoneDropdownChange()"
+                    <select id="modalMilestoneSelect" onchange="onMilestoneDropdownChange()"
                             style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;outline:none;">
                         <option value="">-- Select Project First --</option>
                     </select>
-                    <input type="hidden" id="modalMilestoneId" name="milestoneId" required />
+                    <input type="hidden" id="modalMilestoneId" name="milestoneId" />
                     <input type="hidden" id="modalMilestoneName" name="milestoneName" />
+
+                    <div id="milestoneAmountContainer" style="margin-top:10px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                            <label style="font-size:12.5px;font-weight:600;color:var(--ink-700);margin:0;">
+                                Milestone Amount (₹) <span style="color:#ef4444;">*</span>
+                            </label>
+                            <span id="milestoneAutoHint" style="font-size:10.5px;color:var(--brand-600);font-weight:600;display:none;">Auto-calculated</span>
+                        </div>
+                        <input type="number" id="modalMilestoneAmount" step="0.01" min="0" readonly placeholder="0.00"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;background:#f8fafc;color:var(--ink-800);cursor:not-allowed;" />
+                    </div>
 
                     <div id="modalMilestoneMessage" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;"></div>
                     <div id="milestoneWarning" style="display:none;font-size:11.5px;color:#dc2626;font-weight:600;margin-top:4px;">
                         <i class="bi bi-exclamation-triangle"></i> An invoice already exists for this milestone.
+                    </div>
+                </div>
+
+                <!-- 3C. TASK BASED PROJECT: TASK SELECTION & TASK AMOUNT -->
+                <div id="taskSection" style="display:none;margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                        <label style="font-size:12.5px;font-weight:600;color:var(--ink-700);margin:0;">
+                            Select Completed Tasks <span style="color:#ef4444;">*</span> <small style="color:var(--brand-600);font-weight:600;">(Completed & Unbilled)</small>
+                        </label>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <button type="button" class="btn btn-outline" onclick="toggleSelectAllTasks(true)" style="padding:2px 7px;font-size:11px;font-weight:600;background:#fff;">Select All</button>
+                            <button type="button" class="btn btn-outline" onclick="toggleSelectAllTasks(false)" style="padding:2px 7px;font-size:11px;font-weight:600;background:#fff;">Deselect All</button>
+                            <span id="taskCountBadge" style="font-size:11px;color:var(--brand-600);font-weight:600;"></span>
+                        </div>
+                    </div>
+                    <div id="taskListContainer" style="border:1px solid var(--line);border-radius:8px;max-height:220px;overflow-y:auto;background:#fff;">
+                        <div style="padding:15px;text-align:center;color:var(--ink-400);font-size:12.5px;">
+                            Select a project to load tasks.
+                        </div>
+                    </div>
+                    <div id="taskMessage" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;"></div>
+
+                    <div id="taskAmountContainer" style="margin-top:10px;">
+                        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-700);margin-bottom:5px;">
+                            Task Amount (₹) <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="number" id="modalTaskAmount" step="0.01" min="0" readonly placeholder="0.00"
+                               style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;background:#f8fafc;color:var(--ink-800);cursor:not-allowed;" />
                     </div>
                 </div>
 
@@ -312,16 +382,7 @@
                     <div style="font-size:12px;font-weight:700;color:var(--ink-600);text-transform:uppercase;margin-bottom:10px;letter-spacing:0.5px;">
                         Amount & Tax Calculation
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
-                        <div>
-                            <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
-                                Subtotal (₹) <span style="color:#ef4444;">*</span>
-                            </label>
-                            <input type="number" id="modalAmount" step="0.01" min="0" required oninput="calculateTotals()"
-                                   style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;" />
-                            <span id="milestoneAutoHint" style="font-size:10.5px;color:var(--brand-600);font-weight:600;display:none;">From milestone database</span>
-                        </div>
-
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                         <div>
                             <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-700);margin-bottom:4px;">
                                 Discount (₹)
@@ -633,10 +694,13 @@
         <!-- Modal Toolbar -->
         <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:#f8fafc;">
             <div style="display:flex;align-items:center;gap:10px;">
-                <i class="bi bi-file-earmark-pdf" style="color:#dc2626;font-size:20px;"></i>
-                <h3 style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">Invoice PDF Form</h3>
+                <i class="bi bi-receipt" style="color:var(--brand-600);font-size:20px;"></i>
+                <h3 id="pdfPreviewModalTitle" style="font-size:1.15rem;font-weight:700;color:var(--ink-900);margin:0;">View Invoice Preview</h3>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
+                <a id="btnPreviewOpenFullPage" href="#" class="btn btn-outline" target="_blank" style="font-weight:600;background:#fff;text-decoration:none;">
+                    <i class="bi bi-box-arrow-up-right"></i> Open Full Page
+                </a>
                 <button class="btn btn-primary" type="button" onclick="printPdfContent()" style="font-weight:600;background:#4f46e5;">
                     <i class="bi bi-printer"></i> Print / Save as PDF
                 </button>
@@ -697,6 +761,7 @@
     let allClients = [];
     let allProjects = [];
     let currentProjectMilestones = [];
+    let currentBillableTasks = [];
 
     document.addEventListener('DOMContentLoaded', () => {
         loadInvoicesFromServer();
@@ -933,7 +998,7 @@
                     clientId: c.ClientId || c.clientId || c.LeadId || c.leadId || '',
                     leadId: c.LeadId || c.leadId || '',
                     clientName: c.ClientName || c.clientName || '',
-                    companyName: c.CompanyName || c.companyName || c.ClientName || c.clientName || '',
+                    companyName: c.CompanyName || c.companyName || '',
                     email: c.Email || c.email || '',
                     mobileNumber: c.MobileNumber || c.mobileNumber || '',
                     projectsCount: c.ProjectsCount !== undefined ? c.ProjectsCount : (c.projectsCount || 0)
@@ -956,10 +1021,12 @@
             recSelect.appendChild(defaultOpt);
 
             clients.forEach(c => {
-                const name = c.companyName || c.clientName || 'Client';
-                const extra = c.clientName && c.companyName !== c.clientName ? ` (${c.clientName})` : '';
+                const clientName = (c.clientName || '').trim();
+                const companyName = (c.companyName || '').trim();
+                const name = clientName || companyName || 'Client';
+                const extra = companyName && clientName && companyName.toLowerCase() !== clientName.toLowerCase() ? ` (${companyName})` : '';
                 const opt = document.createElement('option');
-                opt.value = name;
+                opt.value = clientName || companyName;
                 opt.textContent = name + extra;
                 recSelect.appendChild(opt);
             });
@@ -976,9 +1043,13 @@
                     id: p.Id !== undefined ? p.Id : p.id,
                     projectName: p.ProjectName || p.projectName || '',
                     projectCode: p.ProjectCode || p.projectCode || '',
+                    projectType: p.ProjectType || p.projectType || 'Direct Project',
                     clientName: p.ClientName || p.clientName || '',
                     clientCompany: p.ClientCompany || p.clientCompany || '',
                     budget: p.Budget !== undefined ? p.Budget : (p.budget || 0),
+                    invoiceTotal: Number(p.InvoiceTotal !== undefined ? p.InvoiceTotal : (p.invoiceTotal || 0)),
+                    invoiceReceived: Number(p.InvoiceReceived !== undefined ? p.InvoiceReceived : (p.invoiceReceived || 0)),
+                    invoiceDue: Number(p.InvoiceDue !== undefined ? p.InvoiceDue : Math.max(0, (p.InvoiceTotal || p.invoiceTotal || 0) - (p.InvoiceReceived || p.invoiceReceived || 0))),
                     milestones: p.Milestones || p.milestones || []
                 }));
                 currentFilteredProjects = allProjects.slice();
@@ -1042,7 +1113,7 @@
         invoices.forEach(inv => {
             const id = inv.id;
             const invNum = inv.invoiceNumber || `INV-${id}`;
-            const client = inv.clientCompany || inv.clientName || '—';
+            const client = inv.clientName || inv.clientCompany || '—';
             const proj = inv.projectName || '—';
             const milestone = inv.milestoneName || '—';
             const invDate = inv.invoiceDate || '—';
@@ -1174,12 +1245,13 @@
             actionsWrap.style.alignItems = 'center';
             actionsWrap.style.gap = '4px';
 
-            // View
-            const btnView = document.createElement('a');
-            btnView.href = `/Finance/InvoiceDetails/${id}`;
+            // View Invoice Preview
+            const btnView = document.createElement('button');
+            btnView.type = 'button';
             btnView.className = 'btn-action btn-view';
-            btnView.title = 'View Details';
+            btnView.title = 'View Invoice';
             btnView.innerHTML = '<i class="bi bi-eye"></i>';
+            btnView.onclick = () => generatePdfForInvoice(id);
             actionsWrap.appendChild(btnView);
 
             // Edit
@@ -1292,10 +1364,14 @@
         const selectedClientName = (document.getElementById('modalClientSelect')?.value || '').toLowerCase();
 
         clientsToRender.forEach(c => {
-            const displayName = c.companyName || c.clientName || 'Client';
-            const extra = c.clientName && c.companyName && c.companyName !== c.clientName ? c.clientName : (c.leadId || '');
+            const clientName = (c.clientName || '').trim();
+            const companyName = (c.companyName || '').trim();
+            const primaryName = clientName || companyName || 'Client';
+            const secondaryName = companyName && clientName && companyName.toLowerCase() !== clientName.toLowerCase() ? companyName : (companyName && !clientName ? '' : (c.leadId || ''));
             const cid = c.clientId || c.leadId || '';
-            const isSelected = (cid && cid === selectedClientId) || (displayName.toLowerCase() === selectedClientName);
+            const isSelected = (cid && cid === selectedClientId) ||
+                               (primaryName.toLowerCase() === selectedClientName) ||
+                               (companyName && companyName.toLowerCase() === selectedClientName);
 
             const item = document.createElement('div');
             item.className = 'custom-dropdown-item' + (isSelected ? ' selected' : '');
@@ -1308,10 +1384,11 @@
             item.style.alignItems = 'center';
             item.style.background = isSelected ? '#eff6ff' : '#fff';
 
+            // Display Client Name first, followed by Company Name
             item.innerHTML = `
                 <div>
-                    <div style="font-weight:600;color:var(--ink-800);">${escapeHtml(displayName)}</div>
-                    ${extra ? `<div style="font-size:11px;color:var(--ink-500);">${escapeHtml(extra)}</div>` : ''}
+                    <div style="font-weight:600;color:var(--ink-800);">${escapeHtml(primaryName)}</div>
+                    ${secondaryName ? `<div style="font-size:11.5px;color:var(--ink-500);margin-top:2px;"><i class="bi bi-building" style="font-size:10px;margin-right:4px;"></i>${escapeHtml(secondaryName)}</div>` : ''}
                 </div>
                 <span class="badge" style="font-size:10px;background:#f1f5f9;color:var(--ink-600);border:1px solid #e2e8f0;">
                     ${c.projectsCount || 0} proj
@@ -1322,7 +1399,7 @@
             item.onmouseout = () => { if (!isSelected) item.style.background = '#fff'; };
             item.onclick = (e) => {
                 e.stopPropagation();
-                selectClient(cid, displayName, c.companyName || displayName);
+                selectClient(cid, primaryName, secondaryName || companyName);
             };
 
             container.appendChild(item);
@@ -1336,8 +1413,8 @@
             return;
         }
         const filtered = allClients.filter(c =>
-            (c.companyName && c.companyName.toLowerCase().includes(q)) ||
             (c.clientName && c.clientName.toLowerCase().includes(q)) ||
+            (c.companyName && c.companyName.toLowerCase().includes(q)) ||
             (c.clientId && c.clientId.toLowerCase().includes(q)) ||
             (c.leadId && c.leadId.toLowerCase().includes(q)) ||
             (c.email && c.email.toLowerCase().includes(q))
@@ -1353,7 +1430,7 @@
 
         if (idInput) idInput.value = clientId || '';
         if (nameInput) nameInput.value = clientName || '';
-        const displayText = clientCompany || clientName || '-- Select Client --';
+        const displayText = clientName ? (clientCompany && clientCompany.toLowerCase() !== clientName.toLowerCase() ? `${clientName} (${clientCompany})` : clientName) : (clientCompany || '-- Select Client --');
         if (textSpan) {
             textSpan.textContent = displayText;
             textSpan.style.color = 'var(--ink-900)';
@@ -1441,16 +1518,26 @@
             item.style.alignItems = 'center';
             item.style.background = isSelected ? '#eff6ff' : '#fff';
 
-            const codePrefix = p.projectCode ? p.projectCode + ' - ' : '';
-            const clientLabel = p.clientCompany || p.clientName || '';
+            const total = Number(p.invoiceTotal || 0);
+            const received = Number(p.invoiceReceived || 0);
+            const due = Number(p.invoiceDue !== undefined ? p.invoiceDue : Math.max(0, total - received));
+
+            const totalStr = '₹' + Math.round(total).toLocaleString('en-IN');
+            const receivedStr = '₹' + Math.round(received).toLocaleString('en-IN');
+            const dueStr = '₹' + Math.round(due).toLocaleString('en-IN');
+            const summaryStr = `Total ${totalStr} | Received ${receivedStr} | Due ${dueStr}`;
+            const projTitle = `${p.projectName || 'Project'} - ${summaryStr}`;
+
+            const clientLabel = p.clientName ? (p.clientCompany && p.clientCompany.toLowerCase() !== p.clientName.toLowerCase() ? `${p.clientName} (${p.clientCompany})` : p.clientName) : (p.clientCompany || '');
+            const typeLabel = p.projectType || 'Direct Project';
 
             item.innerHTML = `
                 <div>
-                    <div style="font-weight:600;color:var(--ink-800);">${escapeHtml(codePrefix + (p.projectName || 'Project'))}</div>
-                    <div style="font-size:11px;color:var(--ink-500);">${clientLabel ? escapeHtml(clientLabel) + ' &bull; ' : ''}Budget: ${formatCurrency(p.budget || 0)}</div>
+                    <div style="font-weight:600;color:var(--ink-800);font-size:13px;">${escapeHtml(projTitle)}</div>
+                    <div style="font-size:11px;color:var(--ink-500);margin-top:2px;">${clientLabel ? escapeHtml(clientLabel) + ' &bull; ' : ''}Type: <span style="font-weight:600;color:var(--brand-600);">${escapeHtml(typeLabel)}</span></div>
                 </div>
                 <span class="badge" style="font-size:10px;background:#f1f5f9;color:var(--ink-600);border:1px solid #e2e8f0;">
-                    ${(p.milestones ? p.milestones.length : 0)} MLS
+                    ${escapeHtml(typeLabel)}
                 </span>
             `;
 
@@ -1476,9 +1563,294 @@
             (p.projectName && p.projectName.toLowerCase().includes(q)) ||
             (p.projectCode && p.projectCode.toLowerCase().includes(q)) ||
             (p.clientName && p.clientName.toLowerCase().includes(q)) ||
-            (p.clientCompany && p.clientCompany.toLowerCase().includes(q))
+            (p.clientCompany && p.clientCompany.toLowerCase().includes(q)) ||
+            (p.projectType && p.projectType.toLowerCase().includes(q))
         );
         renderProjectOptions(filtered);
+    }
+
+    function getNormalizedProjectType(type) {
+        if (!type) return 'Direct Project';
+        const t = String(type).trim().toLowerCase();
+        if (t.includes('milestone')) return 'Milestone Based Project';
+        if (t.includes('task')) return 'Task Based Project';
+        return 'Direct Project';
+    }
+
+    function onProjectTypeDropdownChange(val) {
+        const normType = getNormalizedProjectType(val);
+        applyProjectTypeFormLayout(normType, false);
+        const projectId = parseInt(document.getElementById('modalProjectSelect')?.value, 10);
+        if (projectId) {
+            const project = allProjects.find(p => p.id === projectId);
+            if (normType === 'Milestone Based Project') {
+                resetTaskSection();
+                const budgetInput = document.getElementById('modalBudget');
+                if (budgetInput) budgetInput.value = '';
+                loadMilestonesForProject(projectId);
+            } else if (normType === 'Task Based Project') {
+                resetMilestoneDropdown();
+                const budgetInput = document.getElementById('modalBudget');
+                if (budgetInput) budgetInput.value = '';
+                loadBillableTasksForProject(projectId);
+            } else {
+                resetMilestoneDropdown();
+                resetTaskSection();
+                const bVal = project && project.budget ? Number(project.budget) : '';
+                const bInput = document.getElementById('modalBudget');
+                if (bInput) bInput.value = bVal;
+                const bHint = document.getElementById('budgetAutoHint');
+                if (bHint) bHint.style.display = bVal ? 'inline' : 'none';
+                const amtInput = document.getElementById('modalAmount');
+                if (amtInput) amtInput.value = bVal;
+                calculateTotals();
+            }
+        } else {
+            if (normType === 'Direct Project') {
+                resetMilestoneDropdown();
+                resetTaskSection();
+            } else if (normType === 'Milestone Based Project') {
+                resetTaskSection();
+                const budgetInput = document.getElementById('modalBudget');
+                if (budgetInput) budgetInput.value = '';
+            } else if (normType === 'Task Based Project') {
+                resetMilestoneDropdown();
+                const budgetInput = document.getElementById('modalBudget');
+                if (budgetInput) budgetInput.value = '';
+            }
+        }
+    }
+
+    function applyProjectTypeFormLayout(projectType, isEdit = false) {
+        const normType = getNormalizedProjectType(projectType);
+        const directSec = document.getElementById('directBudgetSection');
+        const milestoneSec = document.getElementById('milestoneSection');
+        const taskSec = document.getElementById('taskSection');
+        const modalAmount = document.getElementById('modalAmount');
+        const modalBudget = document.getElementById('modalBudget');
+        const modalMsSelect = document.getElementById('modalMilestoneSelect');
+        const modalMsId = document.getElementById('modalMilestoneId');
+        const autoHint = document.getElementById('milestoneAutoHint');
+        const titleEl = document.getElementById('invModalTitle');
+        const amountLabelText = document.getElementById('modalAmountLabelText');
+
+        if (titleEl && !isEdit) {
+            titleEl.textContent = 'Add Invoice';
+        }
+
+        const projTypeSelect = document.getElementById('modalProjectType');
+        if (projTypeSelect && projTypeSelect.value !== normType) {
+            projTypeSelect.value = normType;
+        }
+
+        if (normType === 'Milestone Based Project') {
+            if (directSec) directSec.style.display = 'none';
+            if (milestoneSec) milestoneSec.style.display = 'block';
+            if (taskSec) taskSec.style.display = 'none';
+            if (modalMsSelect) modalMsSelect.required = true;
+            if (modalMsId) modalMsId.required = true;
+            if (modalBudget) modalBudget.required = false;
+
+            if (modalAmount) {
+                modalAmount.readOnly = true;
+                modalAmount.style.background = '#f8fafc';
+                modalAmount.style.cursor = 'not-allowed';
+            }
+            if (amountLabelText) {
+                amountLabelText.textContent = 'Subtotal (₹)';
+            }
+        } else if (normType === 'Task Based Project') {
+            if (directSec) directSec.style.display = 'none';
+            if (milestoneSec) milestoneSec.style.display = 'none';
+            if (taskSec) taskSec.style.display = 'block';
+            if (modalMsSelect) { modalMsSelect.required = false; modalMsSelect.value = ''; }
+            if (modalMsId) { modalMsId.required = false; modalMsId.value = ''; }
+            if (modalBudget) modalBudget.required = false;
+            if (autoHint) autoHint.style.display = 'none';
+
+            if (modalAmount) {
+                modalAmount.readOnly = true;
+                modalAmount.style.background = '#f8fafc';
+                modalAmount.style.cursor = 'not-allowed';
+            }
+            if (amountLabelText) {
+                amountLabelText.textContent = 'Subtotal (₹)';
+            }
+        } else {
+            // Direct Project
+            if (directSec) directSec.style.display = 'block';
+            if (milestoneSec) milestoneSec.style.display = 'none';
+            if (taskSec) taskSec.style.display = 'none';
+            if (modalMsSelect) { modalMsSelect.required = false; modalMsSelect.value = ''; }
+            if (modalMsId) { modalMsId.required = false; modalMsId.value = ''; }
+            if (autoHint) autoHint.style.display = 'none';
+            if (modalBudget) modalBudget.required = true;
+
+            if (modalAmount) {
+                modalAmount.readOnly = true;
+                modalAmount.style.background = '#f8fafc';
+                modalAmount.style.cursor = 'not-allowed';
+            }
+            if (amountLabelText) {
+                amountLabelText.textContent = 'Subtotal (₹)';
+            }
+        }
+    }
+
+    function onBudgetChange(val) {
+        const amtInput = document.getElementById('modalAmount');
+        if (amtInput) {
+            amtInput.value = val;
+        }
+        calculateTotals();
+    }
+
+    function onModalAmountInput() {
+        const amtVal = document.getElementById('modalAmount')?.value || '';
+        const bInput = document.getElementById('modalBudget');
+        if (bInput && document.getElementById('directBudgetSection')?.style.display !== 'none') {
+            bInput.value = amtVal;
+        }
+        calculateTotals();
+    }
+
+    function resetTaskSection() {
+        currentBillableTasks = [];
+        const container = document.getElementById('taskListContainer');
+        if (container) {
+            container.innerHTML = '<div style="padding:15px;text-align:center;color:var(--ink-400);font-size:12.5px;">Select a project to load tasks.</div>';
+        }
+        const badge = document.getElementById('taskCountBadge');
+        if (badge) badge.textContent = '';
+        const msg = document.getElementById('taskMessage');
+        if (msg) { msg.style.display = 'none'; msg.innerHTML = ''; }
+        const taskAmtInput = document.getElementById('modalTaskAmount');
+        if (taskAmtInput) taskAmtInput.value = '';
+    }
+
+    async function loadBillableTasksForProject(projectId, preselectedIds = []) {
+        const container = document.getElementById('taskListContainer');
+        const badge = document.getElementById('taskCountBadge');
+        const msg = document.getElementById('taskMessage');
+        const amtInput = document.getElementById('modalAmount');
+        const taskAmtInput = document.getElementById('modalTaskAmount');
+
+        if (!container) return;
+
+        container.innerHTML = '<div style="padding:15px;text-align:center;color:var(--ink-400);font-size:12.5px;"><i class="bi bi-arrow-repeat spin"></i> Loading billable tasks...</div>';
+        if (badge) badge.textContent = '';
+        if (msg) msg.style.display = 'none';
+
+        try {
+            const res = await fetch(`/api/invoices/billable-tasks?projectId=${projectId}`);
+            const rawTasks = res.ok ? await res.json() : [];
+            currentBillableTasks = (Array.isArray(rawTasks) ? rawTasks : []).map(t => ({
+                id: t.Id !== undefined ? t.Id : t.id,
+                taskCode: t.TaskCode || t.taskCode || '',
+                taskName: t.TaskName || t.taskName || 'Untitled Task',
+                taskAmount: Number(t.TaskAmount !== undefined ? t.TaskAmount : (t.taskAmount || 0)),
+                dueDate: t.DueDate || t.dueDate || ''
+            }));
+
+            if (badge) {
+                badge.textContent = `${currentBillableTasks.length} Completed & Unbilled`;
+            }
+
+            if (currentBillableTasks.length === 0) {
+                container.innerHTML = '<div style="padding:15px;text-align:center;color:var(--ink-400);font-size:12.5px;">No completed, unbilled tasks found for this project.</div>';
+                if (amtInput && (!preselectedIds || preselectedIds.length === 0)) amtInput.value = '0';
+                if (taskAmtInput && (!preselectedIds || preselectedIds.length === 0)) taskAmtInput.value = '0';
+                calculateTotals();
+                if (msg) {
+                    msg.style.display = 'block';
+                    msg.style.background = '#fef2f2';
+                    msg.style.border = '1px solid #fecaca';
+                    msg.style.color = '#dc2626';
+                    msg.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> No billable tasks available. Complete tasks in the project first.';
+                }
+                return;
+            }
+
+            container.innerHTML = '';
+            currentBillableTasks.forEach(task => {
+                const isChecked = Array.isArray(preselectedIds) && preselectedIds.includes(task.id);
+                const row = document.createElement('label');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.justifyContent = 'space-between';
+                row.style.padding = '8px 12px';
+                row.style.borderBottom = '1px solid #f1f5f9';
+                row.style.cursor = 'pointer';
+                row.style.margin = '0';
+                row.style.transition = 'background 0.15s ease';
+
+                row.onmouseover = () => row.style.background = '#f8fafc';
+                row.onmouseout = () => row.style.background = '#fff';
+
+                const codeStr = task.taskCode ? `[${escapeHtml(task.taskCode)}] ` : '';
+                const dueStr = task.dueDate ? ` &bull; Due: ${escapeHtml(task.dueDate)}` : '';
+
+                row.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="checkbox" class="billable-task-checkbox" value="${task.id}" ${isChecked ? 'checked' : ''} onchange="onTaskCheckboxChange()" style="cursor:pointer;width:15px;height:15px;" />
+                        <div>
+                            <div style="font-size:12.5px;font-weight:600;color:var(--ink-800);">${codeStr}${escapeHtml(task.taskName)}</div>
+                            <div style="font-size:11px;color:var(--ink-500);">Amount: ${formatCurrency(task.taskAmount)}${dueStr}</div>
+                        </div>
+                    </div>
+                    <span style="font-size:12px;font-weight:700;color:var(--ink-900);">${formatCurrency(task.taskAmount)}</span>
+                `;
+                container.appendChild(row);
+            });
+
+            onTaskCheckboxChange();
+
+        } catch (err) {
+            console.error(err);
+            container.innerHTML = '<div style="padding:15px;text-align:center;color:#dc2626;font-size:12.5px;">Failed to load billable tasks.</div>';
+        }
+    }
+
+    function onTaskCheckboxChange() {
+        const checkboxes = document.querySelectorAll('.billable-task-checkbox:checked');
+        let total = 0;
+        const selectedTaskNames = [];
+        checkboxes.forEach(cb => {
+            const tId = parseInt(cb.value, 10);
+            const t = currentBillableTasks.find(x => x.id === tId);
+            if (t) {
+                total += t.taskAmount;
+                selectedTaskNames.push(t.taskName);
+            }
+        });
+
+        const amtInput = document.getElementById('modalAmount');
+        if (amtInput) {
+            amtInput.value = total;
+        }
+        const taskAmtInput = document.getElementById('modalTaskAmount');
+        if (taskAmtInput) {
+            taskAmtInput.value = total;
+        }
+
+        const notesInput = document.getElementById('modalNotes');
+        if (notesInput && (!notesInput.value || notesInput.value.startsWith('Invoice for Tasks:'))) {
+            if (selectedTaskNames.length > 0) {
+                notesInput.value = `Invoice for Tasks: ${selectedTaskNames.join(', ')}`;
+            } else {
+                notesInput.value = '';
+            }
+        }
+
+        calculateTotals();
+    }
+
+    function toggleSelectAllTasks(selectAll) {
+        const checkboxes = document.querySelectorAll('.billable-task-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = selectAll;
+        });
+        onTaskCheckboxChange();
     }
 
     function selectProject(projectId) {
@@ -1488,35 +1860,63 @@
         const projIdInput = document.getElementById('modalProjectSelect');
         const projText = document.getElementById('projectSelectText');
         const projClear = document.getElementById('projectClearBtn');
+        const projTypeInput = document.getElementById('modalProjectType');
 
         if (projIdInput) projIdInput.value = project.id;
-        const codePrefix = project.projectCode ? project.projectCode + ' - ' : '';
+
+        const total = Number(project.invoiceTotal || 0);
+        const received = Number(project.invoiceReceived || 0);
+        const due = Number(project.invoiceDue !== undefined ? project.invoiceDue : Math.max(0, total - received));
+
+        const totalStr = '₹' + Math.round(total).toLocaleString('en-IN');
+        const receivedStr = '₹' + Math.round(received).toLocaleString('en-IN');
+        const dueStr = '₹' + Math.round(due).toLocaleString('en-IN');
+        const summaryStr = `Total ${totalStr} | Received ${receivedStr} | Due ${dueStr}`;
+
         if (projText) {
-            projText.textContent = codePrefix + project.projectName;
+            projText.textContent = `${project.projectName} - ${summaryStr}`;
             projText.style.color = 'var(--ink-900)';
             projText.style.fontWeight = '600';
         }
         if (projClear) projClear.style.display = 'inline';
 
+        const summaryBox = document.getElementById('projectInvoiceSummaryBox');
+        if (summaryBox) {
+            const elTot = document.getElementById('projSummaryTotal');
+            const elRec = document.getElementById('projSummaryReceived');
+            const elDue = document.getElementById('projSummaryDue');
+            if (elTot) elTot.textContent = totalStr;
+            if (elRec) elRec.textContent = receivedStr;
+            if (elDue) elDue.textContent = dueStr;
+            summaryBox.style.display = 'flex';
+        }
+
+        const projectType = project.projectType || 'Direct Project';
+        const normType = getNormalizedProjectType(projectType);
+        if (projTypeInput) projTypeInput.value = normType;
+
         const menu = document.getElementById('projectDropdownMenu');
         if (menu) menu.style.display = 'none';
 
-        // Auto-populate client if not already selected
+        // Auto-populate client if not already selected (prefer Client Name first)
         const currentClient = (document.getElementById('modalClientSelect')?.value || '').trim();
-        const targetClient = project.clientCompany || project.clientName;
-        if (!currentClient && targetClient) {
+        const targetClientName = project.clientName || '';
+        const targetClientCompany = project.clientCompany || '';
+        if (!currentClient && (targetClientName || targetClientCompany)) {
             const matchedClient = allClients.find(c =>
-                (c.companyName && c.companyName.toLowerCase() === targetClient.toLowerCase()) ||
-                (c.clientName && c.clientName.toLowerCase() === targetClient.toLowerCase())
+                (targetClientName && c.clientName && c.clientName.toLowerCase() === targetClientName.toLowerCase()) ||
+                (targetClientCompany && c.companyName && c.companyName.toLowerCase() === targetClientCompany.toLowerCase()) ||
+                (targetClientName && c.companyName && c.companyName.toLowerCase() === targetClientName.toLowerCase())
             );
             if (matchedClient) {
                 selectClient(matchedClient.clientId || matchedClient.leadId, matchedClient.clientName, matchedClient.companyName);
             } else {
                 document.getElementById('modalClientId').value = '';
-                document.getElementById('modalClientSelect').value = targetClient;
+                document.getElementById('modalClientSelect').value = targetClientName || targetClientCompany;
                 const clientText = document.getElementById('clientSelectText');
                 if (clientText) {
-                    clientText.textContent = targetClient;
+                    const disp = targetClientName ? (targetClientCompany && targetClientCompany.toLowerCase() !== targetClientName.toLowerCase() ? `${targetClientName} (${targetClientCompany})` : targetClientName) : targetClientCompany;
+                    clientText.textContent = disp;
                     clientText.style.color = 'var(--ink-900)';
                     clientText.style.fontWeight = '600';
                 }
@@ -1525,7 +1925,37 @@
             }
         }
 
-        loadMilestonesForProject(project.id);
+        applyProjectTypeFormLayout(normType, false);
+
+        if (normType === 'Milestone Based Project') {
+            resetTaskSection();
+            const budgetInput = document.getElementById('modalBudget');
+            if (budgetInput) budgetInput.value = '';
+            const bHint = document.getElementById('budgetAutoHint');
+            if (bHint) bHint.style.display = 'none';
+            loadMilestonesForProject(project.id);
+        } else if (normType === 'Task Based Project') {
+            resetMilestoneDropdown();
+            const budgetInput = document.getElementById('modalBudget');
+            if (budgetInput) budgetInput.value = '';
+            const bHint = document.getElementById('budgetAutoHint');
+            if (bHint) bHint.style.display = 'none';
+            loadBillableTasksForProject(project.id);
+        } else {
+            // Direct Project
+            resetMilestoneDropdown();
+            resetTaskSection();
+            const bVal = project.budget ? Number(project.budget) : '';
+            const bInput = document.getElementById('modalBudget');
+            if (bInput) bInput.value = bVal;
+            const bHint = document.getElementById('budgetAutoHint');
+            if (bHint) bHint.style.display = bVal ? 'inline' : 'none';
+            const amtInput = document.getElementById('modalAmount');
+            if (amtInput) {
+                amtInput.value = bVal;
+            }
+            calculateTotals();
+        }
     }
 
     function clearSelectedProject(e) {
@@ -1533,6 +1963,7 @@
         const projIdInput = document.getElementById('modalProjectSelect');
         const projText = document.getElementById('projectSelectText');
         const projClear = document.getElementById('projectClearBtn');
+        const projTypeInput = document.getElementById('modalProjectType');
 
         if (projIdInput) projIdInput.value = '';
         if (projText) {
@@ -1541,8 +1972,33 @@
             projText.style.fontWeight = 'normal';
         }
         if (projClear) projClear.style.display = 'none';
+        if (projTypeInput) projTypeInput.value = 'Direct Project';
+        const summaryBox = document.getElementById('projectInvoiceSummaryBox');
+        if (summaryBox) summaryBox.style.display = 'none';
 
         resetMilestoneDropdown();
+        resetTaskSection();
+
+        const budgetInput = document.getElementById('modalBudget');
+        if (budgetInput) budgetInput.value = '';
+        const bHint = document.getElementById('budgetAutoHint');
+        if (bHint) bHint.style.display = 'none';
+
+        const msAmountInput = document.getElementById('modalMilestoneAmount');
+        if (msAmountInput) msAmountInput.value = '';
+
+        const taskAmtInput = document.getElementById('modalTaskAmount');
+        if (taskAmtInput) taskAmtInput.value = '';
+
+        const amtInput = document.getElementById('modalAmount');
+        if (amtInput) {
+            amtInput.value = '';
+        }
+        const autoHint = document.getElementById('milestoneAutoHint');
+        if (autoHint) autoHint.style.display = 'none';
+
+        applyProjectTypeFormLayout('Direct Project', false);
+        calculateTotals();
     }
 
     function resetMilestoneDropdown() {
@@ -1553,6 +2009,7 @@
         const countBadge = document.getElementById('modalMilestoneCountBadge');
         const warning = document.getElementById('milestoneWarning');
         const autoHint = document.getElementById('milestoneAutoHint');
+        const msAmountInput = document.getElementById('modalMilestoneAmount');
 
         if (msSelect) {
             msSelect.innerHTML = '<option value="">-- Select Project First --</option>';
@@ -1560,6 +2017,7 @@
         }
         if (msIdInput) msIdInput.value = '';
         if (msNameInput) msNameInput.value = '';
+        if (msAmountInput) msAmountInput.value = '';
         if (msMsg) { msMsg.style.display = 'none'; msMsg.textContent = ''; }
         if (countBadge) countBadge.textContent = '';
         if (warning) warning.style.display = 'none';
@@ -1712,7 +2170,12 @@
         if (!selectedId) {
             if (msIdInput) msIdInput.value = '';
             if (msNameInput) msNameInput.value = '';
+            const msAmtInput = document.getElementById('modalMilestoneAmount');
+            if (msAmtInput) msAmtInput.value = '';
+            const amountInput = document.getElementById('modalAmount');
+            if (amountInput) amountInput.value = '';
             if (autoHint) autoHint.style.display = 'none';
+            calculateTotals();
             return;
         }
 
@@ -1726,12 +2189,14 @@
 
     function populateMilestoneDetails(milestone) {
         const amountInput = document.getElementById('modalAmount');
+        const msAmtInput = document.getElementById('modalMilestoneAmount');
         const dueInput = document.getElementById('modalDueDate');
         const notesInput = document.getElementById('modalNotes');
         const autoHint = document.getElementById('milestoneAutoHint');
 
         const amount = Number(milestone.amount > 0 ? milestone.amount : (milestone.effectiveAmount || 0));
         if (amountInput) amountInput.value = amount;
+        if (msAmtInput) msAmtInput.value = amount;
         if (autoHint) autoHint.style.display = amount > 0 ? 'inline' : 'none';
 
         if (milestone.dueDate && dueInput) {
@@ -1747,13 +2212,36 @@
 
     async function openCreateInvoiceModal() {
         document.getElementById('modalInvId').value = '0';
-        document.getElementById('invModalTitle').textContent = 'Create Milestone Invoice';
-        document.getElementById('modalAmount').value = '';
+        document.getElementById('invModalTitle').textContent = 'Add Invoice';
+        const ptInput = document.getElementById('modalProjectType');
+        if (ptInput) ptInput.value = 'Direct Project';
+        const summaryBox = document.getElementById('projectInvoiceSummaryBox');
+        if (summaryBox) summaryBox.style.display = 'none';
+
+        const bInput = document.getElementById('modalBudget');
+        if (bInput) bInput.value = '';
+        const msAmtInput = document.getElementById('modalMilestoneAmount');
+        if (msAmtInput) msAmtInput.value = '';
+        const taskAmtInput = document.getElementById('modalTaskAmount');
+        if (taskAmtInput) taskAmtInput.value = '';
+        const bHint = document.getElementById('budgetAutoHint');
+        if (bHint) bHint.style.display = 'none';
+
+        const amtInput = document.getElementById('modalAmount');
+        if (amtInput) {
+            amtInput.value = '';
+            amtInput.readOnly = true;
+            amtInput.style.background = '#f8fafc';
+            amtInput.style.cursor = 'not-allowed';
+        }
+
         document.getElementById('modalDiscount').value = '0';
         document.getElementById('modalTaxRate').value = '18';
         document.getElementById('modalNotes').value = '';
-        document.getElementById('milestoneWarning').style.display = 'none';
-        document.getElementById('milestoneAutoHint').style.display = 'none';
+        const warn1 = document.getElementById('milestoneWarning');
+        if (warn1) warn1.style.display = 'none';
+        const autoHint1 = document.getElementById('milestoneAutoHint');
+        if (autoHint1) autoHint1.style.display = 'none';
 
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('modalInvDate').value = today;
@@ -1764,7 +2252,7 @@
         try {
             const res = await fetch('/api/invoices/next-code');
             const data = await res.json();
-            document.getElementById('modalInvNumber').value = data.invoiceNumber || 'INV-0001';
+            document.getElementById('modalInvNumber').value = data.InvoiceNumber || data.invoiceNumber || 'INV-0001';
         } catch {
             document.getElementById('modalInvNumber').value = 'INV-0001';
         }
@@ -1772,6 +2260,8 @@
         clearSelectedClient();
         clearSelectedProject();
         resetMilestoneDropdown();
+        resetTaskSection();
+        applyProjectTypeFormLayout('Direct Project', false);
 
         calculateTotals();
         document.getElementById('invoiceModal').style.display = 'flex';
@@ -1786,7 +2276,8 @@
         document.getElementById('modalInvNumber').value = inv.invoiceNumber;
         document.getElementById('modalInvDate').value = inv.invoiceDate || '';
         document.getElementById('modalDueDate').value = inv.dueDate || '';
-        document.getElementById('modalAmount').value = inv.amount || 0;
+        const editAmtInput = document.getElementById('modalAmount');
+        if (editAmtInput) editAmtInput.value = inv.amount || 0;
         document.getElementById('modalDiscount').value = inv.discount || 0;
 
         const taxSel = document.getElementById('modalTaxRate');
@@ -1822,8 +2313,10 @@
         }
 
         document.getElementById('modalNotes').value = inv.notes || '';
-        document.getElementById('milestoneWarning').style.display = 'none';
-        document.getElementById('milestoneAutoHint').style.display = 'none';
+        const warn2 = document.getElementById('milestoneWarning');
+        if (warn2) warn2.style.display = 'none';
+        const autoHint2 = document.getElementById('milestoneAutoHint');
+        if (autoHint2) autoHint2.style.display = 'none';
 
         // Set Client in searchable dropdown
         const clientCompany = inv.clientCompany || inv.clientName || '';
@@ -1831,10 +2324,70 @@
         const clientId = inv.clientId || '';
         selectClient(clientId, clientName, clientCompany);
 
-        // Set Project in searchable dropdown and load milestone
+        // Find project and its type
+        let project = null;
         if (inv.projectId) {
+            project = allProjects.find(p => p.id === inv.projectId);
             selectProject(inv.projectId);
-            await loadMilestonesForProject(inv.projectId, inv.milestoneId, /* isEdit */ true);
+        }
+
+        const projectType = project ? (project.projectType || 'Direct Project') : (inv.milestoneId ? 'Milestone Based Project' : 'Direct Project');
+        const normType = getNormalizedProjectType(projectType);
+
+        const ptInput = document.getElementById('modalProjectType');
+        if (ptInput) ptInput.value = project ? project.projectType : normType;
+
+        applyProjectTypeFormLayout(normType, true);
+
+        // Keep the saved amount and handle type specifics
+        document.getElementById('modalAmount').value = inv.amount || 0;
+
+        if (normType === 'Milestone Based Project') {
+            resetTaskSection();
+            const msAmtInput = document.getElementById('modalMilestoneAmount');
+            if (msAmtInput) msAmtInput.value = inv.amount || 0;
+            const bInput = document.getElementById('modalBudget');
+            if (bInput) bInput.value = '';
+            if (inv.projectId) {
+                await loadMilestonesForProject(inv.projectId, inv.milestoneId, /* isEdit */ true);
+            }
+        } else if (normType === 'Task Based Project') {
+            resetMilestoneDropdown();
+            const taskAmtInput = document.getElementById('modalTaskAmount');
+            if (taskAmtInput) taskAmtInput.value = inv.amount || 0;
+            const bInput = document.getElementById('modalBudget');
+            if (bInput) bInput.value = '';
+            // In edit mode for Task Based, allow adjusting amount if needed
+            const amtInput = document.getElementById('modalAmount');
+            if (amtInput) {
+                amtInput.readOnly = false;
+                amtInput.style.background = '#fff';
+                amtInput.style.cursor = 'text';
+            }
+            if (inv.projectId) {
+                let preselected = [];
+                if (inv.notes) {
+                    const match = inv.notes.match(/\[Tasks:([0-9,]+)\]/);
+                    if (match) {
+                        preselected = match[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+                    }
+                }
+                await loadBillableTasksForProject(inv.projectId, preselected);
+                // Ensure amount is preserved
+                if (amtInput) amtInput.value = inv.amount || 0;
+                if (taskAmtInput) taskAmtInput.value = inv.amount || 0;
+            }
+        } else {
+            resetMilestoneDropdown();
+            resetTaskSection();
+            const bInput = document.getElementById('modalBudget');
+            if (bInput) bInput.value = inv.amount || 0;
+            const amtInput = document.getElementById('modalAmount');
+            if (amtInput) {
+                amtInput.readOnly = false;
+                amtInput.style.background = '#fff';
+                amtInput.style.cursor = 'text';
+            }
         }
 
         calculateTotals();
@@ -1900,8 +2453,6 @@
         const isEdit = id > 0;
 
         const projectId = parseInt(document.getElementById('modalProjectSelect').value, 10);
-        const milestoneVal = document.getElementById('modalMilestoneId').value;
-        const milestoneId = milestoneVal ? parseInt(milestoneVal, 10) : null;
         let clientName = (document.getElementById('modalClientSelect')?.value || '').trim();
         const clientId = (document.getElementById('modalClientId')?.value || '').trim();
 
@@ -1915,8 +2466,42 @@
             return;
         }
 
-        if (!milestoneId) {
-            showToast('Please select an eligible milestone for this invoice', true);
+        const project = allProjects.find(p => p.id === projectId);
+        const projectType = project ? (project.projectType || 'Direct Project') : (document.getElementById('modalProjectType')?.value || 'Direct Project');
+        const normType = getNormalizedProjectType(projectType);
+
+        const subtotal = parseFloat(document.getElementById('modalAmount').value) || 0;
+        let milestoneId = null;
+        let taskIds = null;
+
+        // Validation per type
+        if (normType === 'Milestone Based Project') {
+            const milestoneVal = document.getElementById('modalMilestoneId').value;
+            milestoneId = milestoneVal ? parseInt(milestoneVal, 10) : null;
+            if (!milestoneId) {
+                showToast('Please select an eligible milestone for this invoice', true);
+                return;
+            }
+        } else if (normType === 'Task Based Project') {
+            const checkedBoxes = document.querySelectorAll('.billable-task-checkbox:checked');
+            taskIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value, 10)).filter(n => !isNaN(n));
+            if (!isEdit && (!taskIds || taskIds.length === 0)) {
+                showToast('Please select at least one completed task to bill', true);
+                return;
+            }
+        }
+
+        // Validate dates & discount
+        const invDate = document.getElementById('modalInvDate')?.value;
+        const dueDate = document.getElementById('modalDueDate')?.value;
+        if (invDate && dueDate && new Date(dueDate) < new Date(invDate)) {
+            showToast('Due Date cannot be earlier than Invoice Date', true);
+            return;
+        }
+
+        const discount = parseFloat(document.getElementById('modalDiscount').value) || 0;
+        if (subtotal > 0 && discount > subtotal) {
+            showToast('Discount cannot be greater than Subtotal amount', true);
             return;
         }
 
@@ -1926,18 +2511,22 @@
         const taxType = selectedTaxOpt ? (selectedTaxOpt.getAttribute('data-type') || 'GST') : 'GST';
         const taxName = selectedTaxOpt ? (selectedTaxOpt.getAttribute('data-name') || '') : '';
 
+        const matchedClient = allClients.find(c => (clientId && (c.clientId === clientId || c.leadId === clientId)) || (c.companyName === clientName || c.clientName === clientName));
+        const resolvedCompany = matchedClient ? (matchedClient.companyName || clientName) : clientName;
+        const resolvedContact = matchedClient ? (matchedClient.clientName || clientName) : clientName;
+
         const payload = {
             id: id,
             projectId: projectId,
-            milestoneId: milestoneId,
+            milestoneId: normType === 'Milestone Based Project' ? milestoneId : null,
+            taskIds: normType === 'Task Based Project' ? taskIds : null,
             invoiceNumber: document.getElementById('modalInvNumber').value.trim(),
             clientId: clientId,
-            clientName: clientName,
-            clientCompany: clientName,
-            invoiceDate: document.getElementById('modalInvDate').value,
-            dueDate: document.getElementById('modalDueDate').value,
-            amount: parseFloat(document.getElementById('modalAmount').value) || 0,
-            discount: parseFloat(document.getElementById('modalDiscount').value) || 0,
+            clientName: resolvedContact,
+            clientCompany: resolvedCompany,
+            invoiceDate: invDate,
+            dueDate: dueDate,
+            discount: discount,
             taxRate: taxRate,
             taxName: taxName,
             taxType: taxType,
@@ -1963,16 +2552,23 @@
                 if (res.status === 409) {
                     const warn = document.getElementById('milestoneWarning');
                     if (warn) {
-                        warn.textContent = 'An invoice already exists for this milestone.';
+                        warn.textContent = errMsg;
                         warn.style.display = 'block';
                     }
                 }
                 throw new Error(errMsg);
             }
 
+            const savedInvoice = await res.json().catch(() => ({}));
             showToast(isEdit ? 'Invoice updated successfully' : 'Invoice created successfully');
             closeInvoiceModal();
             await loadInvoicesFromServer();
+
+            // Automatically open the View Invoice section for the created/updated invoice
+            const openId = savedInvoice?.Id || savedInvoice?.id || id;
+            if (openId) {
+                generatePdfForInvoice(openId);
+            }
         } catch (err) {
             showToast(err.message, true);
         } finally {
@@ -2254,11 +2850,15 @@
 
     async function generatePdfForInvoice(id) {
         try {
-            showToast('Loading Invoice PDF...');
+            showToast('Loading Invoice Preview...');
             const res = await fetch(`/api/invoices/${id}/pdf`);
-            if (!res.ok) throw new Error('Failed to load PDF data');
+            if (!res.ok) throw new Error('Failed to load invoice details');
             const data = await res.json();
             renderPdfDocument(data);
+            const titleEl = document.getElementById('pdfPreviewModalTitle');
+            if (titleEl) titleEl.textContent = `Tax Invoice #${data.InvoiceNumber || data.invoiceNumber || id}`;
+            const fullPageBtn = document.getElementById('btnPreviewOpenFullPage');
+            if (fullPageBtn) fullPageBtn.href = `/Finance/InvoiceDetails/${id}`;
             document.getElementById('pdfPreviewModal').style.display = 'flex';
         } catch (err) {
             showToast(err.message, true);
@@ -2304,9 +2904,59 @@
         return 'Rupees ' + str.trim() + ' Only';
     }
 
-    function renderPdfDocument(pdf) {
+    function renderPdfDocument(rawPdf) {
         const area = document.getElementById('pdfPrintableArea');
-        if (!area) return;
+        if (!area || !rawPdf) return;
+
+        const pdf = {
+            id: rawPdf.Id !== undefined ? rawPdf.Id : rawPdf.id,
+            invoiceNumber: rawPdf.InvoiceNumber || rawPdf.invoiceNumber || 'INV-0000',
+            paymentStatus: rawPdf.PaymentStatus || rawPdf.paymentStatus || 'Pending',
+            companyName: rawPdf.CompanyName || rawPdf.companyName || 'Vision CRM Technologies Pvt. Ltd.',
+            companyAddress: rawPdf.CompanyAddress || rawPdf.companyAddress || '',
+            companyEmail: rawPdf.CompanyEmail || rawPdf.companyEmail || '',
+            companyPhone: rawPdf.CompanyPhone || rawPdf.companyPhone || '',
+            companyGstin: rawPdf.CompanyGstin || rawPdf.companyGstin || '',
+            companyPan: rawPdf.CompanyPan || rawPdf.companyPan || '',
+            companyWebsite: rawPdf.CompanyWebsite || rawPdf.companyWebsite || '',
+            clientCompany: rawPdf.ClientCompany || rawPdf.clientCompany || rawPdf.ClientName || rawPdf.clientName || 'Client Organization',
+            clientName: rawPdf.ClientName || rawPdf.clientName || '',
+            clientEmail: rawPdf.ClientEmail || rawPdf.clientEmail || '',
+            clientMobile: rawPdf.ClientMobile || rawPdf.clientMobile || '',
+            invoiceDate: rawPdf.InvoiceDate || rawPdf.invoiceDate || '—',
+            dueDate: rawPdf.DueDate || rawPdf.dueDate || '—',
+            projectName: rawPdf.ProjectName || rawPdf.projectName || '',
+            projectCode: rawPdf.ProjectCode || rawPdf.projectCode || '',
+            milestoneName: rawPdf.MilestoneName || rawPdf.milestoneName || 'Milestone Deliverable Scope',
+            milestoneCode: rawPdf.MilestoneCode || rawPdf.milestoneCode || 'MLS',
+            milestoneDescription: rawPdf.MilestoneDescription || rawPdf.milestoneDescription || rawPdf.Notes || rawPdf.notes || '',
+            milestoneProgressPercent: rawPdf.MilestoneProgressPercent !== undefined ? rawPdf.MilestoneProgressPercent : (rawPdf.milestoneProgressPercent !== undefined ? rawPdf.milestoneProgressPercent : 100),
+            quantity: rawPdf.Quantity !== undefined ? rawPdf.Quantity : (rawPdf.quantity !== undefined ? rawPdf.quantity : 1),
+            unitPrice: rawPdf.UnitPrice !== undefined ? rawPdf.UnitPrice : (rawPdf.unitPrice !== undefined ? rawPdf.unitPrice : (rawPdf.Subtotal !== undefined ? rawPdf.Subtotal : (rawPdf.subtotal !== undefined ? rawPdf.subtotal : (rawPdf.Amount !== undefined ? rawPdf.Amount : (rawPdf.amount || 0))))),
+            subtotal: rawPdf.Subtotal !== undefined ? rawPdf.Subtotal : (rawPdf.subtotal !== undefined ? rawPdf.subtotal : (rawPdf.Amount !== undefined ? rawPdf.Amount : (rawPdf.amount || 0))),
+            discount: rawPdf.Discount !== undefined ? rawPdf.Discount : (rawPdf.discount || 0),
+            taxableAmount: rawPdf.TaxableAmount !== undefined ? rawPdf.TaxableAmount : (rawPdf.taxableAmount || 0),
+            taxRate: rawPdf.TaxRate !== undefined ? rawPdf.TaxRate : (rawPdf.taxRate || 0),
+            taxAmount: rawPdf.TaxAmount !== undefined ? rawPdf.TaxAmount : (rawPdf.taxAmount !== undefined ? rawPdf.taxAmount : (rawPdf.Tax !== undefined ? rawPdf.Tax : (rawPdf.tax || 0))),
+            taxName: rawPdf.TaxName || rawPdf.taxName || '',
+            taxType: (rawPdf.TaxType || rawPdf.taxType || 'GST').trim().toUpperCase(),
+            cgstRate: rawPdf.CgstRate !== undefined ? rawPdf.CgstRate : rawPdf.cgstRate,
+            cgstAmount: rawPdf.CgstAmount !== undefined ? rawPdf.CgstAmount : rawPdf.cgstAmount,
+            sgstRate: rawPdf.SgstRate !== undefined ? rawPdf.SgstRate : rawPdf.sgstRate,
+            sgstAmount: rawPdf.SgstAmount !== undefined ? rawPdf.SgstAmount : rawPdf.sgstAmount,
+            igstRate: rawPdf.IgstRate !== undefined ? rawPdf.IgstRate : rawPdf.igstRate,
+            igstAmount: rawPdf.IgstAmount !== undefined ? rawPdf.IgstAmount : rawPdf.igstAmount,
+            grandTotal: rawPdf.GrandTotal !== undefined ? rawPdf.GrandTotal : (rawPdf.grandTotal || 0),
+            paidAmount: rawPdf.PaidAmount !== undefined ? rawPdf.PaidAmount : (rawPdf.paidAmount || 0),
+            remainingAmount: rawPdf.RemainingAmount !== undefined ? rawPdf.RemainingAmount : (rawPdf.remainingAmount !== undefined ? rawPdf.remainingAmount : 0),
+            bankName: rawPdf.BankName || rawPdf.bankName || 'HDFC Bank Ltd.',
+            bankAccountName: rawPdf.BankAccountName || rawPdf.bankAccountName || 'Vision CRM Technologies Pvt. Ltd.',
+            bankAccountNumber: rawPdf.BankAccountNumber || rawPdf.bankAccountNumber || '50200012345678',
+            bankIfsc: rawPdf.BankIfsc || rawPdf.bankIfsc || 'HDFC0000123',
+            upiId: rawPdf.UpiId || rawPdf.upiId || 'visioncrm@hdfcbank',
+            notes: rawPdf.Notes || rawPdf.notes || '',
+            paymentHistory: rawPdf.PaymentHistory || rawPdf.paymentHistory || rawPdf.Payments || rawPdf.payments || []
+        };
 
         const isPaid = pdf.paymentStatus === 'Paid';
         const isOverdue = pdf.paymentStatus === 'Overdue';
@@ -2314,15 +2964,21 @@
         const statusBg = isPaid ? '#dcfce7' : isOverdue ? '#fee2e2' : '#fffbeb';
         const statusBorder = isPaid ? '#86efac' : isOverdue ? '#fca5a5' : '#fde68a';
 
-        const paymentRows = (pdf.paymentHistory || []).map(p => `
+        const paymentRows = (pdf.paymentHistory || []).map(p => {
+            const payNum = p.PaymentNumber || p.paymentNumber || 'REC';
+            const payDate = p.PaymentDate || p.paymentDate || '—';
+            const payMethod = p.PaymentMethod || p.paymentMethod || 'Bank Transfer';
+            const payRef = p.TransactionReference || p.transactionReference || '—';
+            const payAmt = p.Amount !== undefined ? p.Amount : (p.amount || 0);
+            return `
             <tr style="border-bottom:1px solid #f1f5f9;font-size:12px;">
-                <td style="padding:7px 10px;font-family:monospace;font-weight:700;color:#4f46e5;">${escapeHtml(p.paymentNumber)}</td>
-                <td style="padding:7px 10px;color:#334155;">${escapeHtml(p.paymentDate || '—')}</td>
-                <td style="padding:7px 10px;font-weight:600;color:#0f172a;">${escapeHtml(p.paymentMethod || 'Bank Transfer')}</td>
-                <td style="padding:7px 10px;color:#64748b;font-family:monospace;">${escapeHtml(p.transactionReference || '—')}</td>
-                <td style="padding:7px 10px;text-align:right;font-weight:800;color:#059669;">${formatCurrency(p.amount)}</td>
-            </tr>
-        `).join('');
+                <td style="padding:7px 10px;font-family:monospace;font-weight:700;color:#4f46e5;">${escapeHtml(payNum)}</td>
+                <td style="padding:7px 10px;color:#334155;">${escapeHtml(payDate)}</td>
+                <td style="padding:7px 10px;font-weight:600;color:#0f172a;">${escapeHtml(payMethod)}</td>
+                <td style="padding:7px 10px;color:#64748b;font-family:monospace;">${escapeHtml(payRef)}</td>
+                <td style="padding:7px 10px;text-align:right;font-weight:800;color:#059669;">${formatCurrency(payAmt)}</td>
+            </tr>`;
+        }).join('');
 
         const subtotal = Number(pdf.subtotal || 0);
         const discount = Number(pdf.discount || 0);
@@ -2389,20 +3045,22 @@
                     </div>
                 </div>
 
-                <!-- Scope / Milestone Description Table -->
+                <!-- Scope / Line Items Table -->
                 <div style="margin-bottom:1.5rem;">
                     <table style="width:100%;border-collapse:collapse;font-size:13px;">
                         <thead>
                             <tr style="background:#f1f5f9;border-top:1px solid #cbd5e1;border-bottom:2px solid #cbd5e1;font-size:11.5px;text-align:left;color:#475569;">
-                                <th style="padding:8px 10px;">#</th>
-                                <th style="padding:8px 10px;">Milestone Scope &amp; Deliverables Description</th>
-                                <th style="padding:8px 10px;text-align:center;">Milestone Code</th>
-                                <th style="padding:8px 10px;text-align:right;">Amount (₹)</th>
+                                <th style="padding:8px 10px;text-align:center;width:40px;">#</th>
+                                <th style="padding:8px 10px;">Product / Service Details</th>
+                                <th style="padding:8px 10px;text-align:center;width:120px;">Milestone Code</th>
+                                <th style="padding:8px 10px;text-align:center;width:70px;">Quantity</th>
+                                <th style="padding:8px 10px;text-align:right;width:110px;">Price (₹)</th>
+                                <th style="padding:8px 10px;text-align:right;width:120px;">Subtotal (₹)</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="padding:12px 10px;color:#64748b;font-weight:700;">1</td>
+                                <td style="padding:12px 10px;color:#64748b;font-weight:700;text-align:center;">1</td>
                                 <td style="padding:12px 10px;">
                                     <strong style="color:#0f172a;font-size:13.5px;">${escapeHtml(pdf.milestoneName)}</strong>
                                     <div style="font-size:12px;color:#64748b;margin-top:3px;line-height:1.4;">
@@ -2413,6 +3071,8 @@
                                     </div>
                                 </td>
                                 <td style="padding:12px 10px;text-align:center;font-family:monospace;font-weight:700;color:#4f46e5;">${escapeHtml(pdf.milestoneCode || 'MLS')}</td>
+                                <td style="padding:12px 10px;text-align:center;font-weight:600;">${pdf.quantity || 1}</td>
+                                <td style="padding:12px 10px;text-align:right;font-weight:700;color:#334155;">${formatCurrency(pdf.unitPrice || pdf.subtotal)}</td>
                                 <td style="padding:12px 10px;text-align:right;font-weight:800;font-size:14px;color:#0f172a;">${formatCurrency(pdf.subtotal)}</td>
                             </tr>
                         </tbody>
@@ -2453,14 +3113,31 @@
                             <span>Taxable Amount:</span>
                             <strong>${formatCurrency(pdf.taxableAmount || taxable)}</strong>
                         </div>
-                        <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
-                            <span>CGST (${pdf.cgstRate || halfRate}%):</span>
-                            <strong>${formatCurrency(pdf.cgstAmount || halfTax)}</strong>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
-                            <span>SGST (${pdf.sgstRate || halfRate}%):</span>
-                            <strong>${formatCurrency(pdf.sgstAmount || halfTax)}</strong>
-                        </div>
+                        ${pdf.taxRate === 0 ? '' : pdf.taxType === 'IGST' ? `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>IGST (${pdf.taxRate || 0}%):</span>
+                                <strong>${formatCurrency(pdf.taxAmount || 0)}</strong>
+                            </div>
+                        ` : pdf.taxType === 'CGST' ? `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>CGST (${pdf.taxRate || 0}%):</span>
+                                <strong>${formatCurrency(pdf.taxAmount || 0)}</strong>
+                            </div>
+                        ` : pdf.taxType === 'SGST' ? `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>SGST (${pdf.taxRate || 0}%):</span>
+                                <strong>${formatCurrency(pdf.taxAmount || 0)}</strong>
+                            </div>
+                        ` : `
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>CGST (${pdf.cgstRate !== undefined ? pdf.cgstRate : halfRate}%):</span>
+                                <strong>${formatCurrency(pdf.cgstAmount !== undefined ? pdf.cgstAmount : halfTax)}</strong>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#64748b;">
+                                <span>SGST (${pdf.sgstRate !== undefined ? pdf.sgstRate : halfRate}%):</span>
+                                <strong>${formatCurrency(pdf.sgstAmount !== undefined ? pdf.sgstAmount : halfTax)}</strong>
+                            </div>
+                        `}
                         <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #4f46e5;border-bottom:2px solid #4f46e5;margin:6px 0;font-size:15px;font-weight:900;color:#0f172a;">
                             <span>Total Payable Amount:</span>
                             <span style="color:#4f46e5;">${formatCurrency(pdf.grandTotal)}</span>

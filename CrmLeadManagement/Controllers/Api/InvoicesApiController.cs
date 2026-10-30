@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using CrmLeadManagement.Models;
 using CrmLeadManagement.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -26,6 +27,32 @@ public class InvoicesApiController : ControllerBase
     {
         _db = db;
         _logger = logger;
+    }
+
+    private static HashSet<int> ParseBilledTaskIds(IEnumerable<string?> notesList)
+    {
+        var billed = new HashSet<int>();
+        var regex = new Regex(@"\[Tasks:([0-9, ]+)\]", RegexOptions.IgnoreCase);
+        foreach (var note in notesList)
+        {
+            if (string.IsNullOrWhiteSpace(note)) continue;
+            var matches = regex.Matches(note);
+            foreach (Match match in matches)
+            {
+                if (match.Success && match.Groups.Count > 1)
+                {
+                    var idParts = match.Groups[1].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    foreach (var part in idParts)
+                    {
+                        if (int.TryParse(part, out var tid))
+                        {
+                            billed.Add(tid);
+                        }
+                    }
+                }
+            }
+        }
+        return billed;
     }
 
     private string NextInvoiceNumber()
@@ -87,6 +114,52 @@ public class InvoicesApiController : ControllerBase
         return Ok(new { invoiceNumber = NextInvoiceNumber() });
     }
 
+    // GET /api/invoices/billable-tasks?projectId=1
+    [HttpGet("billable-tasks")]
+    public async Task<ActionResult<IEnumerable<object>>> GetBillableTasks([FromQuery] int projectId)
+    {
+        try
+        {
+            if (projectId <= 0)
+                return BadRequest(new { message = "Valid projectId is required." });
+
+            var project = await _db.WorkProjects.FindAsync(projectId);
+            if (project is null)
+                return NotFound(new { message = $"Project with ID {projectId} not found." });
+
+            var projectInvoiceNotes = await _db.WorkInvoices
+                .Where(i => i.ProjectId == projectId && !string.IsNullOrEmpty(i.Notes))
+                .Select(i => i.Notes)
+                .ToListAsync();
+
+            var billedTaskIds = ParseBilledTaskIds(projectInvoiceNotes);
+
+            var tasks = await _db.WorkTasks
+                .Where(t => t.ProjectId == projectId)
+                .ToListAsync();
+
+            var billableTasks = tasks
+                .Where(t => string.Equals(t.Status, "Completed", StringComparison.OrdinalIgnoreCase) && !billedTaskIds.Contains(t.Id))
+                .OrderBy(t => t.Id)
+                .Select(t => new
+                {
+                    id = t.Id,
+                    taskCode = t.TaskCode ?? "",
+                    taskName = t.TaskName ?? "",
+                    taskAmount = t.TaskAmount,
+                    dueDate = t.DueDate ?? ""
+                })
+                .ToList();
+
+            return Ok(billableTasks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GET /api/invoices/billable-tasks failed for project {ProjectId}", projectId);
+            return StatusCode(500, new { message = "Failed to retrieve billable tasks", error = ex.Message });
+        }
+    }
+
     // GET /api/invoices
     // GET /api/invoices?projectId=1&status=Pending&search=INV
     [HttpGet]
@@ -103,6 +176,15 @@ public class InvoicesApiController : ControllerBase
                 .Include(i => i.Milestone)
                 .Include(i => i.Payments)
                 .AsQueryable();
+
+            // Role‑based filtering: admins/managers see all invoices, others only those linked to accessible projects
+            var currentUser = PermissionChecker.GetCurrentUser(_db, User);
+            var isAdminOrManager = PermissionChecker.IsAdminOrManager(_db, User);
+            if (!isAdminOrManager && currentUser != null)
+            {
+                var accessibleProjectIds = await ProjectAccessPolicy.GetAccessibleProjectIdsAsync(_db, User);
+                query = query.Where(i => accessibleProjectIds.Contains(i.ProjectId));
+            }
 
             if (projectId.HasValue && projectId.Value > 0)
                 query = query.Where(i => i.ProjectId == projectId.Value);
@@ -239,8 +321,20 @@ public class InvoicesApiController : ControllerBase
                 return BadRequest(new { message = $"Project with ID {input.ProjectId} does not exist." });
 
             WorkMilestone? milestone = null;
-            if (input.MilestoneId.HasValue && input.MilestoneId.Value > 0)
+            decimal subtotal = 0m;
+            string finalNotes = input.Notes?.Trim() ?? "";
+
+            bool isTaskBased = string.Equals(project.ProjectType, "Task Based Project", StringComparison.OrdinalIgnoreCase) ||
+                               (project.ProjectType != null && project.ProjectType.Contains("Task", StringComparison.OrdinalIgnoreCase));
+
+            bool isMilestoneBased = string.Equals(project.ProjectType, "Milestone Based Project", StringComparison.OrdinalIgnoreCase) ||
+                                   (project.ProjectType != null && project.ProjectType.Contains("Milestone", StringComparison.OrdinalIgnoreCase));
+
+            if (isMilestoneBased)
             {
+                if (!input.MilestoneId.HasValue || input.MilestoneId.Value <= 0)
+                    return BadRequest(new { message = "Milestone is required for Milestone Based projects." });
+
                 milestone = await _db.WorkMilestones
                     .Include(m => m.Tasks)
                     .FirstOrDefaultAsync(m => m.Id == input.MilestoneId.Value && m.ProjectId == input.ProjectId);
@@ -254,6 +348,69 @@ public class InvoicesApiController : ControllerBase
                 {
                     return Conflict(new { message = "An invoice already exists for this milestone." });
                 }
+
+                subtotal = input.Amount > 0
+                    ? input.Amount
+                    : (milestone.Amount > 0 ? milestone.Amount : milestone.EffectiveAmount);
+            }
+            else if (!isTaskBased) // Direct Project
+            {
+                input.MilestoneId = null;
+                milestone = null;
+
+                if (input.Amount <= 0)
+                    return BadRequest(new { message = "Amount must be greater than 0 for Direct Projects." });
+
+                subtotal = input.Amount;
+
+                if (project.Budget > 0)
+                {
+                    var existingInvoiced = await _db.WorkInvoices
+                        .Where(i => i.ProjectId == project.Id)
+                        .SumAsync(i => i.Amount);
+
+                    if (existingInvoiced + subtotal > project.Budget)
+                    {
+                        var remainingBudget = Math.Max(0, project.Budget - existingInvoiced);
+                        return BadRequest(new { message = $"Invoice amount ({subtotal:F2}) exceeds remaining project budget ({remainingBudget:F2}). Total project budget is {project.Budget:F2}." });
+                    }
+                }
+            }
+            else // Task Based Project
+            {
+                input.MilestoneId = null;
+                milestone = null;
+
+                if (input.TaskIds == null || !input.TaskIds.Any())
+                    return BadRequest(new { message = "At least one completed task must be selected for Task Based projects." });
+
+                var distinctTaskIds = input.TaskIds.Distinct().ToList();
+
+                var tasks = await _db.WorkTasks
+                    .Where(t => distinctTaskIds.Contains(t.Id) && t.ProjectId == project.Id)
+                    .ToListAsync();
+
+                if (tasks.Count != distinctTaskIds.Count)
+                    return BadRequest(new { message = "One or more selected tasks do not belong to this project." });
+
+                var incompleteTasks = tasks.Where(t => !string.Equals(t.Status, "Completed", StringComparison.OrdinalIgnoreCase)).ToList();
+                if (incompleteTasks.Any())
+                    return BadRequest(new { message = $"All selected tasks must be Completed. Task '{incompleteTasks.First().TaskName}' has status '{incompleteTasks.First().Status}'." });
+
+                var projectInvoiceNotes = await _db.WorkInvoices
+                    .Where(i => i.ProjectId == project.Id && !string.IsNullOrEmpty(i.Notes))
+                    .Select(i => i.Notes)
+                    .ToListAsync();
+                var billedTaskIds = ParseBilledTaskIds(projectInvoiceNotes);
+
+                var alreadyBilled = distinctTaskIds.Where(tid => billedTaskIds.Contains(tid)).ToList();
+                if (alreadyBilled.Any())
+                    return BadRequest(new { message = "One or more selected tasks have already been invoiced." });
+
+                subtotal = tasks.Sum(t => t.TaskAmount);
+
+                var taskMarker = $"[Tasks:{string.Join(",", distinctTaskIds)}]";
+                finalNotes = string.IsNullOrWhiteSpace(finalNotes) ? taskMarker : $"{finalNotes} {taskMarker}";
             }
 
             if (string.IsNullOrWhiteSpace(input.InvoiceDate))
@@ -269,9 +426,6 @@ public class InvoicesApiController : ControllerBase
                     return BadRequest(new { message = "Due Date cannot be before Invoice Date." });
             }
 
-            var subtotal = milestone is null
-                ? Math.Max(0, input.Amount)
-                : (milestone.Amount > 0 ? milestone.Amount : milestone.EffectiveAmount);
             var discount = Math.Max(0, input.Discount);
             if (discount > subtotal)
                 discount = subtotal;
@@ -285,14 +439,14 @@ public class InvoicesApiController : ControllerBase
                 ? NextInvoiceNumber()
                 : input.InvoiceNumber.Trim().ToUpper();
 
-            // Client fallback from project if empty
-            var clientName = milestone is not null
-                ? project.ClientName ?? ""
-                : (!string.IsNullOrWhiteSpace(input.ClientName) ? input.ClientName.Trim() : project.ClientName ?? "");
+            // Prioritize user entered/selected client name, then fallback to project
+            var clientName = !string.IsNullOrWhiteSpace(input.ClientName)
+                ? input.ClientName.Trim()
+                : (project.ClientName ?? "");
 
-            var clientCompany = milestone is not null
-                ? project.ClientCompany ?? ""
-                : (!string.IsNullOrWhiteSpace(input.ClientCompany) ? input.ClientCompany.Trim() : project.ClientCompany ?? "");
+            var clientCompany = !string.IsNullOrWhiteSpace(input.ClientCompany)
+                ? input.ClientCompany.Trim()
+                : (!string.IsNullOrWhiteSpace(project.ClientCompany) ? project.ClientCompany : clientName);
 
             var leads = await _db.Leads.AsNoTracking().ToListAsync();
 
@@ -326,7 +480,7 @@ public class InvoicesApiController : ControllerBase
                 PaymentDate        = "",
                 IsRecurring        = input.IsRecurring,
                 RecurringFrequency = input.RecurringFrequency?.Trim() ?? "",
-                Notes              = input.Notes?.Trim() ?? "",
+                Notes              = finalNotes,
                 CreatedDate        = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm")
             };
 
@@ -533,12 +687,21 @@ public class InvoicesApiController : ControllerBase
             if (!string.IsNullOrWhiteSpace(input.ClientId))
                 invoice.ClientId = input.ClientId.Trim();
 
-            invoice.ClientName         = selectedMilestone is not null ? project?.ClientName ?? "" : input.ClientName?.Trim() ?? invoice.ClientName;
-            invoice.ClientCompany      = selectedMilestone is not null ? project?.ClientCompany ?? "" : input.ClientCompany?.Trim() ?? invoice.ClientCompany;
+            if (!string.IsNullOrWhiteSpace(input.ClientName))
+                invoice.ClientName = input.ClientName.Trim();
+            else if (!string.IsNullOrWhiteSpace(project?.ClientName))
+                invoice.ClientName = project.ClientName;
+
+            if (!string.IsNullOrWhiteSpace(input.ClientCompany))
+                invoice.ClientCompany = input.ClientCompany.Trim();
+            else if (!string.IsNullOrWhiteSpace(project?.ClientCompany))
+                invoice.ClientCompany = project.ClientCompany;
+            else if (!string.IsNullOrWhiteSpace(invoice.ClientName))
+                invoice.ClientCompany = invoice.ClientName;
             
-            var subtotal = selectedMilestone is null
-                ? Math.Max(0, input.Amount)
-                : (selectedMilestone.Amount > 0 ? selectedMilestone.Amount : selectedMilestone.EffectiveAmount);
+            var subtotal = input.Amount > 0
+                ? input.Amount
+                : (selectedMilestone is not null ? (selectedMilestone.Amount > 0 ? selectedMilestone.Amount : selectedMilestone.EffectiveAmount) : invoice.Amount);
             var discount = Math.Max(0, input.Discount);
             if (discount > subtotal) discount = subtotal;
 
@@ -718,6 +881,7 @@ public class InvoicesApiController : ControllerBase
 
             var pdfDto = new InvoicePdfDto
             {
+                Id                       = dto.Id,
                 CompanyName              = "Vision CRM Technologies Pvt. Ltd.",
                 CompanyAddress           = "Level 5, Tower B, Cyber City, Bangalore - 560103, Karnataka, India",
                 CompanyEmail             = "billing@visioncrm.com",
@@ -738,6 +902,8 @@ public class InvoicesApiController : ControllerBase
                 MilestoneCode            = dto.MilestoneCode,
                 MilestoneDescription      = dto.MilestoneDescription,
                 MilestoneProgressPercent = dto.MilestoneProgressPercent,
+                Quantity                 = 1,
+                UnitPrice                = dto.Amount,
                 Subtotal                 = dto.Amount,
                 Discount                 = dto.Discount,
                 TaxableAmount            = taxableAmount,
@@ -806,21 +972,23 @@ public class InvoicesApiController : ControllerBase
 
         var clientCompany = !string.IsNullOrWhiteSpace(inv.ClientCompany)
             ? inv.ClientCompany
-            : (inv.Project?.ClientCompany ?? "");
+            : (!string.IsNullOrWhiteSpace(inv.Project?.ClientCompany) ? inv.Project.ClientCompany : clientName);
 
         // Find email and mobile from lead records
-        var matchedLead = leads.FirstOrDefault(l =>
-            (!string.IsNullOrWhiteSpace(l.LeadName) && string.Equals(l.LeadName, clientName, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrWhiteSpace(l.CompanyName) && string.Equals(l.CompanyName, clientCompany, StringComparison.OrdinalIgnoreCase)) ||
-            (!string.IsNullOrWhiteSpace(l.CompanyName) && string.Equals(l.CompanyName, clientName, StringComparison.OrdinalIgnoreCase)));
+        var matchedLead = (!string.IsNullOrWhiteSpace(inv.ClientId) ? leads.FirstOrDefault(l => l.LeadId == inv.ClientId) : null)
+            ?? leads.FirstOrDefault(l =>
+                (!string.IsNullOrWhiteSpace(l.LeadName) && string.Equals(l.LeadName, clientName, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(l.CompanyName) && string.Equals(l.CompanyName, clientCompany, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(l.CompanyName) && string.Equals(l.CompanyName, clientName, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(l.LeadName) && string.Equals(l.LeadName, clientCompany, StringComparison.OrdinalIgnoreCase)));
 
         var clientEmail = matchedLead?.Email ?? "";
         var clientMobile = matchedLead?.MobileNumber ?? "";
 
         var milestoneName = inv.Milestone?.MilestoneName ?? (inv.MilestoneId.HasValue ? $"Milestone #{inv.MilestoneId}" : "Project Level");
         var milestoneCode = inv.Milestone?.MilestoneCode ?? "";
-        var milestoneDesc = inv.Milestone?.Description ?? "";
-        var milestoneProgress = inv.Milestone?.ProgressPercent ?? 0;
+        var milestoneDesc = inv.Milestone?.Description ?? (inv.Notes ?? "");
+        var milestoneProgress = inv.Milestone?.ProgressPercent ?? 100;
 
         return new InvoiceResponseDto
         {
@@ -841,6 +1009,8 @@ public class InvoicesApiController : ControllerBase
             ClientMobile             = clientMobile,
             InvoiceDate              = inv.InvoiceDate ?? "",
             DueDate                  = inv.DueDate ?? "",
+            Quantity                 = 1,
+            UnitPrice                = inv.Amount,
             Amount                   = inv.Amount,
             TaxRate                  = inv.TaxRate,
             Tax                      = inv.Tax,
@@ -877,6 +1047,7 @@ public class InvoiceInputDto
     public int? Id { get; set; }
     public int ProjectId { get; set; }
     public int? MilestoneId { get; set; }
+    public List<int>? TaskIds { get; set; }
     public string? InvoiceNumber { get; set; }
     public string? ClientId { get; set; }
     public string? ClientName { get; set; }
@@ -912,6 +1083,8 @@ public class InvoiceResponseDto
     public string ClientMobile { get; set; } = "";
     public string InvoiceDate { get; set; } = "";
     public string DueDate { get; set; } = "";
+    public int Quantity { get; set; } = 1;
+    public decimal UnitPrice { get; set; }
     public decimal Amount { get; set; }
     public decimal TaxRate { get; set; }
     public decimal Tax { get; set; }
@@ -946,6 +1119,7 @@ public class PaymentItemDto
 
 public class InvoicePdfDto
 {
+    public int Id { get; set; }
     public string CompanyName { get; set; } = "";
     public string CompanyAddress { get; set; } = "";
     public string CompanyEmail { get; set; } = "";
@@ -966,6 +1140,8 @@ public class InvoicePdfDto
     public string MilestoneCode { get; set; } = "";
     public string MilestoneDescription { get; set; } = "";
     public int MilestoneProgressPercent { get; set; }
+    public int Quantity { get; set; } = 1;
+    public decimal UnitPrice { get; set; }
     public decimal Subtotal { get; set; }
     public decimal Discount { get; set; }
     public decimal TaxableAmount { get; set; }

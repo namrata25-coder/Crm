@@ -4,6 +4,10 @@
     ViewData["Title"] = "Projects";
     var employees = ViewData["Employees"] as List<string> ?? new();
     var clients = ViewData["Clients"] as dynamic;
+
+    var canCreate = (bool)(ViewData["CanCreateProject"] ?? false);
+    var canEdit   = (bool)(ViewData["CanEditProject"]   ?? false);
+    var canDelete = (bool)(ViewData["CanDeleteProject"] ?? false);
 }
 
 <div class="page-header">
@@ -11,9 +15,12 @@
         <h1 class="page-title"><i class="bi bi-folder2-open" style="color:var(--brand-600);"></i> Projects</h1>
         <p class="page-sub">Manage, track, and monitor all work projects dynamically</p>
     </div>
-    <button class="btn btn-primary" onclick="openAddProjectModal()">
-        <i class="bi bi-plus-lg"></i> Add Project
-    </button>
+    @if (canCreate)
+    {
+        <button class="btn btn-primary" onclick="openAddProjectModal()">
+            <i class="bi bi-plus-lg"></i> Add Project
+        </button>
+    }
 </div>
 
 <!-- STATS SUMMARY CARDS -->
@@ -63,9 +70,12 @@
             <i class="bi bi-folder-plus" style="font-size:3rem;color:var(--ink-300);"></i>
             <h4 style="margin-top:1rem;font-weight:700;color:var(--ink-700);">No projects created yet</h4>
             <p style="color:var(--ink-500);margin-bottom:1.25rem;">Start by creating your first dynamic project with milestones and tasks.</p>
-            <button class="btn btn-primary" onclick="openAddProjectModal()">
-                <i class="bi bi-plus-lg"></i> Create First Project
-            </button>
+            @if (canCreate)
+            {
+                <button class="btn btn-primary" onclick="openAddProjectModal()">
+                    <i class="bi bi-plus-lg"></i> Create First Project
+                </button>
+            }
         </div>
 
         <!-- Dynamic Table Container -->
@@ -224,6 +234,9 @@
 <script src="~/js/project/project-api.js"></script>
 <script>
 let projectsData = [];
+const PAGE_CAN_CREATE = @Json.Serialize(canCreate);
+const PAGE_CAN_EDIT   = @Json.Serialize(canEdit);
+const PAGE_CAN_DELETE = @Json.Serialize(canDelete);
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -389,9 +402,7 @@ function renderProjects(projects) {
                     <a class="btn-action btn-view" href="/Work/ProjectDetails?id=${id}" title="View Project Details">
                         <i class="bi bi-eye"></i>
                     </a>
-                    <button type="button" class="btn-action btn-edit" onclick="openEditProjectModalById(${id})" title="Edit Project">
-                        <i class="bi bi-pencil"></i>
-                    </button>
+                    ${PAGE_CAN_EDIT ? `<button type="button" class="btn-action btn-edit" onclick="openEditProjectModalById(${id})" title="Edit Project"><i class="bi bi-pencil"></i></button>` : ""}
                     <button type="button" class="btn-action btn-delete" onclick="handleDeleteProject(${id}, '${escapeHtml(name).replace(/'/g, "\\'")}')" title="Delete Project">
                         <i class="bi bi-trash"></i>
                     </button>

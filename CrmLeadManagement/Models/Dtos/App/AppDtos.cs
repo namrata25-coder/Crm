@@ -386,6 +386,9 @@ public class AppLeadStatsDto
     [JsonPropertyName("unassigned")]
     public int Unassigned { get; set; }
 
+    [JsonPropertyName("totalProjects")]
+    public int TotalProjects { get; set; }
+
     [JsonPropertyName("new")]
     public int New { get; set; }
 
@@ -421,15 +424,27 @@ public class AppLeadStatsDto
 }
 
 /// <summary>
-/// Hybrid envelope supporting both flat keys and standard 'data' envelope.
+/// Response envelope for /api/v1/app/leads/stats.
 /// </summary>
-public class AppLeadStatsEnvelope : AppLeadStatsDto
+public class AppLeadStatsEnvelope
 {
     [JsonPropertyName("success")]
     public bool Success { get; set; } = true;
 
     [JsonPropertyName("message")]
     public string Message { get; set; } = "Lead statistics retrieved successfully.";
+
+    [JsonPropertyName("total")]
+    public int Total { get; set; }
+
+    [JsonPropertyName("assigned")]
+    public int Assigned { get; set; }
+
+    [JsonPropertyName("unassigned")]
+    public int Unassigned { get; set; }
+
+    [JsonPropertyName("totalProjects")]
+    public int TotalProjects { get; set; }
 
     [JsonPropertyName("data")]
     public AppLeadStatsDto? Data { get; set; }

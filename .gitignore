@@ -4,6 +4,9 @@
 [Ll]og/
 [Ll]ogs/
 *.log
+bin/
+obj/
+appsettings.Development.json
 
 # Visual Studio / VS Code
 .vs/

@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using CrmLeadManagement.Models;
 using CrmLeadManagement.Models.Dtos.App;
 using CrmLeadManagement.Services;
@@ -44,186 +46,142 @@ public class AppAuthController : ControllerBase
     /// Strictly verifies that the credentials belong to an actual Admin or Super Admin account in the database.
     /// Rejects regular users with HTTP 403 Forbidden.
     /// </summary>
-    [HttpPost("admin-login")]
+    [HttpPost("admin-login", Order = 1)]
+    [HttpPost("admin-login/", Order = 2)]
     [Consumes("application/json")]
     [AllowAnonymous]
     [EnableRateLimiting("AuthRateLimit")]
     public async Task<IActionResult> AdminLogin([FromBody] AppLoginRequest request)
     {
-        request.Role = "admin";
         return await ExecuteLogin(request, requiredRole: "admin");
     }
 
     /// <summary>
-    /// Dedicated User Login API endpoint.
-    /// Strictly verifies that the credentials belong to an authorized User account in the database.
-    /// Rejects Admin accounts with HTTP 403 Forbidden.
+    /// User Login API endpoint.
+    /// Authenticates users and administrators for the mobile application.
     /// </summary>
-    [HttpPost("user-login")]
+    [HttpPost("user-login", Order = 1)]
+    [HttpPost("user-login/", Order = 2)]
     [Consumes("application/json")]
     [AllowAnonymous]
     [EnableRateLimiting("AuthRateLimit")]
     public async Task<IActionResult> UserLogin([FromBody] AppLoginRequest request)
     {
-        request.Role = "user";
-        return await ExecuteLogin(request, requiredRole: "user");
+        return await ExecuteLogin(request, requiredRole: null);
     }
 
     /// <summary>
-    /// Authenticates a user with email and password, returning an opaque Bearer token.
+    /// Authenticates a user or administrator with email/user ID and password, returning an opaque Bearer token.
     /// Rate-limited to 10 requests per minute per IP.
     /// Supports /api/v1/app/auth/login, /api/auth/login, /auth/login, and /login for JSON requests.
     /// </summary>
-    [HttpPost("login")]
-    [HttpPost("/auth/login")]
-    [HttpPost("/login")]
+    [HttpPost("login", Order = 1)]
+    [HttpPost("login/", Order = 2)]
+    [HttpPost("/auth/login", Order = 3)]
+    [HttpPost("/auth/login/", Order = 4)]
+    [HttpPost("/login", Order = 5)]
+    [HttpPost("/login/", Order = 6)]
     [Consumes("application/json")]
     [AllowAnonymous]
     [EnableRateLimiting("AuthRateLimit")]
     public async Task<IActionResult> Login([FromBody] AppLoginRequest request)
     {
-        var targetRole = request.Role ?? request.Portal;
-        return await ExecuteLogin(request, requiredRole: targetRole);
+        return await ExecuteLogin(request, requiredRole: null);
     }
 
     private async Task<IActionResult> ExecuteLogin(AppLoginRequest request, string? requiredRole)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-        var input = (request.Email ?? request.UserId ?? "").Trim();
+
+        // Input: email (ya UserId) aur password. Input ko Trim() aur ToLower() karo, password ko trim mat karo.
+        var rawInput = request.Email ?? request.UserId ?? request.Username ?? "";
+        var input = rawInput.Trim().ToLowerInvariant();
         var password = request.Password ?? "";
 
-        if (string.IsNullOrWhiteSpace(input) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(input) || string.IsNullOrEmpty(password))
         {
-            var msg = string.Equals(requiredRole, "admin", StringComparison.OrdinalIgnoreCase)
-                ? "Please enter both Admin ID and Password."
-                : "Please enter both User ID and Password.";
-            return BadRequest(new AppApiError { Message = msg });
+            _logger.LogWarning("Login failed: missing email/userId or password from IP {IP}", ip);
+            return Unauthorized(new { success = false, message = "Invalid email or password." });
         }
 
-        // =====================================================================
-        // 1. ADMIN LOGIN API
-        // =====================================================================
-        if (string.Equals(requiredRole, "admin", StringComparison.OrdinalIgnoreCase))
-        {
-            bool isAdminId = string.Equals(input, "admin", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(input, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(input, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase);
-
-            if (!isAdminId || password != "admin123")
-            {
-                _logger.LogWarning("Admin API login failed for {Input} from IP {IP}", input, ip);
-                return Unauthorized(new AppApiError { Message = "Invalid Admin ID or Password." });
-            }
-
-            var adminUser = await _db.Users.FirstOrDefaultAsync(u =>
-                (u.UserId != null && u.UserId.ToLower() == "admin") ||
-                (u.Email != null && (u.Email.ToLower() == "admin" || u.Email.ToLower() == "admin@visioncrm.com" || u.Email.ToLower() == "admin@nimbuscrm.com")) ||
-                u.Role == "Admin");
-
-            if (adminUser == null)
-            {
-                adminUser = new UserRoleEntry
-                {
-                    UserId = "admin",
-                    Name = "Administrator",
-                    Email = "admin@visioncrm.com",
-                    Role = "Admin",
-                    Status = "Active",
-                    IsAuthorizedUser = false
-                };
-                adminUser.PasswordHash = _passwordHasher.HashPassword(adminUser, "admin123");
-                _db.Users.Add(adminUser);
-                await _db.SaveChangesAsync();
-            }
-            else
-            {
-                adminUser.UserId = "admin";
-                adminUser.Role = "Admin";
-                adminUser.Status = "Active";
-                if (string.IsNullOrWhiteSpace(adminUser.PasswordHash) ||
-                    _passwordHasher.VerifyHashedPassword(adminUser, adminUser.PasswordHash, "admin123") != PasswordVerificationResult.Success)
-                {
-                    adminUser.PasswordHash = _passwordHasher.HashPassword(adminUser, "admin123");
-                    await _db.SaveChangesAsync();
-                }
-            }
-
-            adminUser.FailedLoginCount = 0;
-            adminUser.LockoutUntil = null;
-            adminUser.LastLoginAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-
-            var (adminPlainToken, adminExpiresAt) = await _tokenService.IssueTokenAsync(adminUser.Id, request.DeviceId);
-
-            return Ok(new AppLoginResponse
-            {
-                Token = adminPlainToken,
-                TokenType = "Bearer",
-                ExpiresAt = adminExpiresAt,
-                User = new AppUserProfileDto
-                {
-                    Id = adminUser.Id,
-                    Name = adminUser.Name,
-                    Email = adminUser.Email,
-                    Role = "Admin"
-                }
-            });
-        }
-
-        // =====================================================================
-        // 2. USER LOGIN API
-        // =====================================================================
-        bool isAdminInput = string.Equals(input, "admin", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(input, "admin@visioncrm.com", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(input, "admin@nimbuscrm.com", StringComparison.OrdinalIgnoreCase);
-
-        if (isAdminInput && password == "admin123")
-        {
-            _logger.LogWarning("Admin credentials entered on User API login from IP {IP}", ip);
-            return StatusCode(StatusCodes.Status403Forbidden, new AppApiError
-            {
-                Message = "Access denied. Administrator credentials cannot be used on the User Login portal. Please use the Admin Portal."
-            });
-        }
-
+        // User dhundo: Email, UserId ya Name (case-insensitive) se. Sirf ek hi match use karo.
         int.TryParse(input, out var numericId);
         var user = await _db.Users.FirstOrDefaultAsync(u =>
-            (u.UserId != null && u.UserId.ToLower() == input.ToLower()) ||
-            (numericId > 0 && u.Id == numericId) ||
-            (u.Email != null && u.Email.ToLower() == input.ToLower()) ||
-            (u.Name != null && u.Name.ToLower() == input.ToLower()));
+            (u.Email != null && u.Email.ToLower() == input) ||
+            (u.UserId != null && u.UserId.ToLower() == input) ||
+            (u.Name != null && u.Name.ToLower() == input) ||
+            (numericId > 0 && u.Id == numericId));
 
         if (user == null)
         {
-            _logger.LogWarning("Failed login for unregistered User ID/Email: {Input} from IP: {IP}", input, ip);
-            return Unauthorized(new AppApiError { Message = "Invalid User ID or Password. Please register first if you don't have an account." });
+            _logger.LogWarning("Login failed: user not found for email/userId '{Input}' from IP {IP}", input, ip);
+            return Unauthorized(new { success = false, message = "Invalid email or password." });
         }
 
-        if (user.IsAdminAccount)
+        // If hitting dedicated admin endpoint, ensure user has Admin authority
+        if (string.Equals(requiredRole, "admin", StringComparison.OrdinalIgnoreCase) && !user.IsAdminAccount)
         {
-            _logger.LogWarning("User API login rejected for Admin account {Email} from IP: {IP}", user.Email, ip);
-            return StatusCode(StatusCodes.Status403Forbidden, new AppApiError
-            {
-                Message = "Access denied. Administrator credentials cannot be used on the User Login portal. Please use the Admin Portal."
-            });
+            _logger.LogWarning("Admin login rejected for non-admin user '{Email}' from IP {IP}", user.Email, ip);
+            return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = "Access denied. Valid Admin credentials are required." });
         }
 
+        // Status check: agar user Inactive hai to 403 do with clear message ("Your account is inactive").
+        if (!string.Equals(user.Status, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Login rejected: inactive account for '{Email}' (Status: {Status}) from IP {IP}", user.Email, user.Status, ip);
+            return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = "Your account is inactive." });
+        }
+
+        // Lockout: LockoutUntil aur FailedLoginCount ka existing logic rakho.
         var now = DateTime.UtcNow;
         if (user.LockoutUntil.HasValue && user.LockoutUntil > now)
         {
-            _logger.LogWarning("Login attempt on locked account User {UserId} ({Email}) from IP: {IP}", user.Id, user.Email, ip);
-            return StatusCode(StatusCodes.Status423Locked, new AppApiError
-            {
-                Message = "Account is temporarily locked due to multiple failed login attempts. Please try again later."
-            });
+            _logger.LogWarning("Login rejected: account '{Email}' is temporarily locked until {LockoutUntil} from IP {IP}", user.Email, user.LockoutUntil, ip);
+            return StatusCode(StatusCodes.Status423Locked, new { success = false, message = "Account is temporarily locked. Please try again later." });
         }
 
+        // Password verify:
+        // Supports:
+        // 1. PasswordHasher<UserRoleEntry> (PBKDF2)
+        // 2. Legacy Plain-text
+        // 3. Legacy SHA-256 hex
         bool passwordValid = false;
+        bool needsRehash = false;
+
         if (!string.IsNullOrWhiteSpace(user.PasswordHash))
         {
             var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
-            passwordValid = verifyResult == PasswordVerificationResult.Success ||
-                            verifyResult == PasswordVerificationResult.SuccessRehashNeeded;
+            if (verifyResult == PasswordVerificationResult.Success)
+            {
+                passwordValid = true;
+            }
+            else if (verifyResult == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                passwordValid = true;
+                needsRehash = true;
+            }
+            else if (string.Equals(user.PasswordHash, password, StringComparison.Ordinal))
+            {
+                // Plain-text match (legacy migration)
+                passwordValid = true;
+                needsRehash = true;
+            }
+            else
+            {
+                // SHA-256 match (legacy)
+                var sha256Hex = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(password)));
+                if (string.Equals(user.PasswordHash, sha256Hex, StringComparison.OrdinalIgnoreCase))
+                {
+                    passwordValid = true;
+                    needsRehash = true;
+                }
+            }
+        }
+        else if (user.IsAdminAccount && password == "admin123")
+        {
+            // Initial uninitialized admin password bootstrap
+            passwordValid = true;
+            needsRehash = true;
         }
 
         if (!passwordValid)
@@ -232,41 +190,49 @@ public class AppAuthController : ControllerBase
             if (user.FailedLoginCount >= 5)
             {
                 user.LockoutUntil = now.AddMinutes(15);
-                _logger.LogWarning("User {UserId} ({Email}) locked out for 15 minutes due to 5 failed login attempts from IP: {IP}", user.Id, user.Email, ip);
+                _logger.LogWarning("Account '{Email}' locked out for 15 minutes due to 5 consecutive failed login attempts from IP {IP}", user.Email, ip);
             }
             await _db.SaveChangesAsync();
-            return Unauthorized(new AppApiError { Message = "Invalid User ID or Password. Please register first if you don't have an account." });
+
+            _logger.LogWarning("Login failed: wrong password for '{Email}' (Attempt #{Attempts}) from IP {IP}", user.Email, user.FailedLoginCount, ip);
+            return Unauthorized(new { success = false, message = "Invalid email or password." });
         }
 
-        if (!string.Equals(user.Status, "Active", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning("Login attempted on inactive account User {UserId} ({Email}) from IP: {IP}", user.Id, user.Email, ip);
-            return StatusCode(StatusCodes.Status403Forbidden, new AppApiError
-            {
-                Message = "User account is inactive. Please contact an administrator."
-            });
-        }
-
+        // Sahi login par count reset karo
         user.FailedLoginCount = 0;
         user.LockoutUntil = null;
         user.LastLoginAt = now;
+
+        // Upgrade hash to latest format if needed
+        if (needsRehash)
+        {
+            user.PasswordHash = _passwordHasher.HashPassword(user, password);
+            _logger.LogInformation("Upgraded password hash for '{Email}' to standard PasswordHasher format", user.Email);
+        }
+
         await _db.SaveChangesAsync();
 
+        // Success par AccessTokens table me token banao (TokenHash save karo, plain token nahi)
         var (plainToken, expiresAt) = await _tokenService.IssueTokenAsync(user.Id, request.DeviceId);
 
-        _logger.LogInformation("Successful login for user {UserId} ({Email}) from IP: {IP}, Device: {Device}", user.Id, user.Email, ip, request.DeviceId);
+        _logger.LogInformation("Login successful for '{Email}' (ID: {Id}, Role: {Role}) from IP {IP}, Device: {Device}", user.Email, user.Id, user.Role, ip, request.DeviceId);
 
-        return Ok(new AppLoginResponse
+        // Success JSON return format
+        return Ok(new
         {
-            Token = plainToken,
-            TokenType = "Bearer",
-            ExpiresAt = expiresAt,
-            User = new AppUserProfileDto
+            success = true,
+            message = "Login successful.",
+            data = new
             {
-                Id = user.Id,
-                Name = user.Name,
-                Email = user.Email,
-                Role = user.Role
+                token = plainToken,
+                expiresAt = expiresAt.ToString("o"),
+                user = new
+                {
+                    id = user.Id,
+                    name = user.Name ?? "",
+                    email = user.Email ?? "",
+                    role = user.Role ?? ""
+                }
             }
         });
     }
